@@ -36,3 +36,6 @@ crashlytics-build.properties
 
 # Packages lockfile - keep tracked for reproducible resolves
 !Packages/packages-lock.json
+.localssl/
+Builds/
+zcv.log

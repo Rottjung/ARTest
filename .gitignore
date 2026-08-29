@@ -39,3 +39,8 @@ crashlytics-build.properties
 .localssl/
 Builds/
 zcv.log
+
+# GitHub Pages site - the generic [Bb]uild/ rule above also matches this,
+# so explicitly un-ignore it (this is a real published site, not build output)
+!docs/Build/
+!docs/Build/*

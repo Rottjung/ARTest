@@ -11,6 +11,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/BuildingTest.unity
     guid: f30ef99f11eb13d40bcdc3743ca7bdeb
+  - enabled: 1
+    path: Assets/Scenes/UCI-RE.unity
+    guid: 7471594727dc8854fa0a7042203f5629
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

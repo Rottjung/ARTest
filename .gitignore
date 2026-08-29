@@ -40,7 +40,8 @@ crashlytics-build.properties
 Builds/
 zcv.log
 
-# GitHub Pages site - the generic [Bb]uild/ rule above also matches this,
-# so explicitly un-ignore it (this is a real published site, not build output)
-!docs/Build/
-!docs/Build/*
+# GitHub Pages sites (possibly multiple, one per scene, in subfolders) - the
+# generic [Bb]uild/ rule above also matches these, so explicitly un-ignore them
+# (these are real published sites, not regenerable build output)
+!docs/**/Build/
+!docs/**/Build/*

@@ -8,7 +8,7 @@ namespace ARReveal.EditorTools
         [MenuItem("ARReveal/Fix/Diagnose UCIProxy Scale")]
         public static void Run()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FBX/UCIProxy.fbx");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/FBX/Proxy.fbx");
             if (prefab == null)
             {
                 Debug.LogError("[DiagnoseProxyScale] Could not load UCIProxy.fbx");

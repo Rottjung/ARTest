@@ -6,6 +6,7 @@ namespace ARReveal.EditorTools
     {
         private const string OutputDir = "Builds/WebGL_UCIRE";
         private const string PagesOutputDir = "docs/uci-re";
+        private const string PagesDevOutputDir = "docs/uci-re-dev";
 
         [MenuItem("ARReveal/UCI-RE/Build WebGL (Brotli)")]
         public static void Run()
@@ -35,6 +36,30 @@ namespace ARReveal.EditorTools
             {
                 scenes = new[] { "Assets/Scenes/UCI-RE.unity" },
                 locationPathName = PagesOutputDir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
+
+            PlayerSettings.WebGL.compressionFormat = previousCompression;
+
+            Log(report);
+        }
+
+        /// <summary>
+        /// Same as above but into docs/uci-re-dev/, a second GitHub Pages URL that's
+        /// separate from the live docs/uci-re/ site - use this to publish in-progress
+        /// changes for review without touching what's currently live.
+        /// </summary>
+        [MenuItem("ARReveal/UCI-RE/Build WebGL for GitHub Pages (dev, uncompressed)")]
+        public static void RunForPagesDev()
+        {
+            var previousCompression = PlayerSettings.WebGL.compressionFormat;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/UCI-RE.unity" },
+                locationPathName = PagesDevOutputDir,
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None
             });

@@ -9,6 +9,10 @@ namespace ARReveal
     /// TentacleController.Grow() so the crack spreads and the hole opens right as the
     /// tentacle pushes through.
     ///
+    /// Sequence on Open(): a spiderweb pre-crack flash across the whole decal, then
+    /// the hole itself grows outward with a glowing crack ring at its edge that
+    /// settles once fully open.
+    ///
     /// No device plane detection involved - the "wall" is the proxy mesh already
     /// anchored to the real facade via image tracking, so this decal is just placed at
     /// a known point/orientation on that mesh, same trick as the tentacle burst points.
@@ -18,7 +22,11 @@ namespace ARReveal
     {
         public enum State { Closed, Opening, Open }
 
-        [Header("Timing")]
+        [Header("Pre-crack flash (fires first, on trigger)")]
+        public float PreCrackRiseDuration = 0.08f;
+        public float PreCrackFadeDuration = 0.25f;
+
+        [Header("Hole opening")]
         public float OpenDuration = 1.0f;
         public AnimationCurve ProgressCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
@@ -34,8 +42,10 @@ namespace ARReveal
         private MaterialPropertyBlock _props;
         private float _openStartTime = -1f;
 
+        private static readonly int ActiveId = Shader.PropertyToID("_Active");
         private static readonly int ProgressId = Shader.PropertyToID("_Progress");
         private static readonly int GlowId = Shader.PropertyToID("_GlowIntensity");
+        private static readonly int PreCrackId = Shader.PropertyToID("_PreCrackIntensity");
 
         public State CurrentState { get; private set; } = State.Closed;
 
@@ -43,6 +53,7 @@ namespace ARReveal
         {
             _renderer = GetComponent<MeshRenderer>();
             _props = new MaterialPropertyBlock();
+            Hide();
         }
 
         private void Start()
@@ -50,7 +61,7 @@ namespace ARReveal
             if (OpenOnStart) Invoke(nameof(Open), OpenOnStartDelay);
         }
 
-        /// <summary>Starts the crack-spread + hole-opening. Call alongside TentacleController.Grow().</summary>
+        /// <summary>Starts the pre-crack flash + hole-opening. Call alongside TentacleController.Grow().</summary>
         public void Open()
         {
             CurrentState = State.Opening;
@@ -61,7 +72,7 @@ namespace ARReveal
         public void Hide()
         {
             CurrentState = State.Closed;
-            SetProps(0f, 0f);
+            SetProps(0f, 0f, 0f, 0f);
         }
 
         private void Update()
@@ -69,6 +80,11 @@ namespace ARReveal
             if (CurrentState == State.Closed) return;
 
             float elapsed = Time.time - _openStartTime;
+
+            float preCrack = elapsed < PreCrackRiseDuration
+                ? Mathf.Clamp01(elapsed / PreCrackRiseDuration)
+                : Mathf.Clamp01(1f - (elapsed - PreCrackRiseDuration) / PreCrackFadeDuration);
+
             float progress = Mathf.Clamp01(elapsed / OpenDuration);
             float curvedProgress = ProgressCurve.Evaluate(progress);
 
@@ -76,17 +92,19 @@ namespace ARReveal
                 ? Mathf.Clamp01(elapsed / GlowRiseDuration)
                 : Mathf.Clamp01(1f - (elapsed - GlowRiseDuration) / GlowFadeDuration);
 
-            SetProps(curvedProgress, glow);
+            SetProps(1f, curvedProgress, glow, preCrack);
 
             if (progress >= 1f && elapsed >= GlowRiseDuration + GlowFadeDuration)
                 CurrentState = State.Open;
         }
 
-        private void SetProps(float progress, float glow)
+        private void SetProps(float active, float progress, float glow, float preCrack)
         {
             _renderer.GetPropertyBlock(_props);
+            _props.SetFloat(ActiveId, active);
             _props.SetFloat(ProgressId, progress);
             _props.SetFloat(GlowId, glow);
+            _props.SetFloat(PreCrackId, preCrack);
             _renderer.SetPropertyBlock(_props);
         }
     }

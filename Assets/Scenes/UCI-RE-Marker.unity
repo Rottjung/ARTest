@@ -482,6 +482,57 @@ Transform:
   - {fileID: 468690109}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &542577146
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 542577148}
+  - component: {fileID: 542577147}
+  m_Layer: 0
+  m_Name: Zappar Instant Tracker
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &542577147
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542577146}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a7c067e774884e3fb23c00a74bd6040, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparInstantTrackingTarget
+  m_anchorOffsetFromCamera: {x: 0, y: 0, z: -3}
+  m_placeOnTouch: 0
+  MoveAnchorOnZ: 0
+  m_zCamera: {fileID: 0}
+  m_minZDistance: 3
+  m_maxZDistance: 40
+--- !u!4 &542577148
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 542577146}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1790931617}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &703987973 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2536123759706779146, guid: 6dcb212f23971254ea312d3fbd370a89, type: 3}
@@ -498,7 +549,7 @@ GameObject:
   - component: {fileID: 1090348473}
   - component: {fileID: 1090348472}
   - component: {fileID: 1090348471}
-  - component: {fileID: 1090348470}
+  - component: {fileID: 1090348474}
   m_Layer: 0
   m_Name: Zappar Ground Marker
   m_TagString: Untagged
@@ -506,22 +557,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1090348470
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1090348469}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d323325e119e9e84c9224168e70677c9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.RevealOnTrackingFound
-  ContentRoots:
-  - {fileID: 2015250556}
-  BurstSequencer: {fileID: 0}
-  RevealOnlyOnce: 1
 --- !u!114 &1090348471
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -552,9 +587,9 @@ MonoBehaviour:
   OnSeenEvent:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1090348470}
-        m_TargetAssemblyTypeName: ARReveal.RevealOnTrackingFound, Assembly-CSharp
-        m_MethodName: Reveal
+      - m_Target: {fileID: 1090348474}
+        m_TargetAssemblyTypeName: ARReveal.HandoffToInstantTracking, Assembly-CSharp
+        m_MethodName: HandoffOnce
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -580,7 +615,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 2015250560}
   - {fileID: 304636474}
   - {fileID: 1399445220}
   - {fileID: 1204280045}
@@ -590,6 +624,21 @@ Transform:
   - {fileID: 1161496767243868315}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1090348474
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1090348469}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02e8c2e6c0191344199eb8aabcf2b94d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.HandoffToInstantTracking
+  ImageTarget: {fileID: 1090348472}
+  InstantTarget: {fileID: 542577147}
+  ContentWrapper: {fileID: 1790931617}
 --- !u!1001 &1204280044
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -873,6 +922,38 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
+--- !u!1 &1790931616
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1790931617}
+  m_Layer: 0
+  m_Name: ContentWrapper
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1790931617
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1790931616}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 2015250560}
+  m_Father: {fileID: 542577148}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2015250556
 GameObject:
   m_ObjectHideFlags: 0
@@ -978,12 +1059,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2015250556}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 3, y: 0.5, z: 3}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1090348473}
+  m_Father: {fileID: 1790931617}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &163192338892367225
 PrefabInstance:
@@ -1182,3 +1263,4 @@ SceneRoots:
   - {fileID: 523330462}
   - {fileID: 1090348473}
   - {fileID: 1659693631}
+  - {fileID: 542577148}

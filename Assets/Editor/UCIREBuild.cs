@@ -7,6 +7,7 @@ namespace ARReveal.EditorTools
         private const string OutputDir = "Builds/WebGL_UCIRE";
         private const string PagesOutputDir = "docs/uci-re";
         private const string PagesDevOutputDir = "docs/uci-re-dev";
+        private const string PagesMarkerOutputDir = "docs/uci-re-marker";
 
         [MenuItem("ARReveal/UCI-RE/Build WebGL (Brotli)")]
         public static void Run()
@@ -60,6 +61,31 @@ namespace ARReveal.EditorTools
             {
                 scenes = new[] { "Assets/Scenes/UCI-RE.unity" },
                 locationPathName = PagesDevOutputDir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
+
+            PlayerSettings.WebGL.compressionFormat = previousCompression;
+
+            Log(report);
+        }
+
+        /// <summary>
+        /// Builds UCI-RE-Marker.unity (the standalone ground-marker anchoring test)
+        /// into its own docs/uci-re-marker/ URL - separate from both the live site and
+        /// uci-re-dev, since this is a different scene testing a different anchoring
+        /// mechanism entirely, not an iteration on the building-photo tracking.
+        /// </summary>
+        [MenuItem("ARReveal/UCI-RE/Build WebGL for GitHub Pages (marker test, uncompressed)")]
+        public static void RunForPagesMarker()
+        {
+            var previousCompression = PlayerSettings.WebGL.compressionFormat;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/UCI-RE-Marker.unity" },
+                locationPathName = PagesMarkerOutputDir,
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None
             });

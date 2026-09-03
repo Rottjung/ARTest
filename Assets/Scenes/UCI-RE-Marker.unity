@@ -824,6 +824,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Proxy
       objectReference: {fileID: 0}
+    - target: {fileID: 4718829890679737409, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalPosition.x
       value: 34.29

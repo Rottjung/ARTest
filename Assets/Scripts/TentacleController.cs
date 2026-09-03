@@ -11,8 +11,10 @@ namespace ARReveal
     ///        rooftop tentacles that don't need to break through anything solid first.
     ///      - Punch: a jab-retract-burst sequence, purely through non-uniform scale on
     ///        ExtendAxis (the tentacle's own forward axis), anchored at the base (which
-    ///        sits at the wall/hole) - the other two axes stay pinned at 1 throughout,
-    ///        so it's always reaching further out, never puffing up in girth:
+    ///        sits at the wall/hole) - the other two axes stay pinned at this instance's
+    ///        own authored scale throughout (captured once in Awake, so per-burst-point
+    ///        sizing survives), so it's always reaching further out, never puffing up
+    ///        in girth:
     ///          1. Jab - a short, fast, dead-straight poke to just past the surface
     ///             (JabDistance), like only the tip breaking the glass/wall.
     ///          2. Retract - pulls back partway, still straight - the "coiling" beat.
@@ -109,6 +111,7 @@ namespace ARReveal
 
         private Transform[] _bones;
         private Quaternion[] _restLocalRotation;
+        private Vector3 _restLocalScale;
         private float _seedX, _seedY, _seedZ;
         private float _jitterSeedX, _jitterSeedY, _jitterSeedZ;
         private float _reachCurrent;
@@ -126,6 +129,11 @@ namespace ARReveal
             _jitterSeedY = Random.Range(0f, 1000f);
             _jitterSeedZ = Random.Range(0f, 1000f);
 
+            // Captured BEFORE zeroing for Punch's hidden state, so each instance's own
+            // authored size (burst points are often scaled up/down individually) is
+            // preserved as "full size" instead of every tentacle being flattened to a
+            // hardcoded (1,1,1) once it finishes punching out.
+            _restLocalScale = transform.localScale;
             if (Style == GrowStyle.Punch) transform.localScale = Vector3.zero;
         }
 
@@ -234,7 +242,7 @@ namespace ARReveal
 
             if (elapsed >= totalPunch)
             {
-                transform.localScale = Vector3.one;
+                transform.localScale = _restLocalScale;
                 CurrentState = State.Idle;
             }
         }
@@ -249,14 +257,14 @@ namespace ARReveal
                 _bones[i].localRotation = Quaternion.Slerp(_restLocalRotation[i], IdleRotationForBone(i), idleWeight);
         }
 
-        /// <summary>A Vector3 with axisValue on ExtendAxis and 1 on the other two.</summary>
+        /// <summary>_restLocalScale with ExtendAxis multiplied by axisValue (1 = that axis's own full/authored size) - the other two axes stay at their full authored size throughout.</summary>
         private Vector3 AxisScale(float axisValue)
         {
             switch (ExtendAxis)
             {
-                case Axis.X: return new Vector3(axisValue, 1f, 1f);
-                case Axis.Y: return new Vector3(1f, axisValue, 1f);
-                default: return new Vector3(1f, 1f, axisValue);
+                case Axis.X: return new Vector3(axisValue * _restLocalScale.x, _restLocalScale.y, _restLocalScale.z);
+                case Axis.Y: return new Vector3(_restLocalScale.x, axisValue * _restLocalScale.y, _restLocalScale.z);
+                default: return new Vector3(_restLocalScale.x, _restLocalScale.y, axisValue * _restLocalScale.z);
             }
         }
 

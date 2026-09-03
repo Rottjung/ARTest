@@ -380,7 +380,8 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6254768242589877224, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -388,6 +389,11 @@ PrefabInstance:
 --- !u!4 &1020818514 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1020818513}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1020818515 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1020818513}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1134603782
@@ -466,7 +472,8 @@ PrefabInstance:
       propertyPath: ReachStrength
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6254768242589877224, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
@@ -474,6 +481,11 @@ PrefabInstance:
 --- !u!4 &1134603783 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1134603782}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1134603784 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1134603782}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &1183340943
@@ -833,11 +845,17 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6254768242589877224, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+--- !u!1 &1195692855 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1195692854}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1356597909 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
@@ -854,6 +872,7 @@ GameObject:
   - component: {fileID: 1394794543}
   - component: {fileID: 1394794542}
   - component: {fileID: 1394794541}
+  - component: {fileID: 1394794544}
   m_Layer: 0
   m_Name: Zappar Image Tracking Target
   m_TagString: Untagged
@@ -890,7 +909,19 @@ MonoBehaviour:
   PreviewImageObject: {fileID: 0}
   OnSeenEvent:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1394794544}
+        m_TargetAssemblyTypeName: ARReveal.RevealOnTrackingFound, Assembly-CSharp
+        m_MethodName: Reveal
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
   OnNotSeenEvent:
     m_PersistentCalls:
       m_Calls: []
@@ -914,6 +945,26 @@ Transform:
   - {fileID: 1020818514}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1394794544
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1394794540}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d323325e119e9e84c9224168e70677c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.RevealOnTrackingFound
+  ContentRoots:
+  - {fileID: 1717539497}
+  - {fileID: 1195692855}
+  - {fileID: 1502780943}
+  - {fileID: 1134603784}
+  - {fileID: 1020818515}
+  BurstSequencer: {fileID: 0}
+  RevealOnlyOnce: 1
 --- !u!1001 &1502780942
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -986,11 +1037,17 @@ PrefabInstance:
       propertyPath: ReachStrength
       value: 0.36
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6254768242589877224, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+--- !u!1 &1502780943 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1502780942}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1587501315
 GameObject:
   m_ObjectHideFlags: 0
@@ -1196,11 +1253,17 @@ PrefabInstance:
       propertyPath: ReachStrength
       value: 1
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 6254768242589877224, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+--- !u!1 &1717539497 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1717539496}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1874941818 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}

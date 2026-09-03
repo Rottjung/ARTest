@@ -1,75 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &2905998634448287823
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 4092669079036423378}
-    m_Modifications:
-    - target: {fileID: 1607900306868618990, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_Name
-      value: WallHoleDemo
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0.19598289
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -5.9050587e-10
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.7071068
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0.000000008309046
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 90
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
---- !u!4 &6419956313654348573 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-  m_PrefabInstance: {fileID: 2905998634448287823}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4559522620857223993
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -128,10 +58,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6419956313654348573}
+    m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}
       insertIndex: -1
@@ -159,6 +86,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
   RootBone: {fileID: 4691232525764372168}
   Style: 1
+  ExtendAxis: 0
   GrowDuration: 1.2
   GrowCurve:
     serializedVersion: 2
@@ -186,7 +114,8 @@ MonoBehaviour:
     m_RotationOrder: 4
   CurledAngle: 70
   PerBoneGrowDelay: 1
-  ExtendAxis: 0
+  CurlAxisRandomness: 25
+  UnfoldStartExtend: 0.35
   JabDuration: 0.1
   JabDistance: 0.4
   RetractDuration: 0.4
@@ -218,11 +147,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleGrowOnStart
   DelaySeconds: 0.5
---- !u!4 &4092669079036423378 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}
-  m_PrefabInstance: {fileID: 4559522620857223993}
-  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4691232525764372168 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9105212513263037937, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}

@@ -35,11 +35,29 @@ namespace ARReveal
         [Tooltip("Everything that should stay anchored - hidden until handoff, then carries a one-time rotation correction and rides along with the instant tracker's ongoing SLAM tracking.")]
         public Transform ContentWrapper;
 
+        [Header("Testing / capture only - leave off for the real build")]
+        [Tooltip("Skips waiting for the QR and the real instant-tracker handoff entirely, and just reveals ContentWrapper as-authored shortly after Play starts - for recording/screenshotting the burst in-editor without needing a working camera/tracking pipeline. Never enable this on a build meant for actual use.")]
+        public bool DebugAutoReveal = false;
+        public float DebugAutoRevealDelay = 1f;
+
         private bool _handedOff;
 
         private void Awake()
         {
             if (ContentWrapper != null) ContentWrapper.gameObject.SetActive(false);
+        }
+
+        private void Start()
+        {
+            if (DebugAutoReveal) Invoke(nameof(DebugReveal), DebugAutoRevealDelay);
+        }
+
+        /// <summary>Bypasses the QR + instant-tracker handoff entirely - just shows ContentWrapper where it already sits in the scene.</summary>
+        private void DebugReveal()
+        {
+            if (_handedOff) return;
+            _handedOff = true;
+            RevealContent();
         }
 
         /// <summary>Wire this to ImageTarget's OnSeenEvent.</summary>
@@ -70,8 +88,30 @@ namespace ARReveal
             {
                 Quaternion correction = ImageTarget.transform.rotation * Quaternion.Inverse(InstantTarget.transform.rotation);
                 ContentWrapper.localRotation = correction;
-                ContentWrapper.gameObject.SetActive(true);
             }
+            RevealContent();
+        }
+
+        /// <summary>
+        /// Activates ContentWrapper and starts every TentacleController (plus any
+        /// WallHoleEffect/DebrisRing) found under it. SetActive(true) alone isn't
+        /// enough - each tentacle waits for its own Grow() call (Unfold-style ones
+        /// otherwise just sit static in their curled rest pose; Punch-style ones stay
+        /// invisible, since they zero their own scale in Awake() until told to grow).
+        /// Auto-discovered rather than hand-wired so it doesn't need updating every
+        /// time a burst point is added or removed under ContentWrapper.
+        /// </summary>
+        private void RevealContent()
+        {
+            if (ContentWrapper == null) return;
+            ContentWrapper.gameObject.SetActive(true);
+
+            foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true))
+                tentacle.Grow();
+            foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true))
+                hole.Open();
+            foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true))
+                debris.Open();
         }
     }
 }

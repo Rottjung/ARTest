@@ -32,11 +32,21 @@ namespace ARReveal
         [Tooltip("Once revealed, stays revealed even if tracking is later lost and re-found - the burst is a one-time event, not something that should reset every time the camera shakes. Untick if you actually want it to reset on OnNotSeenEvent.")]
         public bool RevealOnlyOnce = true;
 
+        [Header("Testing / capture only - leave off for the real build")]
+        [Tooltip("Skips waiting for real tracking and calls Reveal() automatically shortly after Play starts - for recording/screenshotting the burst in-editor without needing a working camera/tracking pipeline. Never enable this on a build meant for actual use.")]
+        public bool DebugAutoReveal = false;
+        public float DebugAutoRevealDelay = 1f;
+
         private bool _revealed;
 
         private void Awake()
         {
             SetContentActive(false);
+        }
+
+        private void Start()
+        {
+            if (DebugAutoReveal) Invoke(nameof(Reveal), DebugAutoRevealDelay);
         }
 
         /// <summary>Wire this to the tracker's OnSeenEvent.</summary>

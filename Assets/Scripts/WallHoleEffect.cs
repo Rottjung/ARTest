@@ -58,12 +58,30 @@ namespace ARReveal
 
         private void Start()
         {
-            if (OpenOnStart) Invoke(nameof(Open), OpenOnStartDelay);
+            // A coroutine, not Invoke(nameof(Open), ...) - Invoke() only works with
+            // parameterless methods (even a C# default-valued parameter breaks it,
+            // which is exactly what happened when Open() gained forceRestart).
+            if (OpenOnStart) StartCoroutine(OpenAfterDelay());
         }
 
-        /// <summary>Starts the pre-crack flash + hole-opening. Call alongside TentacleController.Grow().</summary>
-        public void Open()
+        private System.Collections.IEnumerator OpenAfterDelay()
         {
+            yield return new WaitForSeconds(OpenOnStartDelay);
+            Open();
+        }
+
+        /// <summary>
+        /// Starts the pre-crack flash + hole-opening. Call alongside TentacleController.Grow().
+        /// A second call while already Opening/Open is a no-op, not a restart -
+        /// without this, anything that accidentally triggers the reveal twice (e.g. a
+        /// tracking-found event firing more than once) would reset _openStartTime and
+        /// snap an already-open hole visibly back toward closed before reopening. Pass
+        /// forceRestart if you actually want that (e.g. deliberately re-triggering a
+        /// burst point from scratch).
+        /// </summary>
+        public void Open(bool forceRestart = false)
+        {
+            if (CurrentState != State.Closed && !forceRestart) return;
             CurrentState = State.Opening;
             _openStartTime = Time.time;
         }

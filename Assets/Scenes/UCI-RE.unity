@@ -141,44 +141,60 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.96000004
+      objectReference: {fileID: 0}
+    - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.96000004
+      objectReference: {fileID: 0}
+    - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 0.96000004
+      objectReference: {fileID: 0}
+    - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 12.2
+      value: 12.9
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -14.9
+      value: -13.7
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 10.5
+      value: 11.8
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalRotation.w
-      value: -0.029754553
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalRotation.x
-      value: -0.009793784
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.9888335
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0.14569534
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: -16.712
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 183.694
+      value: 180
       objectReference: {fileID: 0}
     - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: -1.678
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5347873255061870331, guid: 60307a9e3fcf43547a6e92bd3e420286, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -338,15 +354,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 2.6
+      value: 9.41
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -2.86
+      value: -2.21
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 5.5
+      value: 1.8
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.w
@@ -396,6 +412,39 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1020818513}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1020818516 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 279228223612857479, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1020818513}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c867b9451d6efb74296c473ec06342e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.DebrisRing
+--- !u!114 &1020818517 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5902872862967233394, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1020818513}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &1020818518 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6279771163405468294, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1020818513}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1020818515}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1001 &1134603782
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -422,15 +471,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 20.63488
+      value: 15.2
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 6
+      value: 11.4
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 9.8
+      value: 3.8
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.w
@@ -488,6 +537,39 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1134603782}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1134603785 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 279228223612857479, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1134603782}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c867b9451d6efb74296c473ec06342e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.DebrisRing
+--- !u!114 &1134603786 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5902872862967233394, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1134603782}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &1134603787 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6279771163405468294, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1134603782}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1134603784}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1 &1183340943
 GameObject:
   m_ObjectHideFlags: 0
@@ -803,15 +885,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 1.62
+      value: 2.81
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3
+      value: 8.09
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 6.06
+      value: 0.75
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.w
@@ -856,6 +938,39 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1195692854}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1195692856 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 279228223612857479, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1195692854}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c867b9451d6efb74296c473ec06342e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.DebrisRing
+--- !u!114 &1195692857 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5902872862967233394, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1195692854}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &1195692858 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6279771163405468294, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1195692854}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1195692855}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!4 &1356597909 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
@@ -873,6 +988,7 @@ GameObject:
   - component: {fileID: 1394794542}
   - component: {fileID: 1394794541}
   - component: {fileID: 1394794544}
+  - component: {fileID: 1394794545}
   m_Layer: 0
   m_Name: Zappar Image Tracking Target
   m_TagString: Untagged
@@ -904,7 +1020,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 53a46277bb2e24858882d73be7e2e0a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparImageTrackingTarget
-  Target: IMG_8469.zpt
+  Target: Logos.zpt
   Orientation: 1
   PreviewImageObject: {fileID: 0}
   OnSeenEvent:
@@ -963,8 +1079,48 @@ MonoBehaviour:
   - {fileID: 1502780943}
   - {fileID: 1134603784}
   - {fileID: 1020818515}
-  BurstSequencer: {fileID: 0}
+  BurstSequencer: {fileID: 1394794545}
   RevealOnlyOnce: 1
+--- !u!114 &1394794545
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1394794540}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a733f0a27efdabf4f9c7c0ab74792b88, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.BurstSequencer
+  Points:
+  - Name: Tentacle_01
+    Tentacle: {fileID: 1717539500}
+    Hole: {fileID: 1717539499}
+    Debris: {fileID: 1717539498}
+    Delay: 0
+  - Name: Tentacle_01 (1)
+    Tentacle: {fileID: 1195692858}
+    Hole: {fileID: 1195692857}
+    Debris: {fileID: 1195692856}
+    Delay: 0.12
+  - Name: Tentacle_01 (2)
+    Tentacle: {fileID: 1502780946}
+    Hole: {fileID: 1502780945}
+    Debris: {fileID: 1502780944}
+    Delay: 0.24
+  - Name: Tentacle_01 (3)
+    Tentacle: {fileID: 1134603787}
+    Hole: {fileID: 1134603786}
+    Debris: {fileID: 1134603785}
+    Delay: 0.35999998
+  - Name: Tentacle_01 (4)
+    Tentacle: {fileID: 1020818518}
+    Hole: {fileID: 1020818517}
+    Debris: {fileID: 1020818516}
+    Delay: 0.48
+  PlayOnStart: 0
+  PlayOnStartDelay: 0.5
 --- !u!1001 &1502780942
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -991,15 +1147,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 26.2
+      value: 25.8
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1.49
+      value: 2.7
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 4.4
+      value: 0.9
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1048,72 +1204,39 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1502780942}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1587501315
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1587501318}
-  - component: {fileID: 1587501317}
-  - component: {fileID: 1587501316}
-  m_Layer: 0
-  m_Name: Zappar Image Tracking Target (Corner)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1587501316
+--- !u!114 &1502780944 stripped
 MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 279228223612857479, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1502780942}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1587501315}
+  m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 33496e5c07b4bc442bab9fc3d2003a63, type: 3}
+  m_Script: {fileID: 11500000, guid: c867b9451d6efb74296c473ec06342e3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TrackingDebugOverlay
---- !u!114 &1587501317
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.DebrisRing
+--- !u!114 &1502780945 stripped
 MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  m_CorrespondingSourceObject: {fileID: 5902872862967233394, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1502780942}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1587501315}
+  m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53a46277bb2e24858882d73be7e2e0a4, type: 3}
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparImageTrackingTarget
-  Target: IMG_8439.zpt
-  Orientation: 1
-  PreviewImageObject: {fileID: 0}
-  OnSeenEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  OnNotSeenEvent:
-    m_PersistentCalls:
-      m_Calls: []
---- !u!4 &1587501318
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &1502780946 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6279771163405468294, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1502780942}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1587501315}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_GameObject: {fileID: 1502780943}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!850595691 &1653262850
 LightingSettings:
   m_ObjectHideFlags: 0
@@ -1207,43 +1330,43 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -7.69
+      value: -9.9
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3.86
+      value: 6.39
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 2.27
+      value: -3.97
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.5806327
+      value: 0.64950573
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0.13549913
+      value: -0.053511076
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.7983974
+      value: 0.7503779
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0.08406661
+      value: 0.11050752
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 1.324
+      value: -13.613
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 108.161
+      value: 97.797
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 18.305
+      value: 3.731
       objectReference: {fileID: 0}
     - target: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
       propertyPath: m_ConstrainProportionsScale
@@ -1264,6 +1387,39 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3713152452321654376, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
   m_PrefabInstance: {fileID: 1717539496}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1717539498 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 279228223612857479, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1717539496}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c867b9451d6efb74296c473ec06342e3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.DebrisRing
+--- !u!114 &1717539499 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5902872862967233394, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1717539496}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &1717539500 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6279771163405468294, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
+  m_PrefabInstance: {fileID: 1717539496}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1717539497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!4 &1874941818 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4092669079036423378, guid: f3721adc8eab7ba499c1837d5afeeafd, type: 3}
@@ -1276,5 +1432,4 @@ SceneRoots:
   - {fileID: 644705637}
   - {fileID: 1188162682}
   - {fileID: 1394794543}
-  - {fileID: 1587501318}
   - {fileID: 484516096}

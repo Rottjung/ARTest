@@ -12,6 +12,9 @@ namespace ARReveal
     [RequireComponent(typeof(ZapparImageTrackingTarget))]
     public class TrackingDebugOverlay : MonoBehaviour
     {
+        [Tooltip("Off hides the on-screen label entirely - still tracks found/lost counts underneath, just doesn't draw. Flip this off for the real build/client demo.")]
+        public bool ShowOverlay = true;
+
         private bool _seen = false;
         private int _seenCount = 0;
         private int _lostCount = 0;
@@ -39,6 +42,8 @@ namespace ARReveal
 
         private void OnGUI()
         {
+            if (!ShowOverlay) return;
+
             var style = new GUIStyle(GUI.skin.box)
             {
                 fontSize = 28,

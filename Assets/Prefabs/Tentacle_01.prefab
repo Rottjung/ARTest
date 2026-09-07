@@ -1,5 +1,67 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &1104187718784635187
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 4092669079036423378}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.01612
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.000000029802033
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_Name
+      value: Tentacle_05(Rigged)
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+--- !u!4 &637371068922509016 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+  m_PrefabInstance: {fileID: 1104187718784635187}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &4559522620857223993
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -58,7 +120,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 637371068922509016}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}
       insertIndex: -1
@@ -115,7 +180,8 @@ MonoBehaviour:
   CurledAngle: 70
   PerBoneGrowDelay: 1
   CurlAxisRandomness: 25
-  UnfoldStartExtend: 0.35
+  RiseDistance: 0
+  RiseStartScale: 1
   JabDuration: 0.1
   JabDistance: 0.4
   RetractDuration: 0.4
@@ -133,7 +199,25 @@ MonoBehaviour:
   ReachStrength: 0
   ReachSmoothing: 3
   ReachAimDistance: 1
+  MinStrikeDistance: 0.3
   CameraOverride: {fileID: 0}
+  SlimeOverlay: {fileID: 0}
+  ReachByDistance: 0
+  SnapDistance: 1.5
+  SnapFadeDistance: 3
+  SnapFadeGraceDuration: 0.4
+  AttackRepeatInterval: 0.6
+  LashDuration: 0.3
+  LashCoilFraction: 0.35
+  LashStrikeFraction: 0.2
+  LashCoilStrength: 0.35
+  LashOvershoot: 0.15
+  LashBaseAnchorFraction: 0.3
+  LashBendCurve: 1
+  IdleBlendInDuration: 0.25
+  EngagedIdleDamping: 0.15
+  SnapAtCameraOnSettle: 0
+  SnapPeakStrength: 1
 --- !u!114 &6254768242589877224
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -147,6 +231,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleGrowOnStart
   DelaySeconds: 0.5
+--- !u!4 &4092669079036423378 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}
+  m_PrefabInstance: {fileID: 4559522620857223993}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &4691232525764372168 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 9105212513263037937, guid: 6f2bb0c5e247bda46942a83e37a571b6, type: 3}

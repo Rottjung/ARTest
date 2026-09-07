@@ -64,6 +64,10 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -3792634770808409749, guid: 186f4b66f8b2351448dcc1ae273ccba7, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d2f36fbe16613bc469716be836cd8871, type: 2}
     - target: {fileID: 919132149155446097, guid: 186f4b66f8b2351448dcc1ae273ccba7, type: 3}
       propertyPath: m_Name
       value: Tentacle_04(Rigged)
@@ -124,7 +128,8 @@ MonoBehaviour:
   CurledAngle: 70
   PerBoneGrowDelay: 1
   CurlAxisRandomness: 25
-  UnfoldStartExtend: 0.35
+  RiseDistance: 0
+  RiseStartScale: 1
   JabDuration: 0.1
   JabDistance: 0.4
   RetractDuration: 0.4
@@ -142,7 +147,24 @@ MonoBehaviour:
   ReachStrength: 0
   ReachSmoothing: 3
   ReachAimDistance: 1
+  MinStrikeDistance: 0.3
   CameraOverride: {fileID: 0}
+  SlimeOverlay: {fileID: 0}
+  ReachByDistance: 0
+  SnapDistance: 1.5
+  SnapFadeDistance: 3
+  AttackRepeatInterval: 0.6
+  LashDuration: 0.3
+  LashCoilFraction: 0.35
+  LashStrikeFraction: 0.2
+  LashCoilStrength: 0.35
+  LashOvershoot: 0.15
+  LashBendCurve: 1
+  IdleBlendInDuration: 0.25
+  SnapAtCameraOnSettle: 0
+  SnapPeakStrength: 1
+  MaxStretchMultiplier: 2
+  StretchTipFraction: 0.5
 --- !u!4 &1302719984812542340 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -7693118809868692269, guid: 186f4b66f8b2351448dcc1ae273ccba7, type: 3}

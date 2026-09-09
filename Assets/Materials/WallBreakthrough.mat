@@ -39,8 +39,8 @@ Material:
     - _PreCrackScale: 7.8
     - _Progress: 0
     m_Colors:
-    - _BaseColor: {r: 0.4264151, g: 0.42378688, b: 0.4207832, a: 1}
-    - _EmissionColor: {r: 0.8490566, g: 0.438077, b: 0.120149404, a: 1}
-    - _PreCrackColor: {r: 0.9, g: 0.95, b: 1, a: 1}
+    - _BaseColor: {r: 0.18490559, g: 0.17182265, b: 0.1587397, a: 1}
+    - _EmissionColor: {r: 0.5018867, g: 0.47890013, b: 0.4611676, a: 1}
+    - _PreCrackColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

@@ -8,6 +8,7 @@ namespace ARReveal.EditorTools
         private const string PagesOutputDir = "docs/uci-re";
         private const string PagesDevOutputDir = "docs/uci-re-dev";
         private const string PagesMarkerOutputDir = "docs/uci-re-marker";
+        private const string ArVersion1OutputDir = "Builds/UCI-RE-AR_Version1";
 
         [MenuItem("ARReveal/UCI-RE/Build WebGL (Brotli)")]
         public static void Run()
@@ -91,6 +92,27 @@ namespace ARReveal.EditorTools
             });
 
             PlayerSettings.WebGL.compressionFormat = previousCompression;
+
+            Log(report);
+        }
+
+        /// <summary>
+        /// Builds UCI-RE-AR.unity (the client's own Zappar Pro workspace deliverable,
+        /// wired to the RE_AR_QR ground marker via SwapToReArQr) at default/Brotli
+        /// compression, same as the plain UCI-RE Zappar build above - Zappar's own
+        /// hosting handles Brotli fine, unlike GitHub Pages. Zip Builds/UCI-RE-AR_Version1
+        /// (index.html at the zip root) and upload it under the project's Experience tab.
+        /// </summary>
+        [MenuItem("ARReveal/UCI-RE-AR/Build WebGL for Zappar (Version 1, Brotli)")]
+        public static void RunArVersion1()
+        {
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/UCI-RE-AR.unity" },
+                locationPathName = ArVersion1OutputDir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
 
             Log(report);
         }

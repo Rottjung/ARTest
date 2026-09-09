@@ -77,14 +77,13 @@ namespace ARReveal
     ///      to guarantee it actually touches the camera. SlimeOverlay (optional, on
     ///      TentacleController or auto-found on the camera) gets Splat() the
     ///      instant each strike makes contact. Snap At Camera On Settle can instead
-    ///      play "Sweep" (see Sweep()/SnapAtCameraOnSettleShape) - its own sideways
-    ///      windup (not Lash's away-from-camera coil, which has no sideways
-    ///      awareness and always read as winding "up" regardless of any Sweep
-    ///      setting), then the strike curls the chain out into a hook toward one side
-    ///      (SweepHookAngleDegrees, past 180 to reach toward/behind the camera) and
-    ///      back in, reading as grabbing the viewer and pulling them in, rather than
-    ///      driving straight at one fixed point. Reach By Distance's repeats always stay
-    ///      Lash for now.
+    ///      play "Sweep" (see Sweep()/SnapAtCameraOnSettleShape) - extends to one
+    ///      side (windup), then sweeps in ONE CONTINUOUS pass across to the far
+    ///      side, past the camera roughly at the midpoint (SweepHookAngleDegrees),
+    ///      never reversing direction mid-sweep - once it reaches the far side it
+    ///      hands straight off into ApplyIdlePose's existing gentle blend-in back to
+    ///      rest, rather than animating a mechanical pull-back of its own. Reach By
+    ///      Distance's repeats always stay Lash for now.
     ///
     /// The base bone never moves under any of the three layers - motion weight ramps
     /// from 0 at the base to 1 at the tip, so it reads as anchored into the wall with
@@ -236,26 +235,22 @@ namespace ARReveal
         [Tooltip("Between repeat strikes (still engaged/within Snap Fade Distance, but no Lash actively running), idle noise/sine/jitter is capped at this fraction of full strength instead of either full idle sway (which read as the tentacle randomly rotating/drifting while 'waiting' between hits) or a complete freeze (which reads as a dead, frozen prop rather than a predator holding tension before its next strike). 0 = frozen solid, 1 = full idle motion even while engaged. A small value (0.1-0.2ish) is a light tremor, not a sway.")]
         public float EngagedIdleDamping = 0.15f;
 
-        [Header("Attack shape - SWEEP (grabbing hook - curls to one side, tries to get behind the camera, then pulls in)")]
-        [Tooltip("Total time for one whole Sweep, windup through pull-in-finished - its OWN duration, not Lash Duration, on purpose: Lash Duration is deliberately tiny (a near-instant jab - see its own tooltip), and Sweep reusing it made the entire curl-out-and-pull-back-in hook play out in a few frames, which cannot read as anything but a flash/slash however good the underlying curl shape is. A grab needs real time on screen to actually be seen wrapping around and pulling in - keep this well above Lash Duration.")]
+        [Header("Attack shape - SWEEP (extends to one side, sweeps through the camera to the other, blends back)")]
+        [Tooltip("Total time for one whole Sweep, windup through the end of the sweep - its OWN duration, not Lash Duration, on purpose: Lash Duration is deliberately tiny (a near-instant jab - see its own tooltip), and a genuine side-to-side sweep needs real time on screen to actually be seen travelling, not play out in a few frames. Keep this well above Lash Duration. There's no separate 'pull back' phase/duration any more - once the sweep finishes it hands straight off into Idle Blend In Duration's existing blend, same as Lash's own recoil.")]
         public float SweepDuration = 1.2f;
-        [Tooltip("An alternative strike shape to Lash - a genuine hook/half-circle curl (a per-bone twist around world-up, accumulating base to tip in WORLD space - NOT point-targeting CCD, which was tried first and just straightens a curled tentacle into a spike no matter where the target is; also NOT ApplyGrowPose's LOCAL-axis technique, which corkscrews once the rest pose has its own curl baked in - see ApplyHookPose's own doc). The chain curls sideways up to this many degrees at the peak of the reach - 180 = tip ends up pointing back the way it came, i.e. roughly level with/behind the camera; higher still reads as properly wrapping around. Then it uncurls back down over Sweep Pull Fraction, reading as pulling whatever it grabbed back in toward itself. Shares Lash's coil/strike TIMING fractions (Lash Coil Fraction, Lash Strike Fraction - as fractions of Sweep Duration above, not Lash Duration) and bend-shaping fields (Lash Base Anchor Fraction, Lash Bend Curve, Idle Blend In Duration) - NOT Lash Coil Strength, which only affects Lash's own away-from-camera windup (Sweep's windup is the purely-sideways Sweep Coil Backswing Fraction below instead).")]
+        [Tooltip("Total angle (degrees) swept from the starting side, through the camera, to the far side - a SINGLE continuous, monotonic pass (never reverses direction mid-sweep, unlike an earlier version of this that curled out then un-curled back the same way it came - the brief explicitly asked for the tip to keep going with the sweep's own momentum instead of snapping back). Windup extends to -half of this value first (see the windup's own comment), then the strike sweeps continuously across to +half. Higher = a wider arc; 200-260 reads as properly wrapping past the camera on the way through.")]
         public float SweepHookAngleDegrees = 200f;
-        [Range(0.05f, 0.9f)]
-        [Tooltip("Fraction of the strike (after the shared windup/coil) spent pulling the hook back in, after reaching its peak reach - the rest of the strike is spent curling OUT into the hook. E.g. 0.35 = curls out for 65% of the strike, then pulls in for the remaining 35%.")]
-        public float SweepPullFraction = 0.35f;
         public enum SweepDirection { LeftToRight, RightToLeft, Random }
-        [Tooltip("Which side the hook curls out toward. Random picks a fresh side each time this fires.")]
+        [Tooltip("Which side the sweep starts from (and so which side it ends up on, since it's one continuous pass). Random picks a fresh side each time this fires.")]
         public SweepDirection SweepStartSide = SweepDirection.Random;
+        [Tooltip("Shapes the speed of the STRIKE phase (the continuous sweep itself, not the windup, which keeps its own separate ease) over its own progress, 0 (strike start) to 1 (finish) - lets it ramp up faster approaching the camera pass and ease down slower after, or any other custom pacing, instead of a fixed symmetric ease. Default reproduces the original symmetric ease-in/ease-out; drag the middle keyframe to bias it (e.g. steep going in, shallow coming out, for a whip-crack that lingers after the pass).")]
+        public AnimationCurve SweepSpeedCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
         [Range(0f, 1f)]
-        [Tooltip("How far, as a fraction of Sweep Hook Angle Degrees, the windup winds sideways toward the OPPOSITE side before the hook swings out - a whip/golf-club backswing, rotating around world-up the same way the hook itself does (see ApplySidewaysTwist). This is now the ONLY motion in Sweep's windup (no away-from-camera coil - see the windup's own comment for why that had to go), so it's been bumped up from an earlier, more subtle default that was only ever meant to be layered on top of something else. 0 = no windup motion at all, a flat pause before the hook.")]
-        public float SweepCoilBackswingFraction = 0.4f;
-        [Range(0f, 1f)]
-        [Tooltip("Before the hook curl is layered on, the chain first leans toward the camera's general vicinity at this CCD strength (0-1, well under Lash's full 1) - gives the hook a sensible starting basis (roughly facing the viewer) instead of curling out from whatever direction the tentacle's raw, camera-unrelated rest pose happens to point.")]
+        [Tooltip("Before the sweep curl is layered on, the chain first leans toward the camera's general vicinity at this CCD strength (0-1, well under Lash's full 1) - gives the sweep a sensible starting basis (roughly facing the viewer) instead of curling out from whatever direction the tentacle's raw, camera-unrelated rest pose happens to point. Applied throughout both the windup (extending to the starting side) and the strike (the continuous sweep across), via the same ApplyHookPose call, so there's no seam between the two.")]
         public float SweepBendStrength = 0.4f;
-        [Tooltip("Extra upward lift (world units) blended into that initial lean-toward-camera basis as the hook approaches its peak, fading back to the normal Aim Below Camera Offset once it starts pulling back in.")]
-        public float SweepVerticalLift = 0.1f;
-        [Tooltip("How much longer the WHOLE tentacle grows while curling out into the hook, then shrinks back while pulling in (as an extra fraction of its own rest length at the peak, e.g. 0.5 = 50% longer) - applied as a per-bone scale, mostly along local Y (the along-bone axis - same convention ApplyStretchToCloseGap already uses), so it reads as the tentacle pushing further out of its hole to reach around, then reeling itself back in, rather than a couple of segments stretching into a straight line.")]
+        [Tooltip("Upward tilt in DEGREES (not metres - an earlier version baked this into a small aim-point offset a couple of centimetres from the camera, then relied on Sweep Bend Strength's weak partial CCD lean to actually drag the tip there, which couldn't move it far against the much stronger sideways hook curl however large the number - 'set to -10 and nothing visibly changed'), applied the SAME strong, reliable way the sideways sweep itself is (a full-strength incremental world-space rotation, around the camera's right axis, weighted toward the sweep's midpoint) - blended in only near the middle of the sweep (the camera pass), fading to 0 at both the start and end sides. Positive tilts up, negative dips down - flip the sign if it comes out backwards for your setup.")]
+        public float SweepVerticalLift = 20f;
+        [Tooltip("How much longer the WHOLE tentacle grows right at the middle of the sweep (the camera pass), tapering back to its normal length at both the start and end sides (as an extra fraction of its own rest length at the peak, e.g. 0.5 = 50% longer) - applied as a per-bone scale, mostly along local Y (the along-bone axis - same convention ApplyStretchToCloseGap already uses), so it reads as the tentacle reaching further out right as it passes the camera, rather than a couple of segments stretching into a straight line.")]
         public float SweepExtendAmount = 0.5f;
         [Range(0f, 1f)]
         [Tooltip("How much of Sweep Extend Amount's growth also applies to the tentacle's girth (the other two axes), as a fraction of how much applies to its length - 0 = pure elongation with no thickening at all, higher reads as more visibly 'swelling' as it reaches out.")]
@@ -858,35 +853,34 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Alternative strike shape to Lash - same coil/windup TIMING (reuses
-        /// LashCoilFraction/LashStrikeFraction/LashBaseAnchorFraction/LashBendCurve
-        /// so it feels like the same "species" of motion, just a different strike),
-        /// but its OWN windup MOTION (a purely sideways backswing, not Lash's away-
-        /// from-camera coil - see the windup phase's own comment for why that had to
-        /// go: AwayPointWorld has no sideways awareness, and for the typical
-        /// mounting geometry "away from camera" just reads as "up," regardless of
-        /// any Sweep-specific setting) and its own SweepDuration rather than
-        /// LashDuration - Lash's is deliberately a
-        /// near-instant jab, and an earlier version of Sweep reusing it made the
-        /// entire hook play out in a few frames, unable to read as anything but a
-        /// flash/slash regardless of how the curl itself was shaped. The strike phase
-        /// itself curls the chain out into a hook toward one side
-        /// (SweepHookAngleDegrees, via ApplyHookPose) and back in, rather than
-        /// driving at one fixed aim point.
+        /// Extends out to one side (windup), then sweeps in ONE CONTINUOUS,
+        /// MONOTONIC pass across to the far side, going past the camera roughly at
+        /// the midpoint - not "reach out, then reverse back the way it came." Two
+        /// earlier versions of this did reverse (ramping the curl angle up to a peak
+        /// and back down to 0, or ramping length out and back) - both read as an
+        /// un-curl, the tip visibly retracing its own path, which is exactly what
+        /// the brief called out as wrong ("the pull in follows the momentum of the
+        /// sweep, not straight back"). There is no separate pull-back phase any
+        /// more at all: once the sweep finishes at the far side, this hands straight
+        /// off into ApplyIdlePose's existing blend-in (same _idleBlendFromRotation/
+        /// IdleBlendInDuration mechanic Lash's own recoil already uses) - THAT gentle
+        /// multi-frame Slerp back to the normal resting pose is the "go back
+        /// blended" the brief asked for, not a mechanical animated pull-in coded
+        /// into Sweep itself.
         ///
-        /// Deliberately does NOT point the chain at a moving target with CCD - two
-        /// earlier versions tried that (first at full strength, then at a reduced
-        /// strength) and both still read as straight/spike-like: CCD, at ANY
+        /// The angle itself is built the same way throughout - windup and strike
+        /// both call ApplyHookPose with a continuously varying angle (negative
+        /// during windup as it extends to the starting side, sweeping linearly
+        /// through 0 - the camera pass - up to positive at the far side) - so
+        /// there's no seam between "winding up" and "sweeping," they're one curve.
+        ///
+        /// Deliberately does NOT point the chain at a moving target with CCD -
+        /// earlier attempts at that read as straight/spike-like: CCD, at any
         /// strength high enough to actually travel somewhere, converges toward a
         /// straight line pointing at wherever the target currently is - it has no
-        /// concept of "curl," only "point at this spot." A real hook/half-circle
-        /// shape instead needs a per-bone twist around a fixed axis, accumulating
-        /// base to tip via BaseToTipWeight (see ApplyHookPose) - not a target point
-        /// at all. SweepHookAngleDegrees drives
-        /// that twist out (past 180 to properly wrap toward/behind the camera) then
-        /// back in (the "pull toward itself"), while ApplySweepExtension grows and
-        /// shrinks the chain's length on the same timeline, so it reads as reaching
-        /// out and around, grabbing, then reeling back in - not a pendulum swing.
+        /// concept of "curl," only "point at this spot." A real sweeping arc instead
+        /// needs a per-bone twist around a fixed world axis, accumulating base to
+        /// tip (see ApplyHookPose) - not a target point at all.
         ///
         /// Kept entirely separate from Lash() (small duplicated windup block instead
         /// of sharing code) deliberately - Lash is an already-tuned, delicate piece of
@@ -898,10 +892,6 @@ namespace ARReveal
         {
             if (_bones.Length < 2) yield break;
 
-            // No awayPoint/AwayPointWorld() here (unlike Lash) - see the windup
-            // phase's own comment for why: it has no sideways awareness at all and
-            // was the actual cause of the windup always winding "up" regardless of
-            // any Sweep-specific setting.
             Quaternion[] startPose = CaptureLocalRotations();
             bool touched = false;
 
@@ -911,6 +901,8 @@ namespace ARReveal
             bool goingRight = SweepStartSide == SweepDirection.Random
                 ? Random.value < 0.5f
                 : SweepStartSide == SweepDirection.LeftToRight;
+            float dir = goingRight ? 1f : -1f;
+            float halfAngle = SweepHookAngleDegrees * 0.5f;
 
             float coilEnd = Mathf.Clamp01(LashCoilFraction);
             float strikeEnd = Mathf.Clamp(coilEnd + LashStrikeFraction, coilEnd + 0.01f, 1f);
@@ -932,70 +924,50 @@ namespace ARReveal
                 }
                 else if (t < coilEnd)
                 {
-                    // Deliberately NOT the away-from-camera CCD bend Lash's own
-                    // windup uses (awayPoint/LashCoilStrength) - awayPoint is purely
-                    // camera-and-base-position math (AwayPointWorld mirrors the
-                    // camera-facing aim point through this tentacle's base) with NO
-                    // sideways awareness at all, so for the typical mounting (this
-                    // tentacle above the viewer) "away from camera" geometrically
-                    // resolves to "up and back," full stop - regardless of any
-                    // Sweep-specific setting, since none of them touch awayPoint.
-                    // That's exactly why the windup kept winding up "no matter what
-                    // setting" - it was always the dominant force, with the sideways
-                    // twist just layered weakly on top of it. Purely sideways
-                    // instead (world-up axis - see ApplySidewaysTwist's own doc).
+                    // Extends out to the STARTING side (-halfAngle) - this is the
+                    // sweep's own starting position, not a separate "backswing"
+                    // concept; the strike phase below picks up exactly where this
+                    // leaves off (both localT=0 states line up: angle = -halfAngle).
                     _attackPhase = AttackPhase.Windup;
                     float localT = (t - handoffEnd) / Mathf.Max(0.0001f, coilEnd - handoffEnd);
-                    ApplyLocalRotations(_restLocalRotation);
-                    float coilSign = goingRight ? -1f : 1f;
-                    ApplySidewaysTwist(SweepHookAngleDegrees * SweepCoilBackswingFraction * coilSign * EaseInQuad(localT));
+                    float windupAngle = -halfAngle * dir * EaseInQuad(localT);
+                    ApplyHookPose(windupAngle, 0f);
                 }
                 else
                 {
+                    // ONE continuous, monotonic sweep from -halfAngle (the side the
+                    // windup just extended to) through 0 (the camera pass) to
+                    // +halfAngle (the far side) - never reverses. centerProximity
+                    // (1 at the camera pass, 0 at either extreme) drives both the
+                    // reach (ApplySweepExtension) and the vertical lift/contact
+                    // timing inside ApplyHookPose, same as before, just no longer
+                    // tied to a ramp-up-then-down profile.
                     _attackPhase = AttackPhase.Strike;
                     float localT = (t - coilEnd) / (strikeEnd - coilEnd);
-                    // 0 -> 1 curling OUT into the hook over the first (1 -
-                    // SweepPullFraction) share of the strike, then 1 -> 0 pulling
-                    // back IN over the remaining SweepPullFraction - one continuous
-                    // reach-around-and-reel-in motion, not two separately-timed
-                    // stages. Smoothstepped both ways so it eases in/out of the peak
-                    // rather than arriving/leaving with a hard corner.
-                    float reachFraction = Mathf.Clamp01(1f - SweepPullFraction);
-                    float hookT = localT < reachFraction
-                        ? Smoothstep(reachFraction > 0.0001f ? localT / reachFraction : 1f)
-                        : Smoothstep(1f - Mathf.InverseLerp(reachFraction, 1f, localT));
+                    // SweepSpeedCurve, not a fixed Smoothstep - lets the pacing be
+                    // asymmetric (e.g. ramp up fast approaching the camera pass,
+                    // ease down slower after it) instead of a symmetric ease.
+                    float sweepNorm = Mathf.Lerp(-1f, 1f, SweepSpeedCurve.Evaluate(localT));
+                    float angle = halfAngle * dir * sweepNorm;
+                    float centerProximity = 1f - Mathf.Abs(sweepNorm);
 
-                    // Grows the WHOLE tentacle longer while curling out, shrinks back
-                    // while pulling in - same timeline as the hook curl itself (see
-                    // ApplySweepExtension) - applied BEFORE the pose below so the
-                    // hook curl plays out on the already-resized chain.
-                    ApplySweepExtension(hookT);
-                    ApplyHookPose(SweepHookAngleDegrees * hookT * (goingRight ? 1f : -1f), hookT);
+                    ApplySweepExtension(centerProximity);
+                    ApplyHookPose(angle, centerProximity);
 
-                    if (!touched && hookT >= 0.9f) { TouchCamera(); touched = true; }
+                    if (!touched && centerProximity >= 0.85f) { TouchCamera(); touched = true; }
                 }
 
                 yield return null;
             }
 
-            // Hands off GENTLY to the plain, centred baseline reach pose - NOT
-            // Lash's own full-strength (SnapPeakStrength) snap-and-stretch cleanup,
-            // which an earlier version of this copied verbatim. That was the actual
-            // cause of "I still see a 2nd attack": the dramatic contact/stretch
-            // moment already happened INSIDE the loop, at the hook's closest pass
-            // (see the touched/TouchCamera call above) - repeating a full-strength
-            // bend plus a fresh full stretch right after is mechanically almost
-            // exactly what a small Lash's own ending pose looks like, so it read as
-            // a second, separate strike snapping in immediately after the first.
-            // stretchToReach is intentionally unused here now - reserved for future
-            // use if Sweep ever needs a guaranteed-contact variant of its own.
-            Vector3 aimPoint = AimPointWorld();
-            ApplyLocalRotations(_restLocalRotation);
-            ApplySweepExtension(0f); // resets scale cleanly back to normal
-            ApplyDirectionalBend(aimPoint, SweepBendStrength, LashBendCurve);
-            ClampTipFromCamera(aimPoint);
-            if (!touched) TouchCamera(); // safety net only - normally already fired mid-hook
-
+            // No cleanup pose here - ApplySweepExtension already eases back to no
+            // extension by the time the strike naturally reaches the far side
+            // (centerProximity -> 0), and the hand-off below picks up directly from
+            // wherever the sweep actually left the chain, for ApplyIdlePose's own
+            // blend-in to ease from - see this method's own doc for why there's
+            // deliberately no separate "return to center" animation here any more.
+            // stretchToReach is intentionally unused - reserved for a future
+            // guaranteed-contact variant of Sweep, same as Lash's own parameter.
             for (int i = 0; i < _bones.Length; i++)
                 _idleBlendFromRotation[i] = _bones[i].localRotation;
             _idleBlendWeight = 0f;
@@ -1006,7 +978,7 @@ namespace ARReveal
         /// The actual hook shape. Resets to the chain's clean authored rest pose,
         /// then curls it sideways by accumulating hookAngleDeg's worth of rotation
         /// bone-by-bone, base to tip, IN WORLD SPACE around world-up (see
-        /// ApplySidewaysTwist) - a rotation AXIS has to be PERPENDICULAR to the
+        /// ApplyIncrementalTwist) - a rotation AXIS has to be PERPENDICULAR to the
         /// direction you want the tip to actually sweep through, not aligned with
         /// it, so only a genuinely vertical axis produces a horizontal left/right
         /// arc (two earlier attempts got this backwards: camera.up, then a
@@ -1041,18 +1013,21 @@ namespace ARReveal
         private void ApplyHookPose(float hookAngleDeg, float hookT)
         {
             ApplyLocalRotations(_restLocalRotation);
-            ApplySidewaysTwist(hookAngleDeg);
+            ApplyIncrementalTwist(hookAngleDeg, Vector3.up);
 
             Transform cam = ResolveCamera();
+            // Tilts up/down right at the camera pass (peaking with hookT, which is
+            // 0 during the windup and at both far-side extremes, 1 only at the
+            // sweep's midpoint) - a full-strength incremental rotation around the
+            // camera's own right axis, same mechanism/reliability as the sideways
+            // sweep itself (see ApplyIncrementalTwist's own doc for why this and
+            // NOT a weak aim-point-offset-plus-CCD-lean approach, which an earlier
+            // version used and couldn't move the tip far against the much stronger
+            // sideways curl).
+            if (cam != null && Mathf.Abs(SweepVerticalLift) > 0.0001f && hookT > 0.0001f)
+                ApplyIncrementalTwist(SweepVerticalLift * hookT, cam.right);
+
             Vector3 aimPoint = AimPointWorld();
-            if (cam != null)
-            {
-                // Lifts a bit as it commits to the hook (peaking with hookT), fading
-                // back to the plain Aim Below Camera Offset once it starts pulling
-                // back in.
-                float verticalBelow = AimBelowCameraOffset - SweepVerticalLift * hookT;
-                aimPoint = cam.position + cam.forward * Mathf.Max(MinStrikeDistance, ReachAimDistance) - cam.up * verticalBelow;
-            }
             ApplyDirectionalBend(aimPoint, SweepBendStrength, LashBendCurve);
             // Deliberately NOT ClampTipFromCamera here (unlike everywhere else this
             // class bends toward the camera) - that clamp does up to 8 iterations of
@@ -1067,29 +1042,28 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Accumulates totalAngleDeg of rotation around world-space Vector3.up, base
-        /// to tip, incrementally (see ApplyHookPose's own doc for why incremental-
-        /// not-cumulative and world-space-not-local matter here) - shared by the
-        /// hook curl itself and, at a smaller angle and the opposite sign, the
-        /// windup's sideways backswing (see Sweep()'s coil phase).
+        /// Accumulates totalAngleDeg of rotation around the given WORLD-space axis,
+        /// base to tip, incrementally (see ApplyHookPose's own doc for why
+        /// incremental-not-cumulative and world-space-not-local matter here) - bone
+        /// i already inherits every earlier bone's contribution for free (rotating
+        /// bone i-1 rigidly carries bone i, and everything past it, along with it),
+        /// so re-applying the FULL cumulative weight at every bone instead of just
+        /// the delta since the previous one would compound into a wildly over-
+        /// rotated result, since rotations about the same axis add.
         ///
-        /// Plain world-up, not a configurable per-instance local axis (an earlier
-        /// version let SweepHookAxis pick any of this transform's own local X/Y/Z,
-        /// transformed to world) - that was backwards. The rotation AXIS has to be
-        /// PERPENDICULAR to the direction you want the tip to sweep through, not
-        /// aligned with it: rotating around a HORIZONTAL axis sweeps things through
-        /// a VERTICAL arc (a pendulum, "over" then "under" - exactly what a local
-        /// axis that happened to be horizontal for a given instance's rotation
-        /// produced), and only rotating around a genuinely VERTICAL axis produces a
-        /// horizontal, left/right sweep. World-up is the one reference this whole
-        /// project already treats as true vertical everywhere else (FallingRubble's
-        /// fake gravity, ApplyGrowPose's curl axis, etc.) - using it here guarantees
-        /// a real left/right sweep regardless of how any given tentacle instance
-        /// happens to be rotated, with no per-instance axis to get wrong.
+        /// Two callers, two axes: ApplyHookPose's sideways sweep uses world-up
+        /// (Vector3.up) - a HORIZONTAL rotation axis sweeps things through a
+        /// VERTICAL arc and vice versa, so only a genuinely vertical axis produces
+        /// the intended horizontal, left/right sweep (an earlier version let
+        /// SweepHookAxis pick a configurable per-instance local axis, transformed to
+        /// world - backwards, and easy to land on a horizontal axis by accident,
+        /// which is exactly what produced an up/down pendulum instead of a
+        /// sideways sweep). The vertical-lift caller uses the camera's own right
+        /// axis instead, for the same reason in the other direction - a HORIZONTAL
+        /// axis is what's needed to tilt something up/down.
         /// </summary>
-        private void ApplySidewaysTwist(float totalAngleDeg)
+        private void ApplyIncrementalTwist(float totalAngleDeg, Vector3 axis)
         {
-            Vector3 axis = Vector3.up;
             float previousWeight = 0f;
             for (int i = 1; i < _bones.Length; i++)
             {

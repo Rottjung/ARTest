@@ -1805,6 +1805,17 @@ Transform:
   - {fileID: 1106795034}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &660008611 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 64065429}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
 --- !u!1 &757000855
 GameObject:
   m_ObjectHideFlags: 0
@@ -1830,12 +1841,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 757000855}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1106795034}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &757000857
 MonoBehaviour:
@@ -2326,56 +2337,56 @@ MonoBehaviour:
   HeroExtraDelay: 0.6
   Pairs:
   - Name: 1
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1993176816}
+    Hole: {fileID: 2081206633}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 2
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1527239820}
+    Hole: {fileID: 1817045917}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 3
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1923419309}
+    Hole: {fileID: 1728680594}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 4
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1822279242}
+    Hole: {fileID: 1925984803}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 5
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1488138581}
+    Hole: {fileID: 1721102118}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 6
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1936755391}
+    Hole: {fileID: 1765243058}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 7
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 2136924978}
+    Hole: {fileID: 2101388805}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 8
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1808650849}
+    Hole: {fileID: 1940074495}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
   - Name: 9
-    Tentacle: {fileID: 0}
-    Hole: {fileID: 0}
+    Tentacle: {fileID: 1118121133}
+    Hole: {fileID: 660008611}
     Debris: {fileID: 0}
     Smoke: {fileID: 0}
     Rubble: {fileID: 0}
@@ -2430,9 +2441,19 @@ Transform:
   - {fileID: 133611113}
   - {fileID: 64065430}
   - {fileID: 2146805678}
-  - {fileID: 757000856}
   m_Father: {fileID: 542577148}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1118121133 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6788994840280513249, guid: fbf85205850ba404497902c6e6fd5b5b, type: 3}
+  m_PrefabInstance: {fileID: 942262158}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1 &1191017941
 GameObject:
   m_ObjectHideFlags: 0
@@ -2546,6 +2567,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
   m_PrefabInstance: {fileID: 1411516512}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1488138581 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
+  m_PrefabInstance: {fileID: 93529835}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1 &1501273712
 GameObject:
   m_ObjectHideFlags: 0
@@ -2577,6 +2609,17 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1527239820 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
+  m_PrefabInstance: {fileID: 91708712}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1001 &1721102116
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2699,6 +2742,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
   m_PrefabInstance: {fileID: 1721102116}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1721102118 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 1721102116}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
 --- !u!1001 &1728680592
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2781,6 +2835,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
   m_PrefabInstance: {fileID: 1728680592}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1728680594 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 1728680592}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
 --- !u!1001 &1765243056
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2863,6 +2928,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
   m_PrefabInstance: {fileID: 1765243056}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1765243058 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 1765243056}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
 --- !u!1001 &1785633055
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3026,6 +3102,28 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7025100762346189058, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
   m_PrefabInstance: {fileID: 1785633055}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1808650849 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6788994840280513249, guid: fbf85205850ba404497902c6e6fd5b5b, type: 3}
+  m_PrefabInstance: {fileID: 320823049}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
+--- !u!114 &1817045917 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 900301881}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
 --- !u!1001 &1822279239
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3197,6 +3295,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 679711221734628482, guid: a643e58ef652a474587d359e9882ea45, type: 3}
   m_PrefabInstance: {fileID: 1822279239}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1822279242 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6109786624428484672, guid: a643e58ef652a474587d359e9882ea45, type: 3}
+  m_PrefabInstance: {fileID: 1822279239}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1001 &1826351228
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3478,6 +3587,28 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 679711221734628482, guid: a643e58ef652a474587d359e9882ea45, type: 3}
   m_PrefabInstance: {fileID: 1923419306}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1923419309 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6109786624428484672, guid: a643e58ef652a474587d359e9882ea45, type: 3}
+  m_PrefabInstance: {fileID: 1923419306}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
+--- !u!114 &1925984803 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 1411516512}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
 --- !u!1001 &1936755388
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3681,6 +3812,39 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7025100762346189058, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
   m_PrefabInstance: {fileID: 1936755388}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1936755391 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
+  m_PrefabInstance: {fileID: 1936755388}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
+--- !u!114 &1940074495 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 133611112}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &1993176816 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
+  m_PrefabInstance: {fileID: 433030931}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1 &2052042710
 GameObject:
   m_ObjectHideFlags: 0
@@ -3848,6 +4012,39 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
   m_PrefabInstance: {fileID: 2081206631}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &2081206633 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 2081206631}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &2101388805 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+  m_PrefabInstance: {fileID: 1826351228}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f57a90719bb96da4cb18d1b14eda9369, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.WallHoleEffect
+--- !u!114 &2136924978 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
+  m_PrefabInstance: {fileID: 1785633055}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
 --- !u!1001 &2146805677
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3914,6 +4111,7 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 757000856}
   - {fileID: 1090348473}
   - {fileID: 542577148}
   - {fileID: 483163053}

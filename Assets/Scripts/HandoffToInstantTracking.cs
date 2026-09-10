@@ -124,11 +124,19 @@ namespace ARReveal
         /// them (see TriggerPairAfterDelay/TriggerAfterDelay) - anything else stays
         /// disabled forever, which is the point: a forgotten test script can no longer
         /// fire early no matter what its own flags say.
+        ///
+        /// ARShareController is explicitly exempted - it's persistent UI chrome (the
+        /// Selfie/Share buttons), not gated AR content, and was never meant to be
+        /// swept up here at all. The real fix is keeping it OUTSIDE ContentWrapper
+        /// entirely (it doesn't need to wait for tracking either - ContentWrapper's
+        /// own SetActive(false) above would still hide it if it's a child, regardless
+        /// of this exclusion) - this is just a safety net in case it, or anything
+        /// else meant to be persistent, ends up under ContentWrapper anyway.
         /// </summary>
         private void DisableAllChildScripts()
         {
             foreach (var mb in ContentWrapper.GetComponentsInChildren<MonoBehaviour>(true))
-                if (mb != null) mb.enabled = false;
+                if (mb != null && !(mb is ARShareController)) mb.enabled = false;
         }
 
         private void Start()

@@ -87,7 +87,13 @@ namespace ARReveal
                 fontSize = 28,
                 normal = { textColor = color }
             };
-            GUI.Box(new Rect(10, 10, 340, 90), text, style);
+            // Box height sized to the actual number of lines (up to 3 once handed
+            // off and the QR is in view) - a fixed height tuned for the old 2-line
+            // text was still in place when the "(QR in view)" third line was added,
+            // which is exactly why it was rendering cut off.
+            int lineCount = text.Split('\n').Length;
+            float boxHeight = 20f + lineCount * 34f;
+            GUI.Box(new Rect(10, 10, 360, boxHeight), text, style);
         }
     }
 }

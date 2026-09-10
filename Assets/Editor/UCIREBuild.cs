@@ -8,6 +8,7 @@ namespace ARReveal.EditorTools
         private const string PagesOutputDir = "docs/uci-re";
         private const string PagesDevOutputDir = "docs/uci-re-dev";
         private const string PagesMarkerOutputDir = "docs/uci-re-marker";
+        private const string PagesArOutputDir = "docs/uci-re-ar";
         private const string ArVersion1OutputDir = "Builds/UCI-RE-AR_Version1";
 
         [MenuItem("ARReveal/UCI-RE/Build WebGL (Brotli)")]
@@ -113,6 +114,44 @@ namespace ARReveal.EditorTools
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None
             });
+
+            Log(report);
+        }
+
+        /// <summary>
+        /// Same UCI-RE-AR.unity scene as above, but uncompressed into docs/uci-re-ar/
+        /// for GitHub Pages - a fast, self-serve way to test the QR/instant-tracking
+        /// handoff, tentacle timing, and Selfie/Share buttons on a real phone WITHOUT
+        /// going through ZapWorks' own upload/publish pipeline at all. This works for
+        /// that testing purpose because QR tracking itself doesn't depend on ZapWorks
+        /// hosting in any way - the trained RE_AR_QR.zpt target ships inside
+        /// StreamingAssets as part of the build itself (see the Image Tracking doc in
+        /// TentacleController/HandoffToInstantTracking's own comments), so it tracks
+        /// identically regardless of which server is serving the files. What's
+        /// DIFFERENT here vs the real Zappar-hosted deliverable: no ZapWorks
+        /// interstitial/branding screen at all (Pages has none to begin with, so this
+        /// isn't representative of that), and a larger uncompressed download (GitHub
+        /// Pages can't set Content-Encoding: br) - fine for a quick test on wifi, not
+        /// a stand-in for judging real-world load time on the client's own hosting.
+        ///
+        /// Requires a `git push` after this to actually go live - GitHub Pages serves
+        /// straight from the repo's docs/ folder, not a local build output.
+        /// </summary>
+        [MenuItem("ARReveal/UCI-RE-AR/Build WebGL for GitHub Pages (uncompressed, testing only)")]
+        public static void RunForPagesAr()
+        {
+            var previousCompression = PlayerSettings.WebGL.compressionFormat;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/UCI-RE-AR.unity" },
+                locationPathName = PagesArOutputDir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
+
+            PlayerSettings.WebGL.compressionFormat = previousCompression;
 
             Log(report);
         }

@@ -4,54 +4,90 @@ using Zappar;
 namespace ARReveal
 {
     /// <summary>
-    /// On-screen "TRACKING: FOUND/LOST" label, wired to the same OnSeenEvent/
-    /// OnNotSeenEvent as content scripts - lets you confirm on the phone itself
-    /// whether the tracker is actually catching/losing the target, independent of
-    /// whether any content is visible. Uses legacy OnGUI so it needs no Canvas setup.
+    /// On-screen tracking status label. Uses legacy OnGUI so it needs no Canvas setup.
+    ///
+    /// Deliberately does NOT say "TRACKING LOST" when the QR leaves the camera's
+    /// view (an earlier version did) - that's a normal, expected state in this
+    /// project's setup, not a failure: once HandoffToInstantTracking has handed off,
+    /// content rides along on the instant tracker's own SLAM tracking, which keeps
+    /// working with or without the QR still in view (that's the whole point of the
+    /// handoff - see that class's own doc comment). Flagging every ordinary "QR out
+    /// of frame" moment as "LOST" in red reads as something being broken when
+    /// nothing is. Instead this shows three genuinely distinct, honestly-labelled
+    /// states: waiting for the QR to be seen at all, tracking active (content is
+    /// live and anchored), and how many times the anchor has been RE-seeded from a
+    /// fresh QR detection since - that reset count, not raw QR visibility, is the
+    /// actually meaningful diagnostic for judging tracking quality on-site.
     /// </summary>
     [RequireComponent(typeof(ZapparImageTrackingTarget))]
     public class TrackingDebugOverlay : MonoBehaviour
     {
-        [Tooltip("Off hides the on-screen label entirely - still tracks found/lost counts underneath, just doesn't draw. Flip this off for the real build/client demo.")]
+        [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
+        [Tooltip("Where the reset count and handoff state actually come from. Auto-found (this GameObject, its parents, or anywhere in the scene, in that order) if left blank - the two components don't have to be on the same object.")]
+        public HandoffToInstantTracking Handoff;
 
-        private bool _seen = false;
-        private int _seenCount = 0;
-        private int _lostCount = 0;
+        private bool _qrVisible;
         private ZapparImageTrackingTarget _target;
 
         private void Awake()
         {
             _target = GetComponent<ZapparImageTrackingTarget>();
+            if (Handoff == null) Handoff = GetComponentInParent<HandoffToInstantTracking>();
+            if (Handoff == null) Handoff = FindFirstObjectByType<HandoffToInstantTracking>();
         }
 
         private void OnEnable()
         {
+            if (_target == null) return;
             _target.OnSeenEvent.AddListener(HandleSeen);
             _target.OnNotSeenEvent.AddListener(HandleNotSeen);
         }
 
         private void OnDisable()
         {
+            if (_target == null) return;
             _target.OnSeenEvent.RemoveListener(HandleSeen);
             _target.OnNotSeenEvent.RemoveListener(HandleNotSeen);
         }
 
-        private void HandleSeen() { _seen = true; _seenCount++; }
-        private void HandleNotSeen() { _seen = false; _lostCount++; }
+        private void HandleSeen() => _qrVisible = true;
+        private void HandleNotSeen() => _qrVisible = false;
 
         private void OnGUI()
         {
             if (!ShowOverlay) return;
 
+            bool handedOff = Handoff != null && Handoff.HasHandedOff;
+            int resets = Handoff != null ? Handoff.ResetCount : 0;
+
+            string text;
+            Color color;
+            if (!handedOff)
+            {
+                // Genuinely still waiting - the QR has never been seen (or was seen
+                // but the handoff hasn't finished this frame yet) - this is the ONE
+                // state that should read as "not there yet", since content really
+                // isn't live.
+                text = "WAITING FOR QR...";
+                color = Color.yellow;
+            }
+            else
+            {
+                // Content is live and anchored via the instant tracker's own SLAM
+                // tracking regardless of whether the QR is currently in view - so
+                // this always reads as active, never "lost". The QR-visible note is
+                // a quiet aside, not an alarm.
+                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "");
+                color = Color.green;
+            }
+
             var style = new GUIStyle(GUI.skin.box)
             {
                 fontSize = 28,
-                normal = { textColor = _seen ? Color.green : Color.red }
+                normal = { textColor = color }
             };
-            string text = (_seen ? "TRACKING: FOUND" : "TRACKING: LOST") +
-                $"\nfound x{_seenCount}  lost x{_lostCount}";
-            GUI.Box(new Rect(10, 10, 340, 80), text, style);
+            GUI.Box(new Rect(10, 10, 340, 90), text, style);
         }
     }
 }

@@ -194,6 +194,16 @@ namespace ARReveal
         private bool _handedOff;
 
         /// <summary>
+        /// The building's real-world rotation, as last established by the QR (the
+        /// only source ever trusted for rotation - see this class's own
+        /// "SECONDARY RE-ANCHOR SOURCES" doc). Re-applied to ContentWrapper EVERY
+        /// FRAME in LateUpdate, not just once right after a re-seed - see
+        /// LateUpdate's own doc comment for why a one-shot correction turned out
+        /// not to be enough.
+        /// </summary>
+        private Quaternion _lockedWorldRotation = Quaternion.identity;
+
+        /// <summary>
         /// True once the FIRST handoff has completed (content revealed). Exposed for
         /// TrackingDebugOverlay - "waiting for the QR" and "tracking active" are
         /// genuinely different states worth telling apart on screen.
@@ -321,66 +331,129 @@ namespace ARReveal
             SeedAnchorPosition(Z.GetPosition(cameraRelative));
 
             // Wait a frame so InstantTarget's own Update() applies the pose we just
-            // seeded before we read its transform for the rotation correction below.
+            // seeded before we read its transform below.
             yield return null;
 
-            if (ContentWrapper != null)
-            {
-                // ContentWrapper is a CHILD of InstantTarget (rides along with its
-                // ongoing SLAM tracking), so its WORLD rotation is
-                // InstantTarget.rotation * ContentWrapper.localRotation - to make
-                // that equal ImageTarget's actual detected rotation, localRotation
-                // needs to be Inverse(InstantTarget.rotation) * ImageTarget.rotation,
-                // NOT the other order. An earlier version had the operands swapped
-                // (ImageTarget.rotation * Inverse(InstantTarget.rotation)), which
-                // - because quaternion multiplication doesn't commute - produced a
-                // CONJUGATION of the correct result instead: same rotation angle as
-                // the QR's real orientation, but around a different axis (reading as
-                // content tipped onto its side), and one that varies with the
-                // specific relationship between the QR's detected rotation and the
-                // instant tracker's fixed seed rotation at the moment of handoff -
-                // which is exactly why it came out differently depending on which
-                // direction the QR was scanned from.
-                Quaternion correction = Quaternion.Inverse(InstantTarget.transform.rotation) * ImageTarget.transform.rotation;
-                ContentWrapper.localRotation = correction;
-            }
-            NormalizeContentScale();
+            // The QR is the ONLY source ever trusted for rotation - record its
+            // detected world rotation as the standing "correct" value.
+            // LateUpdate (not this one-off assignment) is what actually keeps
+            // ContentWrapper's rotation pinned to it every frame from here on -
+            // see LateUpdate's own doc comment for why a one-shot correction,
+            // which is all this used to do, wasn't enough.
+            _lockedWorldRotation = ImageTarget.transform.rotation;
+            ApplyLockedTransform();
             if (firstTime) RevealContent();
         }
 
         /// <summary>
-        /// Found the same way as the rotation bug (real-device test: content
-        /// "looks a lot smaller" after a re-anchor): re-seeding the anchor's
-        /// position via SetFromCameraOffset doesn't just silently re-seed
-        /// ROTATION as a side effect (see ReanchorFromSecondaryRoutine's doc for
-        /// that one) - it re-seeds SCALE too. ZapparInstantTrackingTarget.
-        /// UpdateTargetPose() sets transform.localScale straight from the native
-        /// anchor pose every frame, and that scale is monocular SLAM's own
-        /// internal estimate of the ratio between its tracking units and real
-        /// metres - inherently uncertain (the same scale-ambiguity problem behind
-        /// the still-open "walks meters, registers as decimetres" bug), and
-        /// apparently uses whatever numbers happen to fall out of THIS specific
-        /// re-seed rather than staying pinned at 1. Since ContentWrapper is a
-        /// CHILD of InstantTarget, any shrink in InstantTarget.localScale shrinks
-        /// the whole building with it. Rather than trying to preserve "whatever
-        /// scale was there before" (the rotation fix's approach), this goes
-        /// further and FORCES ContentWrapper's WORLD scale to exactly (1,1,1)
-        /// after every re-anchor (QR or secondary) - the anchor's own scale
-        /// estimate isn't a meaningful real-world quantity worth preserving, it's
-        /// an artifact of monocular tracking uncertainty, so always cancelling it
-        /// out entirely is more correct than carrying forward whatever value it
-        /// last happened to seed. Assumes uniform, non-sheared scale throughout
-        /// (true here - InstantTarget sits at scene root with no scaled parent
-        /// above it), so simple component-wise division is enough.
+        /// Re-applies the standing-correct rotation (_lockedWorldRotation, last
+        /// set by the QR) and forces world scale back to (1,1,1), EVERY FRAME,
+        /// not just once right after a re-seed. Why continuous, not one-shot:
+        /// ZapparInstantTrackingTarget.UpdateTargetPose() re-reads the native
+        /// anchor's full pose - position, rotation, AND scale - fresh from the
+        /// tracking engine on EVERY SINGLE FRAME, not just at explicit re-seed
+        /// moments (Z.InstantWorldTrackerAnchorPose(tracker, cameraPose, ...) is
+        /// called unconditionally in its Update()). A one-shot correction right
+        /// after HandoffRoutine/ReanchorFromSecondaryRoutine looked right for
+        /// exactly one frame, then silently drifted wrong again as ordinary
+        /// per-frame tracking noise/uncertainty (which is what the anchor's
+        /// rotation and scale actually represent - see NormalizeContentScale's
+        /// own doc on why scale in particular is inherently unstable, especially
+        /// in the first few frames after a fresh seed) kept overwriting
+        /// InstantTarget's transform underneath it - exactly matching a
+        /// real-device report of content going invisible/sideways/tiny again
+        /// despite the earlier one-shot fixes seeming to work at first. Position
+        /// is deliberately NOT touched here - that's meant to update continuously
+        /// as the camera moves relative to the anchor, that's the entire point of
+        /// world tracking; only rotation and scale, which should never change for
+        /// a real static building, get continuously re-locked.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!_handedOff) return;
+            ApplyLockedTransform();
+        }
+
+        private void ApplyLockedTransform()
+        {
+            if (ContentWrapper == null || InstantTarget == null) return;
+
+            // Guard against a degenerate InstantTarget pose - most likely in the
+            // first frame or two right after a fresh seed, before the native
+            // tracker has had any real data to work with yet (a fresh anchor's
+            // pose matrix can be poorly conditioned before tracking settles).
+            // Was the actual cause of a real-device "no building at all"
+            // regression: NaN/Infinity poisons the moment it's divided into or
+            // multiplied through, and unlike ordinary bad-but-finite values,
+            // NOTHING here would ever recover from it on its own - every later
+            // frame's ApplyLockedTransform would keep computing NaN from NaN
+            // forever, even long after the underlying tracking became fine
+            // again. Skipping a bad frame instead just leaves ContentWrapper at
+            // its last known-good rotation/scale for one frame, imperceptible in
+            // practice, instead of permanently breaking it.
+            Quaternion instantRotation = InstantTarget.transform.rotation;
+            if (!IsFinite(instantRotation))
+                return;
+
+            // ContentWrapper is a CHILD of InstantTarget (rides along with its
+            // ongoing SLAM tracking), so its WORLD rotation is
+            // InstantTarget.rotation * ContentWrapper.localRotation - to make
+            // that equal _lockedWorldRotation, localRotation needs to be
+            // Inverse(InstantTarget.rotation) * _lockedWorldRotation, NOT the
+            // other order (quaternion multiplication doesn't commute - the other
+            // order produces a CONJUGATION instead: same angle, wrong axis,
+            // reading as content tipped onto its side - the original QR bug).
+            ContentWrapper.localRotation = Quaternion.Inverse(instantRotation) * _lockedWorldRotation;
+            NormalizeContentScale();
+        }
+
+        /// <summary>Same finiteness check TrackingDebugOverlay uses for its own NaN guard on this exact tracking data - a quaternion is finite iff all four components are.</summary>
+        private static bool IsFinite(Quaternion q) =>
+            !float.IsNaN(q.x) && !float.IsNaN(q.y) && !float.IsNaN(q.z) && !float.IsNaN(q.w) &&
+            !float.IsInfinity(q.x) && !float.IsInfinity(q.y) && !float.IsInfinity(q.z) && !float.IsInfinity(q.w);
+
+        private static bool IsFinite(Vector3 v) =>
+            !float.IsNaN(v.x) && !float.IsNaN(v.y) && !float.IsNaN(v.z) &&
+            !float.IsInfinity(v.x) && !float.IsInfinity(v.y) && !float.IsInfinity(v.z);
+
+        /// <summary>
+        /// Forces ContentWrapper's WORLD scale to exactly (1,1,1), cancelling out
+        /// InstantTarget.lossyScale - the native anchor pose's own scale
+        /// component, which is monocular SLAM's inherently uncertain internal
+        /// estimate of the ratio between its tracking units and real metres (the
+        /// same scale-ambiguity problem behind the still-open "walks meters,
+        /// registers as decimetres" bug), NOT a meaningful real-world quantity
+        /// worth preserving or trusting - especially unstable in the first few
+        /// frames after a fresh seed, before tracking has had time to settle.
+        /// Called every frame from ApplyLockedTransform/LateUpdate, not just
+        /// once after a re-seed - see LateUpdate's own doc for why that matters.
+        /// Assumes uniform, non-sheared scale throughout (true here - InstantTarget
+        /// sits at scene root with no scaled parent above it).
         /// </summary>
         private void NormalizeContentScale()
         {
-            if (ContentWrapper == null) return;
+            if (ContentWrapper == null || InstantTarget == null) return;
             Vector3 s = InstantTarget.transform.lossyScale;
+
+            // Same reasoning as ApplyLockedTransform's rotation guard - skip a
+            // degenerate frame entirely rather than let NaN/Infinity poison
+            // ContentWrapper.localScale permanently (1/NaN is NaN forever after,
+            // with nothing here to ever recover it).
+            if (!IsFinite(s)) return;
+
+            // A genuinely tiny-but-nonzero component (not caught by an exact-zero
+            // check) is just as dangerous: 1/0.0001 = 10000, still a finite
+            // number, still enough to make the building explode to an absurd
+            // size (or, inverted, shrink to imperceptible) for a frame. Clamping
+            // the minimum magnitude before dividing bounds how extreme a single
+            // bad frame's compensation can be, the same spirit as the exact-zero
+            // guard this replaced, just wide enough to actually catch what a
+            // real device produced.
+            const float minMagnitude = 0.05f;
             ContentWrapper.localScale = new Vector3(
-                Mathf.Approximately(s.x, 0f) ? 1f : 1f / s.x,
-                Mathf.Approximately(s.y, 0f) ? 1f : 1f / s.y,
-                Mathf.Approximately(s.z, 0f) ? 1f : 1f / s.z);
+                Mathf.Sign(s.x == 0f ? 1f : s.x) / Mathf.Max(Mathf.Abs(s.x), minMagnitude),
+                Mathf.Sign(s.y == 0f ? 1f : s.y) / Mathf.Max(Mathf.Abs(s.y), minMagnitude),
+                Mathf.Sign(s.z == 0f ? 1f : s.z) / Mathf.Max(Mathf.Abs(s.z), minMagnitude));
         }
 
         /// <summary>
@@ -432,31 +505,21 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Real-device testing found this needed to be a coroutine with an actual
-        /// rotation step after all - NOT the same rotation correction HandoffRoutine
-        /// does (this still never reads the secondary target's own detected
-        /// rotation - see this class's "SECONDARY RE-ANCHOR SOURCES" doc for why
-        /// that's still avoided), but re-seeding the anchor's POSITION via
-        /// SeedAnchorPosition/SetFromCameraOffset also silently re-seeds its
-        /// ROTATION as a side effect (the native call bundles both into one pose,
-        /// seeding a "facing away from camera at this instant" rotation regardless
-        /// of which real-world feature triggered it) - simply never touching
-        /// ContentWrapper.localRotation, as the first version of this method did,
-        /// does NOT stop the anchor's rotation changing underneath it, which is
-        /// exactly why content tipped onto its side on a real device the same way
-        /// the original QR rotation bug did, just via a different path. The fix:
-        /// capture ContentWrapper's WORLD rotation before re-seeding, then
-        /// re-derive localRotation afterward to land on that SAME world rotation -
-        /// this only ever CANCELS OUT the anchor's rotation change, it never
-        /// introduces any new rotation information from the secondary target, so
-        /// the position-only intent still holds.
+        /// Position-only, same as ever - this never reads or sets
+        /// _lockedWorldRotation, so it can't introduce any rotation information
+        /// from the secondary target (see this class's "SECONDARY RE-ANCHOR
+        /// SOURCES" doc for why that's avoided on purpose). Used to also do a
+        /// one-shot rotation/scale correction here directly; that's now handled
+        /// continuously by LateUpdate/ApplyLockedTransform instead (every frame,
+        /// not just once after this routine finishes) - see LateUpdate's own doc
+        /// comment for why one-shot wasn't enough. Still worth calling
+        /// ApplyLockedTransform once here anyway, for immediate same-frame
+        /// feedback rather than waiting for the next LateUpdate.
         /// </summary>
         private IEnumerator ReanchorFromSecondaryRoutine(SecondaryReanchorSource source)
         {
             Vector3 targetCameraRelative = Z.GetPosition(source.Target.AnchorPoseCameraRelative());
             Vector3 qrEquivalentOffset = targetCameraRelative - source.WorldPositionRelativeToQR;
-
-            Quaternion worldRotationBefore = ContentWrapper != null ? ContentWrapper.rotation : Quaternion.identity;
 
             SeedAnchorPosition(qrEquivalentOffset);
 
@@ -464,9 +527,7 @@ namespace ARReveal
             // Update() applies the freshly-seeded pose before reading its rotation.
             yield return null;
 
-            if (ContentWrapper != null)
-                ContentWrapper.localRotation = Quaternion.Inverse(InstantTarget.transform.rotation) * worldRotationBefore;
-            NormalizeContentScale();
+            ApplyLockedTransform();
         }
 
         /// <summary>

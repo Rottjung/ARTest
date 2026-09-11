@@ -182,8 +182,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.DebrisRing
   ChunkCount: 32
-  InnerRadius: 0.25
-  OuterRadius: 0.75
+  InnerRadius: 0.2
+  OuterRadius: 0.6
   DensityBias: 1.27
   ChunkSize: 0.1
   LargeChunkChance: 0.5

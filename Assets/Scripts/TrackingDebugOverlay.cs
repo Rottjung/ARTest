@@ -65,6 +65,24 @@ namespace ARReveal
         private Vector3 _lastAnchorPos;
         private float _totalAnchorMovement;
         private bool _posInitialized;
+        // A real-device test showed "Anchor moved" latching permanently to NaN -
+        // Vector3.Distance returns NaN if EITHER position it's given has any NaN
+        // component, and float NaN poisons every += after it forever, so a single
+        // bad frame (most likely right at/just after placement, before the native
+        // anchor pose has fully stabilised - Z.GetRotation/Z.GetScale decomposing
+        // a not-yet-valid matrix is the likely source) would explain the whole
+        // odometer going permanently unreadable from that point on, even though
+        // the underlying anchor pose may well have recovered to sane values on
+        // every later frame. Guarded below so one bad frame is skipped/counted
+        // instead of poisoning the running total - the count itself is still
+        // shown (only when >0) since a NaN frame happening at all is itself a
+        // real, worth-knowing signal about the native anchor pose's stability,
+        // not just noise to hide.
+        private int _anchorNaNFrames;
+
+        private static bool IsFinite(Vector3 v) =>
+            !float.IsNaN(v.x) && !float.IsNaN(v.y) && !float.IsNaN(v.z) &&
+            !float.IsInfinity(v.x) && !float.IsInfinity(v.y) && !float.IsInfinity(v.z);
 
         private void Awake()
         {
@@ -94,13 +112,31 @@ namespace ARReveal
                 return;
             }
 
-            _totalCamMovement += Vector3.Distance(_zCamTransform.position, _lastCamPos);
-            _lastCamPos = _zCamTransform.position;
+            // Same NaN guard on the camera side, for the same reason - cheap
+            // insurance even though it hasn't actually been observed there yet.
+            Vector3 camPos = _zCamTransform.position;
+            if (IsFinite(camPos))
+            {
+                _totalCamMovement += Vector3.Distance(camPos, _lastCamPos);
+                _lastCamPos = camPos;
+            }
 
             if (anchorTransform != null)
             {
-                _totalAnchorMovement += Vector3.Distance(anchorTransform.position, _lastAnchorPos);
-                _lastAnchorPos = anchorTransform.position;
+                Vector3 anchorPos = anchorTransform.position;
+                if (IsFinite(anchorPos))
+                {
+                    _totalAnchorMovement += Vector3.Distance(anchorPos, _lastAnchorPos);
+                    _lastAnchorPos = anchorPos;
+                }
+                else
+                {
+                    _anchorNaNFrames++;
+                    // Don't fold the bad value into _lastAnchorPos - next good
+                    // frame should compare against the last KNOWN-GOOD position,
+                    // not a garbage one, or it'd just move the poisoning by one
+                    // frame instead of fixing it.
+                }
             }
         }
 
@@ -145,13 +181,15 @@ namespace ARReveal
                 // tracking regardless of whether the QR is currently in view - so
                 // this always reads as active, never "lost". The QR-visible note is
                 // a quiet aside, not an alarm.
-                float liveDist = (Handoff != null && Handoff.InstantTarget != null && _zCamTransform != null)
-                    ? Vector3.Distance(_zCamTransform.position, Handoff.InstantTarget.transform.position)
-                    : -1f;
+                bool haveAnchor = Handoff != null && Handoff.InstantTarget != null && _zCamTransform != null;
+                Vector3 anchorPosNow = haveAnchor ? Handoff.InstantTarget.transform.position : Vector3.zero;
+                bool distValid = haveAnchor && IsFinite(anchorPosNow) && IsFinite(_zCamTransform.position);
+                float liveDist = distValid ? Vector3.Distance(_zCamTransform.position, anchorPosNow) : -1f;
                 text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
                     $"\nCam moved: {_totalCamMovement:F2}m" +
                     $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
-                    (liveDist >= 0f ? $"\nDist: {liveDist:F2}m" : "");
+                    (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +
+                    (distValid ? $"\nDist: {liveDist:F2}m" : "\nDist: n/a (bad anchor pose)");
                 color = Color.green;
             }
 

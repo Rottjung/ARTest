@@ -1682,7 +1682,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 37677d5322c344b439d86a6630bd7a6a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparCamera
-  AnchorOrigin: {fileID: 0}
+  AnchorOrigin: {fileID: 542577147}
   UseFrontFacingCamera: 0
   CameraAttitudeFromGyro: 0
   MirrorCamera: 0

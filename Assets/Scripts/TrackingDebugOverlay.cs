@@ -30,11 +30,59 @@ namespace ARReveal
         private bool _qrVisible;
         private ZapparImageTrackingTarget _target;
 
+        // --- Camera-movement odometer (diagnostic only) -----------------------
+        // Added while chasing the "building stays at the same distance no matter
+        // how far I walk" bug with Unity closed/no device to test on. This can't
+        // fix that bug by itself - it exists to answer the one question needed to
+        // narrow it down next time someone's on a real phone: does the ZAPPAR
+        // CAMERA's own transform.position actually change as the person walks?
+        // ZapparBaseCamera.UpdatePose() sets transform.localPosition every frame
+        // straight from the native SLAM pose (see that class's own source) - if
+        // this number stays ~0 while someone visibly walks several meters, the
+        // native/device-level world tracking itself isn't producing positional
+        // data (a SLAM/environment/device limitation - e.g. too few visual
+        // features to track, or a device motion-permission problem - not
+        // something fixable in this project's own scripts). If instead this
+        // number climbs in step with real walked distance but the building still
+        // doesn't appear to get closer, the bug is downstream of tracking, in how
+        // ContentWrapper/the building is parented or rendered - a genuinely
+        // different, and fixable, place to look. Reads as "Cam moved: X.XXm" -
+        // a running total (odometer, not current distance) so it's unambiguous
+        // whether it's climbing at all, glanceable without needing to watch it
+        // continuously.
+        private Transform _zCamTransform;
+        private Vector3 _lastCamPos;
+        private float _totalCamMovement;
+        private bool _camPosInitialized;
+
         private void Awake()
         {
             _target = GetComponent<ZapparImageTrackingTarget>();
             if (Handoff == null) Handoff = GetComponentInParent<HandoffToInstantTracking>();
             if (Handoff == null) Handoff = FindFirstObjectByType<HandoffToInstantTracking>();
+
+            var zCam = ZapparCamera.Instance != null ? ZapparCamera.Instance : FindFirstObjectByType<ZapparCamera>();
+            if (zCam != null) _zCamTransform = zCam.transform;
+        }
+
+        private void Update()
+        {
+            // Only start accumulating once handed off - the camera can jump
+            // around freely before the anchor is placed (that's expected/normal,
+            // see ZapparInstantTrackingTarget's own pre-placement re-seed loop),
+            // so counting that would just add noise to the one number this exists
+            // to make readable.
+            if (_zCamTransform == null || Handoff == null || !Handoff.HasHandedOff) return;
+
+            if (!_camPosInitialized)
+            {
+                _lastCamPos = _zCamTransform.position;
+                _camPosInitialized = true;
+                return;
+            }
+
+            _totalCamMovement += Vector3.Distance(_zCamTransform.position, _lastCamPos);
+            _lastCamPos = _zCamTransform.position;
         }
 
         private void OnEnable()
@@ -78,7 +126,8 @@ namespace ARReveal
                 // tracking regardless of whether the QR is currently in view - so
                 // this always reads as active, never "lost". The QR-visible note is
                 // a quiet aside, not an alarm.
-                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "");
+                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
+                    $"\nCam moved: {_totalCamMovement:F2}m";
                 color = Color.green;
             }
 
@@ -87,10 +136,13 @@ namespace ARReveal
                 fontSize = 28,
                 normal = { textColor = color }
             };
-            // Box height sized to the actual number of lines (up to 3 once handed
-            // off and the QR is in view) - a fixed height tuned for the old 2-line
-            // text was still in place when the "(QR in view)" third line was added,
-            // which is exactly why it was rendering cut off.
+            // Box height sized to the actual number of lines (up to 4 once handed
+            // off, the QR is in view, and the cam-moved odometer line is showing) -
+            // a fixed height tuned for the old 2-line text was still in place when
+            // the "(QR in view)" 3rd line was added, which is exactly why it was
+            // rendering cut off - computing it from the real line count instead
+            // means adding more lines later (like the odometer just now) can't
+            // reintroduce that same bug.
             int lineCount = text.Split('\n').Length;
             float boxHeight = 20f + lineCount * 34f;
             GUI.Box(new Rect(10, 10, 360, boxHeight), text, style);

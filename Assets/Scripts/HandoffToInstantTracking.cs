@@ -66,6 +66,49 @@ namespace ARReveal
     /// the wrong one placed the anchor off by an amount that depended on which way
     /// the camera happened to be facing when the QR was detected - fixed to match
     /// the SDK's own convention.
+    ///
+    /// STILL OPEN as of this writing, investigated with Unity closed/no device to
+    /// test on (this feature is explicitly undocumented/unsupported in Editor
+    /// PlayMode per Zappar's own docs, so static code review was the only
+    /// available tool): "walking towards the building doesn't get me closer /
+    /// walking around it doesn't let me see around it - it stays at the same
+    /// distance and screen position no matter how I move." Ruled out this
+    /// session, each with a concrete reason, not just re-asserted:
+    ///  - AnchorOrigin pointing at the wrong tracking target (there are two
+    ///    plausible candidates - the QR ImageTrackingTarget and the Instant
+    ///    Tracker - and if it pointed at the QR one, AnchorPoseCameraRelative()
+    ///    returns Matrix4x4.identity the instant the QR leaves frame, which
+    ///    would exactly explain "camera pose stops updating once you walk away
+    ///    from the QR"). Checked the actual serialized scene data:
+    ///    AnchorOrigin correctly references the ZapparInstantTrackingTarget
+    ///    component, not the QR target. Confirmed correct.
+    ///  - A stray ResetTrackerAnchor() call somewhere re-arming the pre-placement
+    ///    per-frame reseed loop (which pins the anchor to a fixed camera-relative
+    ///    offset every frame - would exactly match "stuck at a fixed distance").
+    ///    Grepped the whole project: never called anywhere. Ruled out.
+    ///  - HandoffOnce()/OnSeenEvent re-firing continuously and re-seeding the
+    ///    anchor every frame while the QR is in view. Confirmed
+    ///    ZapparImageTrackingTarget only invokes OnSeenEvent on the
+    ///    not-visible-to-visible EDGE, not every frame while visible. Ruled out.
+    ///  - com.zappar.uar package or the zappar-cv.js CDN version being stale.
+    ///    Checked GitHub commit history (nothing SLAM/tracking-relevant since
+    ///    this project's pinned commit) and cross-checked the version string
+    ///    against the package's own current WebGLTemplate (identical, 2.1.9).
+    ///    Ruled out.
+    ///  - A separate/newer "World Tracking" Unity component distinct from
+    ///    ZapparInstantTrackingTarget (a 2021 Zappar blog post uses that name).
+    ///    Checked: the installed package only ships Face/Image/Instant tracking
+    ///    targets - no such separate class exists in this Unity SDK. Ruled out
+    ///    as a real option here.
+    /// Current best-supported (NOT confirmed) theory: this is a monocular-SLAM
+    /// tracking-QUALITY limitation rather than a code bug - Zappar's own docs
+    /// note their (non-beta) Instant World Tracking wants "a relatively dense
+    /// set of features... on the horizontal placement surface" for reliable
+    /// results, and walking straight towards an anchor is a genuinely hard
+    /// motion for a single camera to resolve depth from (minimal parallax)
+    /// versus moving sideways. Added TrackingDebugOverlay's "Cam moved: X.XXm"
+    /// odometer specifically to test this theory on the next real-device
+    /// session - see that class's own doc comment for what each outcome means.
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {

@@ -55,12 +55,17 @@ namespace ARReveal
     /// depending on which direction the QR was scanned from. Fixed; every other aspect
     /// of the handoff (see below) is unaffected by this, only the rotation math was.
     ///
-    /// Built from the SDK's public API surface - the POSITION handoff specifically
-    /// still hasn't been confirmed on a real device: it assumes
-    /// ImageTarget.AnchorPoseCameraRelative()'s translation is in the same camera-space
-    /// convention InstantWorldTrackerAnchorPoseSetFromCameraOffset expects. If the QR's
-    /// real-world position doesn't line up even with the rotation now correct, that's
-    /// the remaining place to look.
+    /// The POSITION handoff had a real bug too, found the same way (real-device
+    /// testing: "scan the QR from a different angle, the building ends up in a
+    /// different place"): HandoffRoutine was seeding the anchor with
+    /// InstantTrackerTransformOrientation.WORLD, an unverified guess. Reading
+    /// Zappar's own ZapparInstantTrackingTarget.Update() - the SDK's own reference
+    /// usage of this exact function - shows every call it makes uses
+    /// MINUS_Z_AWAY_FROM_USER instead, never WORLD. That parameter controls how the
+    /// camera-relative offset's axes get interpreted at the moment of seeding, so
+    /// the wrong one placed the anchor off by an amount that depended on which way
+    /// the camera happened to be facing when the QR was detected - fixed to match
+    /// the SDK's own convention.
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {
@@ -178,9 +183,19 @@ namespace ARReveal
             Matrix4x4 cameraRelative = ImageTarget.AnchorPoseCameraRelative();
             Vector3 offset = Z.GetPosition(cameraRelative);
 
+            // MINUS_Z_AWAY_FROM_USER, not WORLD - confirmed by reading Zappar's own
+            // ZapparInstantTrackingTarget.Update() (the SDK's own reference usage of
+            // this exact function): every call it makes uses MINUS_Z_AWAY_FROM_USER,
+            // never WORLD. WORLD was an unverified guess (flagged as such in this
+            // class's own doc comment before real-device testing) - it changes how
+            // the offset's axes get interpreted relative to the camera at the moment
+            // of seeding, so using the wrong one would place the anchor at a position
+            // that's systematically off in a way that depends on which direction the
+            // camera was actually facing when the QR was detected - exactly matching
+            // "scan from a different angle, building ends up in a different place."
             Z.InstantWorldTrackerAnchorPoseSetFromCameraOffset(
                 InstantTarget.InstantTracker.Value, offset.x, offset.y, offset.z,
-                Z.InstantTrackerTransformOrientation.WORLD);
+                Z.InstantTrackerTransformOrientation.MINUS_Z_AWAY_FROM_USER);
             InstantTarget.PlaceTrackerAnchor();
 
             // Wait a frame so InstantTarget's own Update() applies the pose we just

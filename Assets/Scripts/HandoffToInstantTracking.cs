@@ -160,6 +160,21 @@ namespace ARReveal
     /// NormalizeContentScale's own doc comment. Fixed the same way in spirit
     /// (cancel out the anchor's incidental change rather than trust it), applied
     /// after EVERY re-anchor now, QR included, not just the secondary source.
+    ///
+    /// A genuinely separate FOURTH bug (not a side effect of re-seeding this
+    /// time - a plain math error in this class's own code) turned up the same
+    /// way again (real-device test: content tracked via the secondary target
+    /// ended up several metres above the ground, viewed from a bird's-eye angle
+    /// instead of sitting on it): ReanchorFromSecondaryRoutine's position math
+    /// was subtracting a fixed WORLD-space offset (WorldPositionRelativeToQR)
+    /// directly from a CAMERA-LOCAL vector (AnchorPoseCameraRelative() - despite
+    /// the name, expressed along the camera's own current axes, not fixed world
+    /// directions - confirmed by how the QR path itself uses this same kind of
+    /// value). Mixing those two frames without first rotating one into the
+    /// other is only valid when the camera happens to be perfectly
+    /// world-axis-aligned, which in practice it almost never is - see that
+    /// routine's own doc comment for the fix (rotate WorldPositionRelativeToQR
+    /// into the camera's current local frame before subtracting).
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {
@@ -484,18 +499,13 @@ namespace ARReveal
         /// The math: source.Target.AnchorPoseCameraRelative() gives THIS target's
         /// position as seen from the camera right now. We don't want to anchor
         /// there though - we want the anchor to end up exactly where the QR
-        /// itself sits, same as every QR-triggered re-seed. Since
-        /// source.WorldPositionRelativeToQR is defined as (this target's real
-        /// position) MINUS (the QR's real position, i.e. the origin) in the
-        /// scene's shared coordinate system, subtracting it from the target's
-        /// camera-relative position converts "camera-relative position of THIS
-        /// target" into "camera-relative position of the QR's own spot" -
-        /// algebraically: camera_to_QR = camera_to_target - (target_pos - QR_pos)
-        /// = camera_to_target - WorldPositionRelativeToQR. That's exactly the
-        /// same quantity HandoffRoutine gets directly from the QR, so feeding it
-        /// into the same SeedAnchorPosition produces the same result a QR
-        /// re-detection would have - just triggered by a different, more often
-        /// visible, real-world feature.
+        /// itself sits, same as every QR-triggered re-seed. See
+        /// ReanchorFromSecondaryRoutine's own comment for the corrected math -
+        /// an earlier version of this comment described a plain component-wise
+        /// subtraction as sufficient, which turned out to be wrong: real-device
+        /// testing showed content ending up several metres above the ground
+        /// (a bird's-eye view) whenever the secondary target was tracked, which
+        /// traced back to exactly the coordinate-frame bug described there.
         /// </summary>
         private void ReanchorFromSecondary(SecondaryReanchorSource source)
         {
@@ -515,11 +525,38 @@ namespace ARReveal
         /// comment for why one-shot wasn't enough. Still worth calling
         /// ApplyLockedTransform once here anyway, for immediate same-frame
         /// feedback rather than waiting for the next LateUpdate.
+        ///
+        /// REAL BUG FOUND AND FIXED HERE (real-device test: content tracked via
+        /// the secondary target ended up several metres above the ground, a
+        /// bird's-eye view instead of sitting on it): source.WorldPositionRelativeToQR
+        /// is a FIXED WORLD-SPACE offset (the facade target's real position minus
+        /// the QR's, expressed in the scene's ordinary world axes - X/Z along the
+        /// ground, Y up - same as any other position you'd read off a Transform
+        /// in the Editor). But source.Target.AnchorPoseCameraRelative() is NOT
+        /// world-space - "camera relative" here means expressed along the
+        /// CAMERA's OWN current axes (confirmed by how the QR path itself
+        /// actually works: HandoffRoutine feeds ImageTarget.AnchorPoseCameraRelative()'s
+        /// raw vector straight into SetFromCameraOffset with
+        /// MINUS_Z_AWAY_FROM_USER, and the native engine interprets those
+        /// components along whichever way the camera happens to be facing at
+        /// that instant, not fixed world directions). The original version of
+        /// this method subtracted a world-space vector from a camera-local one
+        /// directly - mixing two different coordinate frames, valid only in the
+        /// impossible special case where the camera happens to be perfectly
+        /// world-axis-aligned. The fix: rotate WorldPositionRelativeToQR INTO the
+        /// camera's current local frame first (multiply by the inverse of the
+        /// camera's current world rotation), so both vectors being subtracted are
+        /// actually expressed in the same frame before combining them.
         /// </summary>
         private IEnumerator ReanchorFromSecondaryRoutine(SecondaryReanchorSource source)
         {
             Vector3 targetCameraRelative = Z.GetPosition(source.Target.AnchorPoseCameraRelative());
-            Vector3 qrEquivalentOffset = targetCameraRelative - source.WorldPositionRelativeToQR;
+
+            Quaternion cameraRotation = ZapparCamera.Instance != null
+                ? ZapparCamera.Instance.transform.rotation
+                : Quaternion.identity;
+            Vector3 worldOffsetInCameraFrame = Quaternion.Inverse(cameraRotation) * source.WorldPositionRelativeToQR;
+            Vector3 qrEquivalentOffset = targetCameraRelative - worldOffsetInCameraFrame;
 
             SeedAnchorPosition(qrEquivalentOffset);
 

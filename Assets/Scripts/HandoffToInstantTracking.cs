@@ -153,6 +153,13 @@ namespace ARReveal
     /// any new rotation information from the secondary target, so "this source
     /// only affects position" still holds in the sense that matters (the
     /// building's real-world orientation is neither read from nor changed by it).
+    ///
+    /// A THIRD side effect turned up the same way (real-device test: "content
+    /// looks a lot smaller" after tracking the secondary target): re-seeding
+    /// position also silently re-seeds SCALE, not just rotation - see
+    /// NormalizeContentScale's own doc comment. Fixed the same way in spirit
+    /// (cancel out the anchor's incidental change rather than trust it), applied
+    /// after EVERY re-anchor now, QR included, not just the secondary source.
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {
@@ -337,7 +344,43 @@ namespace ARReveal
                 Quaternion correction = Quaternion.Inverse(InstantTarget.transform.rotation) * ImageTarget.transform.rotation;
                 ContentWrapper.localRotation = correction;
             }
+            NormalizeContentScale();
             if (firstTime) RevealContent();
+        }
+
+        /// <summary>
+        /// Found the same way as the rotation bug (real-device test: content
+        /// "looks a lot smaller" after a re-anchor): re-seeding the anchor's
+        /// position via SetFromCameraOffset doesn't just silently re-seed
+        /// ROTATION as a side effect (see ReanchorFromSecondaryRoutine's doc for
+        /// that one) - it re-seeds SCALE too. ZapparInstantTrackingTarget.
+        /// UpdateTargetPose() sets transform.localScale straight from the native
+        /// anchor pose every frame, and that scale is monocular SLAM's own
+        /// internal estimate of the ratio between its tracking units and real
+        /// metres - inherently uncertain (the same scale-ambiguity problem behind
+        /// the still-open "walks meters, registers as decimetres" bug), and
+        /// apparently uses whatever numbers happen to fall out of THIS specific
+        /// re-seed rather than staying pinned at 1. Since ContentWrapper is a
+        /// CHILD of InstantTarget, any shrink in InstantTarget.localScale shrinks
+        /// the whole building with it. Rather than trying to preserve "whatever
+        /// scale was there before" (the rotation fix's approach), this goes
+        /// further and FORCES ContentWrapper's WORLD scale to exactly (1,1,1)
+        /// after every re-anchor (QR or secondary) - the anchor's own scale
+        /// estimate isn't a meaningful real-world quantity worth preserving, it's
+        /// an artifact of monocular tracking uncertainty, so always cancelling it
+        /// out entirely is more correct than carrying forward whatever value it
+        /// last happened to seed. Assumes uniform, non-sheared scale throughout
+        /// (true here - InstantTarget sits at scene root with no scaled parent
+        /// above it), so simple component-wise division is enough.
+        /// </summary>
+        private void NormalizeContentScale()
+        {
+            if (ContentWrapper == null) return;
+            Vector3 s = InstantTarget.transform.lossyScale;
+            ContentWrapper.localScale = new Vector3(
+                Mathf.Approximately(s.x, 0f) ? 1f : 1f / s.x,
+                Mathf.Approximately(s.y, 0f) ? 1f : 1f / s.y,
+                Mathf.Approximately(s.z, 0f) ? 1f : 1f / s.z);
         }
 
         /// <summary>
@@ -423,6 +466,7 @@ namespace ARReveal
 
             if (ContentWrapper != null)
                 ContentWrapper.localRotation = Quaternion.Inverse(InstantTarget.transform.rotation) * worldRotationBefore;
+            NormalizeContentScale();
         }
 
         /// <summary>

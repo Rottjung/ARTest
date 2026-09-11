@@ -189,12 +189,30 @@ namespace ARReveal
                 // doc comment - shows exactly how far off a secondary source's
                 // WorldPositionRelativeToQR estimate was the last time it fired,
                 // so a real-device test reporting this number back gives a
-                // precise correction instead of another guess. Blank until a
-                // secondary source has actually re-anchored at least once.
-                Vector3 reanchorDelta = Handoff != null ? Handoff.LastSecondaryReanchorDelta : Vector3.zero;
-                string reanchorLine = reanchorDelta != Vector3.zero
-                    ? $"\nReanchor: ({reanchorDelta.x:F2}, {reanchorDelta.y:F2}, {reanchorDelta.z:F2})"
-                    : "";
+                // precise correction instead of another guess.
+                //
+                // Gated on Completions > 0, NOT "delta != zero" (a real-device
+                // test showed the line never appearing even though the secondary
+                // target clearly fired and moved content, badly - the old
+                // zero-check couldn't tell "the delta genuinely is zero" apart
+                // from "something threw before ever setting it", so it just
+                // stayed silently blank either way). Also always shows the
+                // Attempts/Completions counts once ANY attempt has happened -
+                // if those two numbers ever differ, something between "the event
+                // fired" and "the delta got recorded" is failing silently, which
+                // is itself the answer if the delta line still doesn't show.
+                int attempts = Handoff != null ? Handoff.SecondaryReanchorAttempts : 0;
+                int completions = Handoff != null ? Handoff.SecondaryReanchorCompletions : 0;
+                string reanchorLine = "";
+                if (attempts > 0)
+                {
+                    reanchorLine = $"\nReanchor tries: {attempts}/{completions}";
+                    if (completions > 0)
+                    {
+                        Vector3 d = Handoff.LastSecondaryReanchorDelta;
+                        reanchorLine += $"\nReanchor: ({d.x:F2}, {d.y:F2}, {d.z:F2})";
+                    }
+                }
 
                 text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
                     $"\nCam moved: {_totalCamMovement:F2}m" +

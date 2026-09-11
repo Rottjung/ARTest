@@ -236,8 +236,24 @@ namespace ARReveal
         /// 6.1m LOWER when the secondary source fired, meaning that source's
         /// Y estimate was about 6.1m too LARGE - reduce it by roughly that much).
         /// Vector3.zero until the first secondary re-anchor happens.
+        ///
+        /// TWO counters below exist because a real-device test showed the
+        /// overlay's "Reanchor" line never appearing even though the secondary
+        /// target was clearly detected and DID move the content (visibly, badly)
+        /// - the original display logic hid the line whenever this Vector3
+        /// happened to still read exactly zero, which is indistinguishable from
+        /// "the coroutine never actually reached the line that sets it" (e.g. an
+        /// exception partway through) with no way to tell the two apart from the
+        /// overlay alone. SecondaryReanchorAttempts increments the INSTANT the
+        /// event fires (before anything that could go wrong); SecondaryReanchorCompletions
+        /// increments only once LastSecondaryReanchorDelta has actually been set.
+        /// If a real test shows Attempts > Completions, something between those
+        /// two points is failing silently - genuinely useful to know, not just
+        /// display plumbing.
         /// </summary>
         public Vector3 LastSecondaryReanchorDelta { get; private set; }
+        public int SecondaryReanchorAttempts { get; private set; }
+        public int SecondaryReanchorCompletions { get; private set; }
 
         /// <summary>
         /// True once the FIRST handoff has completed (content revealed). Exposed for
@@ -532,6 +548,7 @@ namespace ARReveal
         {
             if (!_handedOff || source?.Target == null) return;
             ResetCount++;
+            SecondaryReanchorAttempts++;
             StartCoroutine(ReanchorFromSecondaryRoutine(source));
         }
 
@@ -591,7 +608,10 @@ namespace ARReveal
             yield return null;
 
             if (InstantTarget != null)
+            {
                 LastSecondaryReanchorDelta = InstantTarget.transform.position - positionBefore;
+                SecondaryReanchorCompletions++;
+            }
 
             ApplyLockedTransform();
         }

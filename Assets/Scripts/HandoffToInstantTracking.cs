@@ -29,6 +29,21 @@ namespace ARReveal
     }
 
     /// <summary>
+    /// A SECOND (or third...) real-world image target that re-anchors POSITION
+    /// ONLY whenever it's seen, on top of the primary QR - see
+    /// HandoffToInstantTracking's own class doc ("SECONDARY RE-ANCHOR SOURCES")
+    /// for the full reasoning on why this is position-only.
+    /// </summary>
+    [System.Serializable]
+    public class SecondaryReanchorSource
+    {
+        public string Name = "Building Facade";
+        public ZapparImageTrackingTarget Target;
+        [Tooltip("This target's real-world position, in the SAME coordinate system the rest of the scene already places things in relative to the QR (which sits at the scene/world origin, X/Z along the ground, Y up) - concretely: if you dropped an empty GameObject at this target's real mounted spot in the Editor and read its Transform Position, that's this value. Get this wrong and every re-anchor from this source is off by exactly that error - a rough estimate is fine to start with (see ReanchorFromSecondary's own comment for how it's used), refine after a real on-site test.")]
+        public Vector3 WorldPositionRelativeToQR;
+    }
+
+    /// <summary>
     /// The moment the QR image target is first seen, seeds a ZapparInstantTrackingTarget's
     /// anchor at that same real-world position (via Zappar's own persistent 6DOF/SLAM
     /// world tracking) and hands off to it - so content stays correctly anchored even
@@ -109,6 +124,27 @@ namespace ARReveal
     /// versus moving sideways. Added TrackingDebugOverlay's "Cam moved: X.XXm"
     /// odometer specifically to test this theory on the next real-device
     /// session - see that class's own doc comment for what each outcome means.
+    ///
+    /// SECONDARY RE-ANCHOR SOURCES (AdditionalReanchorSources): the QR only gets
+    /// glimpsed once at the very start, so between then and whenever someone
+    /// finally reaches the building, position drift has nothing to correct it -
+    /// exactly the mechanism behind the still-open bug above. A second image
+    /// target trained on part of the real building's own facade (see
+    /// BuildingFacadeTarget.jpg under Assets/Images) stays recognisable for most
+    /// of the experience instead of one early glimpse, so it can correct drift
+    /// continuously. Deliberately POSITION-ONLY, never rotation: the QR's
+    /// detected rotation can be used directly as ContentWrapper's target world
+    /// rotation only because the whole scene was authored around that exact
+    /// convention (QR flat on the ground, building rotation authored relative to
+    /// it) - a second target trained on a vertical wall has no guaranteed
+    /// equivalent relationship without dedicated on-device calibration, and
+    /// getting it wrong would reintroduce the exact "tipped on its side" bug
+    /// already fixed once for the QR path. Position, by contrast, is simple
+    /// vector math that works for ANY known real-world reference point (see
+    /// ReanchorFromSecondary's own comment for the derivation) - so that's the
+    /// safe subset shipped now; rotation correction from a secondary source
+    /// could be added later if a real test shows it's needed and its
+    /// convention can be confirmed on-device.
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {
@@ -117,6 +153,12 @@ namespace ARReveal
 
         [Tooltip("Everything that should stay anchored - hidden until handoff, then carries a one-time rotation correction and rides along with the instant tracker's ongoing SLAM tracking.")]
         public Transform ContentWrapper;
+
+        [Header("Secondary re-anchor sources (optional)")]
+        [Tooltip("Extra image targets (e.g. the building's own facade) that also correct position drift whenever seen, in addition to the QR. See SecondaryReanchorSource's own doc comment for how to set one up and why it's position-only.")]
+        public SecondaryReanchorSource[] AdditionalReanchorSources;
+
+        private readonly List<UnityEngine.Events.UnityAction> _secondaryListeners = new List<UnityEngine.Events.UnityAction>();
 
         [Header("Burst stagger")]
         [Tooltip("Each burst point (see Pairs below) or unpaired tentacle/hole/debris waits its own random delay (seconds) in this range before triggering, instead of all bursting in the same frame - purely a start-time offset, doesn't touch any of their own grow/open timings. Set both to 0 to burst everything at once.")]
@@ -159,6 +201,43 @@ namespace ARReveal
             if (ContentWrapper == null) return;
             ContentWrapper.gameObject.SetActive(false);
             DisableAllChildScripts();
+        }
+
+        /// <summary>
+        /// Subscribes each AdditionalReanchorSources entry's OWN OnSeenEvent -
+        /// unlike the QR (wired once, manually, in the Inspector to HandoffOnce,
+        /// since that's the one event that also has to trigger the very first
+        /// reveal), secondary sources are wired here in code so adding a new one
+        /// is just "assign the Target field", no Inspector event wiring to
+        /// remember or get wrong. Delegates are kept in _secondaryListeners so
+        /// OnDisable can remove the exact same instances - a lambda re-created
+        /// fresh in OnDisable would NOT match the one AddListener actually added,
+        /// silently leaking the subscription instead of removing it.
+        /// </summary>
+        private void OnEnable()
+        {
+            if (AdditionalReanchorSources == null) return;
+            foreach (var source in AdditionalReanchorSources)
+            {
+                if (source?.Target == null) continue;
+                var capturedSource = source; // local copy - avoids the classic captured-loop-variable bug
+                UnityEngine.Events.UnityAction listener = () => ReanchorFromSecondary(capturedSource);
+                _secondaryListeners.Add(listener);
+                source.Target.OnSeenEvent.AddListener(listener);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (AdditionalReanchorSources == null) return;
+            int i = 0;
+            foreach (var source in AdditionalReanchorSources)
+            {
+                if (source?.Target == null) continue;
+                if (i < _secondaryListeners.Count) source.Target.OnSeenEvent.RemoveListener(_secondaryListeners[i]);
+                i++;
+            }
+            _secondaryListeners.Clear();
         }
 
         /// <summary>
@@ -224,22 +303,7 @@ namespace ARReveal
             // Camera-relative offset of the QR at the exact moment of detection - this
             // is what places the instant anchor at the same real-world spot.
             Matrix4x4 cameraRelative = ImageTarget.AnchorPoseCameraRelative();
-            Vector3 offset = Z.GetPosition(cameraRelative);
-
-            // MINUS_Z_AWAY_FROM_USER, not WORLD - confirmed by reading Zappar's own
-            // ZapparInstantTrackingTarget.Update() (the SDK's own reference usage of
-            // this exact function): every call it makes uses MINUS_Z_AWAY_FROM_USER,
-            // never WORLD. WORLD was an unverified guess (flagged as such in this
-            // class's own doc comment before real-device testing) - it changes how
-            // the offset's axes get interpreted relative to the camera at the moment
-            // of seeding, so using the wrong one would place the anchor at a position
-            // that's systematically off in a way that depends on which direction the
-            // camera was actually facing when the QR was detected - exactly matching
-            // "scan from a different angle, building ends up in a different place."
-            Z.InstantWorldTrackerAnchorPoseSetFromCameraOffset(
-                InstantTarget.InstantTracker.Value, offset.x, offset.y, offset.z,
-                Z.InstantTrackerTransformOrientation.MINUS_Z_AWAY_FROM_USER);
-            InstantTarget.PlaceTrackerAnchor();
+            SeedAnchorPosition(Z.GetPosition(cameraRelative));
 
             // Wait a frame so InstantTarget's own Update() applies the pose we just
             // seeded before we read its transform for the rotation correction below.
@@ -266,6 +330,58 @@ namespace ARReveal
                 ContentWrapper.localRotation = correction;
             }
             if (firstTime) RevealContent();
+        }
+
+        /// <summary>
+        /// Shared by both the QR's HandoffRoutine and a secondary source's
+        /// ReanchorFromSecondary - re-seeds the instant tracker's anchor at
+        /// cameraRelativeOffsetToQR (interpreted the same way regardless of which
+        /// real-world feature was actually detected to compute it - see
+        /// ReanchorFromSecondary for how a secondary source converts ITS OWN
+        /// detection into this same "as if the QR itself were detected" quantity).
+        /// MINUS_Z_AWAY_FROM_USER, not WORLD - see this class's own doc comment
+        /// for why (confirmed against Zappar's own reference usage).
+        /// </summary>
+        private void SeedAnchorPosition(Vector3 cameraRelativeOffsetToQR)
+        {
+            Z.InstantWorldTrackerAnchorPoseSetFromCameraOffset(
+                InstantTarget.InstantTracker.Value,
+                cameraRelativeOffsetToQR.x, cameraRelativeOffsetToQR.y, cameraRelativeOffsetToQR.z,
+                Z.InstantTrackerTransformOrientation.MINUS_Z_AWAY_FROM_USER);
+            InstantTarget.PlaceTrackerAnchor();
+        }
+
+        /// <summary>
+        /// Fired (via the lambda wired in OnEnable) whenever a secondary source's
+        /// OnSeenEvent triggers. Never runs before the QR's own first handoff -
+        /// see this class's "SECONDARY RE-ANCHOR SOURCES" doc for why that stays
+        /// exclusively the QR's job.
+        ///
+        /// The math: source.Target.AnchorPoseCameraRelative() gives THIS target's
+        /// position as seen from the camera right now. We don't want to anchor
+        /// there though - we want the anchor to end up exactly where the QR
+        /// itself sits, same as every QR-triggered re-seed. Since
+        /// source.WorldPositionRelativeToQR is defined as (this target's real
+        /// position) MINUS (the QR's real position, i.e. the origin) in the
+        /// scene's shared coordinate system, subtracting it from the target's
+        /// camera-relative position converts "camera-relative position of THIS
+        /// target" into "camera-relative position of the QR's own spot" -
+        /// algebraically: camera_to_QR = camera_to_target - (target_pos - QR_pos)
+        /// = camera_to_target - WorldPositionRelativeToQR. That's exactly the
+        /// same quantity HandoffRoutine gets directly from the QR, so feeding it
+        /// into the same SeedAnchorPosition produces the same result a QR
+        /// re-detection would have - just triggered by a different, more often
+        /// visible, real-world feature.
+        /// </summary>
+        private void ReanchorFromSecondary(SecondaryReanchorSource source)
+        {
+            if (!_handedOff || source?.Target == null) return;
+            ResetCount++;
+            Vector3 targetCameraRelative = Z.GetPosition(source.Target.AnchorPoseCameraRelative());
+            Vector3 qrEquivalentOffset = targetCameraRelative - source.WorldPositionRelativeToQR;
+            SeedAnchorPosition(qrEquivalentOffset);
+            // No rotation correction here - see this class's "SECONDARY RE-ANCHOR
+            // SOURCES" doc comment for why that's deliberate, not an oversight.
         }
 
         /// <summary>

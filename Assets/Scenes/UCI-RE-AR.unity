@@ -1861,7 +1861,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
   Camera: {fileID: 0}
-  ButtonColor: {r: 1, g: 1, b: 1, a: 0.85}
+  ButtonColor: {r: 0.9169811, g: 0.039793417, b: 0.039793417, a: 0.85}
   ButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
   SortingOrder: 600
 --- !u!1 &777038240

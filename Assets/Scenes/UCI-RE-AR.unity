@@ -1612,6 +1612,59 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
+--- !u!1 &510838787
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 510838789}
+  - component: {fileID: 510838788}
+  m_Layer: 0
+  m_Name: Zappar Building Facade Target
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &510838788
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 510838787}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53a46277bb2e24858882d73be7e2e0a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparImageTrackingTarget
+  Target: BuildingFacade.zpt
+  Orientation: 1
+  PreviewImageObject: {fileID: 0}
+  OnSeenEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  OnNotSeenEvent:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!4 &510838789
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 510838787}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &523330458
 GameObject:
   m_ObjectHideFlags: 0
@@ -1866,7 +1919,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
   Camera: {fileID: 0}
-  ButtonColor: {r: 0.9169811, g: 0.039793417, b: 0.039793417, a: 0.85}
+  ButtonColor: {r: 1, g: 1, b: 1, a: 0.85}
   ButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
   SortingOrder: 600
 --- !u!1 &777038240
@@ -2336,6 +2389,10 @@ MonoBehaviour:
   ImageTarget: {fileID: 1090348472}
   InstantTarget: {fileID: 542577147}
   ContentWrapper: {fileID: 1106795034}
+  AdditionalReanchorSources:
+  - Name: Building Facade (UCI LUXE + Bowling World signage)
+    Target: {fileID: 510838788}
+    WorldPositionRelativeToQR: {x: 5.5, y: 11, z: 20.4}
   MinStartDelay: 1
   MaxStartDelay: 10
   MinDelayBetweenBursts: 0.5
@@ -2659,7 +2716,7 @@ MonoBehaviour:
   ButtonColor: {r: 1, g: 1, b: 1, a: 0.85}
   ButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
   SortingOrder: 600
-  StartHidden: 0
+  StartHidden: 1
 --- !u!4 &1607842903
 Transform:
   m_ObjectHideFlags: 0
@@ -4178,3 +4235,4 @@ SceneRoots:
   - {fileID: 173990622}
   - {fileID: 1191017942}
   - {fileID: 1607842903}
+  - {fileID: 510838789}

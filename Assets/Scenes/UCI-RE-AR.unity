@@ -1845,7 +1845,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c2eb0cc433255d43a08205add911dac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ZapparMotionFeed
-  Enabled: 1
+  Enabled: 0
 --- !u!1 &542577146
 GameObject:
   m_ObjectHideFlags: 0

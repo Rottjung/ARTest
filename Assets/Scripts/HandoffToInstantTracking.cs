@@ -132,19 +132,27 @@ namespace ARReveal
     /// target trained on part of the real building's own facade (see
     /// BuildingFacadeTarget.jpg under Assets/Images) stays recognisable for most
     /// of the experience instead of one early glimpse, so it can correct drift
-    /// continuously. Deliberately POSITION-ONLY, never rotation: the QR's
-    /// detected rotation can be used directly as ContentWrapper's target world
-    /// rotation only because the whole scene was authored around that exact
-    /// convention (QR flat on the ground, building rotation authored relative to
-    /// it) - a second target trained on a vertical wall has no guaranteed
-    /// equivalent relationship without dedicated on-device calibration, and
-    /// getting it wrong would reintroduce the exact "tipped on its side" bug
-    /// already fixed once for the QR path. Position, by contrast, is simple
-    /// vector math that works for ANY known real-world reference point (see
-    /// ReanchorFromSecondary's own comment for the derivation) - so that's the
-    /// safe subset shipped now; rotation correction from a secondary source
-    /// could be added later if a real test shows it's needed and its
-    /// convention can be confirmed on-device.
+    /// continuously. The secondary target's OWN detected rotation is never used
+    /// (see ReanchorFromSecondaryRoutine's own comment) - the QR's detected
+    /// rotation can be used directly as ContentWrapper's target world rotation
+    /// only because the whole scene was authored around that exact convention
+    /// (QR flat on the ground, building rotation authored relative to it) - a
+    /// second target trained on a vertical wall has no guaranteed equivalent
+    /// relationship without dedicated on-device calibration, and getting it wrong
+    /// would reintroduce the exact "tipped on its side" bug already fixed once for
+    /// the QR path. HOWEVER - real-device testing found that re-seeding position
+    /// ALONE still isn't rotation-neutral: the native anchor's rotation gets
+    /// re-seeded as a side effect of re-seeding its position (whichever real-world
+    /// feature triggered it), so ContentWrapper's existing rotation correction
+    /// (from whenever the QR last set it) silently stops matching and content
+    /// tips over anyway - same visible bug, different cause than the original.
+    /// The actual fix (see ReanchorFromSecondaryRoutine): capture ContentWrapper's
+    /// WORLD rotation before re-seeding, then re-derive its local rotation
+    /// afterward to land back on that exact same world rotation - this only ever
+    /// CANCELS OUT the anchor's incidental rotation change, it never introduces
+    /// any new rotation information from the secondary target, so "this source
+    /// only affects position" still holds in the sense that matters (the
+    /// building's real-world orientation is neither read from nor changed by it).
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {
@@ -377,11 +385,44 @@ namespace ARReveal
         {
             if (!_handedOff || source?.Target == null) return;
             ResetCount++;
+            StartCoroutine(ReanchorFromSecondaryRoutine(source));
+        }
+
+        /// <summary>
+        /// Real-device testing found this needed to be a coroutine with an actual
+        /// rotation step after all - NOT the same rotation correction HandoffRoutine
+        /// does (this still never reads the secondary target's own detected
+        /// rotation - see this class's "SECONDARY RE-ANCHOR SOURCES" doc for why
+        /// that's still avoided), but re-seeding the anchor's POSITION via
+        /// SeedAnchorPosition/SetFromCameraOffset also silently re-seeds its
+        /// ROTATION as a side effect (the native call bundles both into one pose,
+        /// seeding a "facing away from camera at this instant" rotation regardless
+        /// of which real-world feature triggered it) - simply never touching
+        /// ContentWrapper.localRotation, as the first version of this method did,
+        /// does NOT stop the anchor's rotation changing underneath it, which is
+        /// exactly why content tipped onto its side on a real device the same way
+        /// the original QR rotation bug did, just via a different path. The fix:
+        /// capture ContentWrapper's WORLD rotation before re-seeding, then
+        /// re-derive localRotation afterward to land on that SAME world rotation -
+        /// this only ever CANCELS OUT the anchor's rotation change, it never
+        /// introduces any new rotation information from the secondary target, so
+        /// the position-only intent still holds.
+        /// </summary>
+        private IEnumerator ReanchorFromSecondaryRoutine(SecondaryReanchorSource source)
+        {
             Vector3 targetCameraRelative = Z.GetPosition(source.Target.AnchorPoseCameraRelative());
             Vector3 qrEquivalentOffset = targetCameraRelative - source.WorldPositionRelativeToQR;
+
+            Quaternion worldRotationBefore = ContentWrapper != null ? ContentWrapper.rotation : Quaternion.identity;
+
             SeedAnchorPosition(qrEquivalentOffset);
-            // No rotation correction here - see this class's "SECONDARY RE-ANCHOR
-            // SOURCES" doc comment for why that's deliberate, not an oversight.
+
+            // Same reason as HandoffRoutine - wait a frame so InstantTarget's own
+            // Update() applies the freshly-seeded pose before reading its rotation.
+            yield return null;
+
+            if (ContentWrapper != null)
+                ContentWrapper.localRotation = Quaternion.Inverse(InstantTarget.transform.rotation) * worldRotationBefore;
         }
 
         /// <summary>

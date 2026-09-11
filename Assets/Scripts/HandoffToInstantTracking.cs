@@ -219,6 +219,27 @@ namespace ARReveal
         private Quaternion _lockedWorldRotation = Quaternion.identity;
 
         /// <summary>
+        /// How far InstantTarget's world position moved the LAST time a secondary
+        /// source re-anchored it - i.e. exactly how wrong that source's
+        /// WorldPositionRelativeToQR estimate was, assuming the camera itself
+        /// didn't move in the brief moment between whatever last set the anchor
+        /// (the QR, or an earlier secondary re-anchor) and this one. Added because
+        /// "content ends up a few metres above ground / bird's-eye view" after
+        /// tracking the secondary target is consistent with the coordinate-frame
+        /// fix (see ReanchorFromSecondaryRoutine) being correct but the estimated
+        /// WorldPositionRelativeToQR itself (a rough guess from photos, never an
+        /// actual on-site measurement) being off - this turns the next real-device
+        /// test into a precise correction instead of another guess: whatever this
+        /// reads (see TrackingDebugOverlay's "Reanchor" line), that's
+        /// approximately the (x,y,z) error to subtract from WorldPositionRelativeToQR
+        /// (e.g. if this reads "Reanchor: (0.2, -6.1, 1.0)", the anchor jumped
+        /// 6.1m LOWER when the secondary source fired, meaning that source's
+        /// Y estimate was about 6.1m too LARGE - reduce it by roughly that much).
+        /// Vector3.zero until the first secondary re-anchor happens.
+        /// </summary>
+        public Vector3 LastSecondaryReanchorDelta { get; private set; }
+
+        /// <summary>
         /// True once the FIRST handoff has completed (content revealed). Exposed for
         /// TrackingDebugOverlay - "waiting for the QR" and "tracking active" are
         /// genuinely different states worth telling apart on screen.
@@ -558,11 +579,19 @@ namespace ARReveal
             Vector3 worldOffsetInCameraFrame = Quaternion.Inverse(cameraRotation) * source.WorldPositionRelativeToQR;
             Vector3 qrEquivalentOffset = targetCameraRelative - worldOffsetInCameraFrame;
 
+            // See LastSecondaryReanchorDelta's own doc comment - captured before
+            // seeding so the delta below reflects exactly what THIS re-anchor
+            // changed, nothing else.
+            Vector3 positionBefore = InstantTarget != null ? InstantTarget.transform.position : Vector3.zero;
+
             SeedAnchorPosition(qrEquivalentOffset);
 
             // Same reason as HandoffRoutine - wait a frame so InstantTarget's own
             // Update() applies the freshly-seeded pose before reading its rotation.
             yield return null;
+
+            if (InstantTarget != null)
+                LastSecondaryReanchorDelta = InstantTarget.transform.position - positionBefore;
 
             ApplyLockedTransform();
         }

@@ -185,11 +185,23 @@ namespace ARReveal
                 Vector3 anchorPosNow = haveAnchor ? Handoff.InstantTarget.transform.position : Vector3.zero;
                 bool distValid = haveAnchor && IsFinite(anchorPosNow) && IsFinite(_zCamTransform.position);
                 float liveDist = distValid ? Vector3.Distance(_zCamTransform.position, anchorPosNow) : -1f;
+                // See HandoffToInstantTracking.LastSecondaryReanchorDelta's own
+                // doc comment - shows exactly how far off a secondary source's
+                // WorldPositionRelativeToQR estimate was the last time it fired,
+                // so a real-device test reporting this number back gives a
+                // precise correction instead of another guess. Blank until a
+                // secondary source has actually re-anchored at least once.
+                Vector3 reanchorDelta = Handoff != null ? Handoff.LastSecondaryReanchorDelta : Vector3.zero;
+                string reanchorLine = reanchorDelta != Vector3.zero
+                    ? $"\nReanchor: ({reanchorDelta.x:F2}, {reanchorDelta.y:F2}, {reanchorDelta.z:F2})"
+                    : "";
+
                 text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
                     $"\nCam moved: {_totalCamMovement:F2}m" +
                     $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
                     (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +
-                    (distValid ? $"\nDist: {liveDist:F2}m" : "\nDist: n/a (bad anchor pose)");
+                    (distValid ? $"\nDist: {liveDist:F2}m" : "\nDist: n/a (bad anchor pose)") +
+                    reanchorLine;
                 color = Color.green;
             }
 

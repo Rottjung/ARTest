@@ -330,6 +330,21 @@ namespace ARReveal
         {
             bool firstTime = !_handedOff;
             _handedOff = true;
+            // Set directly rather than relying on HandleQrSeen (a separate
+            // runtime-added listener on this SAME OnSeenEvent) having already run
+            // first - UnityEvent does NOT guarantee persistent/Inspector-wired
+            // listeners (this method) run after runtime AddListener ones
+            // (HandleQrSeen, added in OnEnable). Real-device testing found the
+            // overlay stuck at "0/10 agreeing frames" forever: if HandoffOnce ran
+            // first, SettleAndSample's very first frame saw _qrVisible still
+            // false and exited immediately, before ever taking a single sample -
+            // and since the QR never left and re-entered view again, nothing
+            // ever restarted it. HandoffOnce is only ever invoked as a direct
+            // result of the QR having just been seen (that's what OnSeenEvent
+            // means), so it's always correct to set this true here regardless of
+            // listener order - HandleQrNotSeen still correctly clears it later if
+            // the QR genuinely leaves view mid-settle.
+            _qrVisible = true;
             if (_handoffCoroutine != null) StopCoroutine(_handoffCoroutine);
             int generation = ++_handoffGeneration;
             _handoffCoroutine = StartCoroutine(HandoffRoutine(firstTime, generation));

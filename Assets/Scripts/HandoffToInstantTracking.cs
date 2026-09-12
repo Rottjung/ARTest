@@ -241,6 +241,12 @@ namespace ARReveal
         /// <summary>Rotation tolerance (degrees) between consecutive samples to count as "agreeing" - see SettleAndSample. Same untested-constant caveat as SettleFramesRequired.</summary>
         public const float SettleRotationToleranceDegrees = 3f;
 
+        /// <summary>Closest plausible camera-to-QR distance (meters) for a settle sample to be trusted at all - see SettleAndSample's own "DISTANCE SANITY CHECK" comment. Generous on purpose (a few centimeters would mean the QR is essentially against the lens) - this exists to catch a genuinely degenerate reading, not to enforce a specific scanning distance.</summary>
+        public const float MinPlausibleDistanceMeters = 0.05f;
+
+        /// <summary>Farthest plausible camera-to-QR distance (meters) for a settle sample to be trusted at all - see SettleAndSample's own "DISTANCE SANITY CHECK" comment. Generous on purpose (well beyond any distance a QR could realistically still be read at) - this exists to catch a genuinely degenerate reading, not to enforce a specific scanning distance.</summary>
+        public const float MaxPlausibleDistanceMeters = 15f;
+
         /// <summary>Hard cap on how long one settle attempt waits for convergence before giving up and seeding from the last sample anyway - fail OPEN, not closed: a client demo should never end up with content that never appears just because a reading never fully converged. See SettleAndSample.</summary>
         public const int SettleTimeoutFrames = 90;
 
@@ -636,6 +642,40 @@ namespace ARReveal
                     // Same reasoning as ApplyLockedTransform's NaN guard - skip
                     // a degenerate frame rather than let it poison the running
                     // agreement check.
+                    haveLast = false;
+                    SettleProgress = 0;
+                    sum = Vector3.zero;
+                    yield return null;
+                    continue;
+                }
+
+                // DISTANCE SANITY CHECK: real-device testing found content
+                // sometimes simply invisible after a lock (or a reset),
+                // regardless of how still the camera was held - traced to
+                // ContentRoot's own reveal (RevealContent) only ever running
+                // ONCE, on the true first lock, while its POSITION gets reset
+                // on every lock/reset independently, meaning each attempt is
+                // an independent chance for a bad reading to lock in. Frame-
+                // to-frame agreement alone can't catch a stable-but-wrong
+                // reading (the known planar-marker pose ambiguity - see this
+                // class's own doc comment). Unlike the earlier gravity-up
+                // check (removed after it broke everything - it depended on
+                // an unverified assumption about which local axis is "up"),
+                // this check depends on nothing but plain Euclidean distance:
+                // ContentRoot's position is always set to wherever the QR
+                // itself is (the building's own real-world offset is baked
+                // into its mesh data, not into this position), so the camera-
+                // to-QR distance should always be a normal, close-range
+                // scanning distance - never a couple centimeters (content
+                // effectively on top of the camera) or dozens of meters
+                // (content far outside where a QR could plausibly be read at
+                // all). Rejecting readings outside that range - never letting
+                // them count toward SettleProgress - stops a degenerate
+                // solution from ever being locked onto in the first place.
+                Vector3 camPos = ZapparCamera.Instance != null ? ZapparCamera.Instance.transform.position : Vector3.zero;
+                float distFromCamera = Vector3.Distance(pos, camPos);
+                if (distFromCamera < MinPlausibleDistanceMeters || distFromCamera > MaxPlausibleDistanceMeters)
+                {
                     haveLast = false;
                     SettleProgress = 0;
                     sum = Vector3.zero;

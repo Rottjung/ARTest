@@ -1369,7 +1369,7 @@ Transform:
   m_GameObject: {fileID: 467850643}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 2.5, y: 0, z: 20.4}
+  m_LocalPosition: {x: 2.5, y: 0.5, z: 20.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2904,7 +2904,7 @@ Transform:
   m_GameObject: {fileID: 1224018143}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.71, y: 0, z: 4.59}
+  m_LocalPosition: {x: 1.71, y: 0.5, z: 4.59}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3219,7 +3219,7 @@ Transform:
   m_GameObject: {fileID: 1521515409}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0, y: 0, z: 0}
+  m_LocalPosition: {x: -0, y: -0.001, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -3267,6 +3267,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.HideObjectsButton
   ObjectsToToggle:
   - {fileID: 87741577}
+  - {fileID: 467850643}
+  - {fileID: 1224018143}
+  - {fileID: 1521515409}
   ButtonColor: {r: 0.94716984, g: 0.3238801, b: 0.10543959, a: 0.85}
   ButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
   SortingOrder: 600

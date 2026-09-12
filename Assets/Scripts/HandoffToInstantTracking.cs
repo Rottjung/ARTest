@@ -395,29 +395,59 @@ namespace ARReveal
             }
         }
 
+        /// <summary>Consecutive not-visible frames tolerated as a detection "blip" before SettleAndSample actually gives up, rather than resetting progress to 0 on the very first one - see that method's own doc comment for why this was needed (a real-device test got stuck at "0/10 agreeing frames" for 30+ seconds, which traced to marginal/borderline QR detection flickering seen/not-seen every few frames, re-triggering HandoffOnce - and its fresh SettleProgress=0 - faster than 10 consecutive frames could ever accumulate). Untested constant, same caveat as the other Settle* ones.</summary>
+        private const int VisibilityGraceFrames = 8;
+
         /// <summary>
         /// Samples ImageTarget.AnchorPoseCameraRelative()'s position every frame
-        /// and waits for SettleFramesRequired CONSECUTIVE samples to all agree
-        /// within SettlePositionTolerance of each other before calling onSettled
-        /// with the average of that agreeing run - see this class's own doc
-        /// comment ("SEEDING FROM A SETTLED, AVERAGED READING") for why the very
-        /// first detection frame isn't trusted directly. Aborts (never calls
-        /// onSettled) if the QR drops out of view before converging (_qrVisible,
-        /// tracked via HandleQrSeen/HandleQrNotSeen) or a newer HandoffOnce call
-        /// supersedes this one (generation check). Falls back to seeding from
-        /// whatever the last sample was after SettleTimeoutFrames rather than
-        /// risking content that never appears at all - see that constant's own
-        /// doc for why (fail open, not closed).
+        /// the QR is visible, and waits for SettleFramesRequired CONSECUTIVE
+        /// (accepted) samples to all agree within SettlePositionTolerance of each
+        /// other before calling onSettled with the average of that agreeing run -
+        /// see this class's own doc comment ("SEEDING FROM A SETTLED, AVERAGED
+        /// READING") for why the very first detection frame isn't trusted
+        /// directly.
+        ///
+        /// A brief not-visible blip (up to VisibilityGraceFrames) is tolerated
+        /// WITHOUT resetting progress or sampling that frame - ImageTarget only
+        /// updates its transform while currently detected (confirmed by reading
+        /// the SDK source elsewhere in this project), so a frame where it's
+        /// momentarily not-seen would otherwise either have to be skipped (safe,
+        /// what this does) or would silently re-sample the same frozen stale pose
+        /// (NOT safe - would falsely count as "agreeing" with itself). The ORIGINAL
+        /// version of this method aborted the ENTIRE attempt on the very first
+        /// not-visible frame, which - real-device testing found - got stuck
+        /// showing "0/10 agreeing frames" for 30+ seconds: marginal/borderline QR
+        /// detection can flicker seen/not-seen every few frames, and each re-seen
+        /// edge fires HandoffOnce again (a fresh generation, SettleProgress reset
+        /// to 0), faster than 10 consecutive genuinely-sampled frames could ever
+        /// accumulate before the next abort. Only a SUSTAINED loss (longer than
+        /// VisibilityGraceFrames) now actually gives up (yield break) - a
+        /// momentary flicker just pauses sampling for those frames instead.
+        ///
+        /// Also aborts if a newer HandoffOnce call supersedes this one (generation
+        /// check). Falls back to seeding from whatever the last sample was after
+        /// SettleTimeoutFrames rather than risking content that never appears at
+        /// all - see that constant's own doc for why (fail open, not closed).
         /// </summary>
         private IEnumerator SettleAndSample(int generation, System.Action<Vector3> onSettled)
         {
             Vector3 sum = Vector3.zero;
             Vector3 lastSample = Vector3.zero;
             bool haveLastSample = false;
+            int notVisibleStreak = 0;
 
             for (int frame = 0; frame < SettleTimeoutFrames; frame++)
             {
-                if (generation != _handoffGeneration || !_qrVisible) yield break;
+                if (generation != _handoffGeneration) yield break;
+
+                if (!_qrVisible)
+                {
+                    notVisibleStreak++;
+                    if (notVisibleStreak > VisibilityGraceFrames) yield break; // genuinely lost, not just a blip
+                    yield return null;
+                    continue; // don't sample or touch progress during a brief blip
+                }
+                notVisibleStreak = 0;
 
                 Vector3 sample = Z.GetPosition(ImageTarget.AnchorPoseCameraRelative());
                 if (!IsFinite(sample))

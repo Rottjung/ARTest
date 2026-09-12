@@ -296,14 +296,20 @@ namespace ARReveal
             {
                 // worldPositionStays: false - this is a deliberate SNAP to
                 // wherever the QR is actually detected right now (identity local
-                // transform, matching ContentWrapper's authored rest position
-                // relative to its original parent), not "keep wherever it
-                // currently is" - if the QR was re-found after drifting on SLAM,
-                // this is exactly the correction that's wanted.
+                // position/rotation, matching ContentWrapper's authored rest
+                // position relative to its original parent), not "keep wherever
+                // it currently is" - if the QR was re-found after drifting on
+                // SLAM, this is exactly the correction that's wanted. Scale is
+                // NOT reset to identity here - see LateUpdate/NormalizeContentScale,
+                // which corrects it continuously in BOTH phases instead, since
+                // trusting ImageTarget's own scale directly turned out to be a
+                // real bug (see this class's own doc comment - real-device
+                // testing showed content not rendering AT ALL immediately after
+                // switching to this live-follow design, consistent with
+                // inheriting a wildly wrong scale factor from the QR target).
                 ContentWrapper.SetParent(ImageTarget.transform, false);
                 ContentWrapper.localPosition = Vector3.zero;
                 ContentWrapper.localRotation = Quaternion.identity;
-                ContentWrapper.localScale = Vector3.one;
             }
             IsFollowingQrLive = true;
 
@@ -347,35 +353,53 @@ namespace ARReveal
 
         /// <summary>
         /// Re-applies the standing-correct rotation (_lockedWorldRotation, last
-        /// set by the QR) and forces world scale back to (1,1,1), EVERY FRAME,
-        /// not just once right after a re-seed. Why continuous, not one-shot:
-        /// ZapparInstantTrackingTarget.UpdateTargetPose() re-reads the native
-        /// anchor's full pose - position, rotation, AND scale - fresh from the
-        /// tracking engine on EVERY SINGLE FRAME, not just at explicit re-seed
-        /// moments (Z.InstantWorldTrackerAnchorPose(tracker, cameraPose, ...) is
-        /// called unconditionally in its Update()). A one-shot correction right
-        /// after the SLAM handoff looked right for exactly one frame, then
-        /// silently drifted wrong again as ordinary
-        /// per-frame tracking noise/uncertainty (which is what the anchor's
-        /// rotation and scale actually represent - see NormalizeContentScale's
-        /// own doc on why scale in particular is inherently unstable, especially
-        /// in the first few frames after a fresh seed) kept overwriting
-        /// InstantTarget's transform underneath it - exactly matching a
-        /// real-device report of content going invisible/sideways/tiny again
-        /// despite the earlier one-shot fixes seeming to work at first. Position
-        /// is deliberately NOT touched here - that's meant to update continuously
-        /// as the camera moves relative to the anchor, that's the entire point of
-        /// world tracking; only rotation and scale, which should never change for
-        /// a real static building, get continuously re-locked.
+        /// set by the QR) EVERY FRAME, not just once right after a re-seed. Why
+        /// continuous, not one-shot: ZapparInstantTrackingTarget.UpdateTargetPose()
+        /// re-reads the native anchor's full pose - position, rotation, AND scale
+        /// - fresh from the tracking engine on EVERY SINGLE FRAME, not just at
+        /// explicit re-seed moments (Z.InstantWorldTrackerAnchorPose(tracker,
+        /// cameraPose, ...) is called unconditionally in its Update()). A
+        /// one-shot correction right after the SLAM handoff looked right for
+        /// exactly one frame, then silently drifted wrong again as ordinary
+        /// per-frame tracking noise/uncertainty kept overwriting InstantTarget's
+        /// transform underneath it - exactly matching a real-device report of
+        /// content going invisible/sideways again despite an earlier one-shot
+        /// fix seeming to work at first. Position is deliberately NOT touched
+        /// here - that's meant to update continuously as the camera moves
+        /// relative to the anchor, that's the entire point of world tracking;
+        /// only rotation, which should never change for a real static building,
+        /// gets continuously re-locked. Scale is handled separately, in
+        /// LateUpdate below, in BOTH phases - see NormalizeContentScale.
         ///
-        /// Skipped entirely while IsFollowingQrLive - ContentWrapper is a direct
-        /// child of ImageTarget's transform then, so Unity's own parenting
-        /// already keeps it correctly placed with zero extra code; this
-        /// correction only matters once it's riding on the Instant Tracker.
+        /// Skipped entirely while IsFollowingQrLive - ContentWrapper's rotation
+        /// is a direct child of ImageTarget's transform then, so Unity's own
+        /// parenting already keeps it correctly oriented with zero extra code;
+        /// this correction only matters once it's riding on the Instant Tracker.
         /// </summary>
         private void LateUpdate()
         {
-            if (!_handedOff || IsFollowingQrLive) return;
+            if (!_handedOff) return;
+
+            // Never trust whichever transform ContentWrapper is CURRENTLY
+            // parented under for real-world SCALE, in EITHER phase - see
+            // NormalizeContentScale's own doc comment. Originally this only ran
+            // during the SLAM-fallback phase (InstantTarget's own SLAM-derived
+            // scale is a known, previously-fixed source of this exact problem),
+            // but a real-device test found content not rendering AT ALL right
+            // after the QR was first scanned - i.e. during the LIVE phase, no
+            // SLAM involved yet - which is only consistent with the QR's OWN
+            // image-tracking target ALSO not supplying a reliable real-world
+            // scale (an untrained/incorrect-DPI target produces exactly this,
+            // the same underlying bug class already found and fixed once for a
+            // different training image this session). The old QR-seeds-SLAM
+            // design never had this problem because it never used the QR's
+            // scale for anything at all - only its position.
+            Transform reference = IsFollowingQrLive
+                ? (ImageTarget != null ? ImageTarget.transform : null)
+                : (InstantTarget != null ? InstantTarget.transform : null);
+            NormalizeContentScale(reference);
+
+            if (IsFollowingQrLive) return;
             ApplyLockedTransform();
         }
 
@@ -394,7 +418,7 @@ namespace ARReveal
             // frame's ApplyLockedTransform would keep computing NaN from NaN
             // forever, even long after the underlying tracking became fine
             // again. Skipping a bad frame instead just leaves ContentWrapper at
-            // its last known-good rotation/scale for one frame, imperceptible in
+            // its last known-good rotation for one frame, imperceptible in
             // practice, instead of permanently breaking it.
             Quaternion instantRotation = InstantTarget.transform.rotation;
             if (!IsFinite(instantRotation))
@@ -409,7 +433,6 @@ namespace ARReveal
             // order produces a CONJUGATION instead: same angle, wrong axis,
             // reading as content tipped onto its side - the original QR bug).
             ContentWrapper.localRotation = Quaternion.Inverse(instantRotation) * _lockedWorldRotation;
-            NormalizeContentScale();
         }
 
         /// <summary>Same finiteness check TrackingDebugOverlay uses for its own NaN guard on this exact tracking data - a quaternion is finite iff all four components are.</summary>
@@ -423,22 +446,29 @@ namespace ARReveal
 
         /// <summary>
         /// Forces ContentWrapper's WORLD scale to exactly (1,1,1), cancelling out
-        /// InstantTarget.lossyScale - the native anchor pose's own scale
-        /// component, which is monocular SLAM's inherently uncertain internal
+        /// whichever transform it's CURRENTLY parented under (reference -
+        /// InstantTarget during the SLAM fallback, ImageTarget during the live
+        /// phase - see LateUpdate) - trusting either one's own scale directly is
+        /// a real, previously-confirmed bug, not a hypothetical: InstantTarget's
+        /// SLAM-derived scale is monocular SLAM's inherently uncertain internal
         /// estimate of the ratio between its tracking units and real metres (the
         /// same scale-ambiguity problem behind the still-open "walks meters,
-        /// registers as decimetres" bug), NOT a meaningful real-world quantity
-        /// worth preserving or trusting - especially unstable in the first few
-        /// frames after a fresh seed, before tracking has had time to settle.
-        /// Called every frame from ApplyLockedTransform/LateUpdate, not just
-        /// once after a re-seed - see LateUpdate's own doc for why that matters.
-        /// Assumes uniform, non-sheared scale throughout (true here - InstantTarget
-        /// sits at scene root with no scaled parent above it).
+        /// registers as decimetres" bug); ImageTarget's own scale depends on the
+        /// QR's trained target actually having a correct real-world physical size
+        /// baked in, which a real-device test found NOT to hold - content simply
+        /// didn't render at all the moment ContentWrapper first inherited it
+        /// directly (see this class's own doc comment). Neither is a meaningful
+        /// real-world quantity worth preserving from either source - called every
+        /// frame in BOTH phases, not just once after a re-seed, since a
+        /// tracked transform's scale can drift moment to moment even when its
+        /// position/rotation are being trusted directly. Assumes uniform,
+        /// non-sheared scale throughout (true here - neither ImageTarget nor
+        /// InstantTarget has a scaled parent above it).
         /// </summary>
-        private void NormalizeContentScale()
+        private void NormalizeContentScale(Transform reference)
         {
-            if (ContentWrapper == null || InstantTarget == null) return;
-            Vector3 s = InstantTarget.transform.lossyScale;
+            if (ContentWrapper == null || reference == null) return;
+            Vector3 s = reference.lossyScale;
 
             // Same reasoning as ApplyLockedTransform's rotation guard - skip a
             // degenerate frame entirely rather than let NaN/Infinity poison

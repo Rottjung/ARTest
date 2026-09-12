@@ -22,6 +22,19 @@ namespace ARReveal
     [RequireComponent(typeof(ZapparImageTrackingTarget))]
     public class TrackingDebugOverlay : MonoBehaviour
     {
+        /// <summary>
+        /// BUMP BOTH OF THESE TOGETHER in every commit meant to be tested as a new
+        /// build - shown as a colored tag line in the overlay so a glance confirms
+        /// a genuinely fresh build/deploy loaded (not a stale cached one), without
+        /// having to read or compare any text. Requested after a debugging round
+        /// where it wasn't obvious whether a real-device test was actually running
+        /// the latest fix or a leftover cached build. Cycle through visually
+        /// distinct colors (not just a version number bump) since the whole point
+        /// is to be readable as "different" at a glance, from across a room.
+        /// </summary>
+        private const string BuildTag = "build-3";
+        private const string BuildTagColorHex = "#00E5FF"; // cyan - change alongside BuildTag above
+
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
         [Tooltip("Where the reset count and handoff state actually come from. Auto-found (this GameObject, its parents, or anywhere in the scene, in that order) if left blank - the two components don't have to be on the same object.")]
@@ -208,9 +221,17 @@ namespace ARReveal
                 color = Color.green;
             }
 
+            // Build-tag line always shown first, in its own color via rich text -
+            // see BuildTag/BuildTagColorHex's own doc comment for why. Kept
+            // separate from `color` above (which still means waiting/locking/
+            // active) rather than overriding the whole box's color, so that
+            // meaningful state coloring isn't lost.
+            text = $"<color={BuildTagColorHex}>[{BuildTag}]</color>\n" + text;
+
             var style = new GUIStyle(GUI.skin.box)
             {
                 fontSize = 28,
+                richText = true,
                 normal = { textColor = color }
             };
             // Box height sized to the actual number of lines (up to 6 once handed

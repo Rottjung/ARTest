@@ -89,32 +89,43 @@ namespace ARReveal
     /// InstantTarget's own SLAM-derived scale is never trusted directly either,
     /// same reasoning, same fix.
     ///
-    /// MIRRORED/BEHIND-THE-USER FIRST LOCKS - actually verified, not guessed:
-    /// read Zappar's own SDK source (Library/PackageCache/com.zappar.uar/
-    /// Runtime/*.cs) directly to check whether the position math here
-    /// (feeding ImageTarget.AnchorPoseCameraRelative() into
-    /// InstantWorldTrackerAnchorPoseSetFromCameraOffset) uses matching
-    /// coordinate conventions on both ends. Z.ConvertToUnityPose - applied to
-    /// ImageTarget.transform.position but NOT to AnchorPoseCameraRelative()'s
-    /// raw output - turns out to be a pure Z-axis flip (traced the actual
-    /// matrix multiplication: F*pose*F where F=diag(1,1,-1,1) negates exactly
-    /// the Z component of a translation), used to convert Zappar's native
-    /// camera-space convention into Unity's; both AnchorPoseCameraRelative()
-    /// calls involved here (image tracker's and instant tracker's) skip that
-    /// conversion identically, and MINUS_Z_AWAY_FROM_USER's own semantics
-    /// (matching the SDK's own -3 default offset for "in front") are
-    /// consistent with the NATIVE convention, not Unity's - so this pairing is
-    /// self-consistent and NOT the source of the bug. The real explanation: a
-    /// flat marker like a QR code has a well-known SECOND, mirrored solution
-    /// to "where is the camera relative to this square" that can be just as
-    /// stable/self-consistent as the correct one from certain viewing angles -
-    /// frame-to-frame agreement (SettleAndSample's original check) genuinely
-    /// cannot distinguish the two, since the wrong solution can hold just as
-    /// steady as the right one. Added a second, independent check that can:
-    /// the QR sits flat on the ground, so a genuinely correct reading's "up"
-    /// direction should point close to real gravity-up, which a mirrored
-    /// misread usually won't - see SettleAndSample's own "GRAVITY-UP SANITY
-    /// CHECK" comment. This reduces but cannot fully eliminate the risk (a
+    /// NO MORE NATIVE CAMERA-RELATIVE MATH FOR POSITION AT ALL - the previous
+    /// version of this class fed ImageTarget.AnchorPoseCameraRelative() (the
+    /// QR's pose expressed via Zappar's own native camera-relative computation)
+    /// into InstantWorldTrackerAnchorPoseSetFromCameraOffset, trusting that
+    /// conversion to reproduce the same real-world position ImageTarget.transform
+    /// already shows correctly. Investigated this properly (read Zappar's own
+    /// SDK source directly - Library/PackageCache/com.zappar.uar/Runtime/*.cs -
+    /// rather than guessing again) after a real-device report of "mirrored,
+    /// behind me" first locks: traced Z.ConvertToUnityPose's actual matrix math
+    /// (F*pose*F, F=diag(1,1,-1,1), a pure Z-axis flip converting Zappar's
+    /// native camera-space convention to Unity's) and confirmed the specific
+    /// pairing used WAS self-consistent (both ends skip that conversion
+    /// identically) - so that particular conversion wasn't a sign-flip bug.
+    /// But it was still an unnecessary detour: ImageTarget.transform.position
+    /// is ALREADY the correct, Unity-composed world position (that's what
+    /// makes the QR/ground-plane always line up right in the first place) -
+    /// there's no reason to re-derive a separate camera-relative quantity and
+    /// feed it through a completely different native subsystem (the Instant
+    /// Tracker's own seeding API) when the already-correct value is sitting
+    /// right there. So: ContentWrapper's world position is now set DIRECTLY
+    /// from a settled ImageTarget.transform.position reading (see
+    /// HandoffRoutine) - the Instant Tracker's own native seed (SeedAnchorPosition)
+    /// is only used to give SLAM some starting point to track FROM, and no
+    /// longer needs to be numerically accurate at all, since ContentWrapper's
+    /// displayed position doesn't come from it anymore.
+    ///
+    /// This does NOT fully eliminate a separate, genuine risk: a flat marker
+    /// like a QR code has a well-known SECOND, mirrored solution to "where is
+    /// the camera relative to this square" that can be just as frame-to-frame
+    /// stable as the correct one from certain viewing angles - consistency
+    /// checking alone (SettleAndSample's original check) cannot distinguish
+    /// the two, since the wrong solution can hold just as steady as the right
+    /// one. Added a second, independent check that can: the QR sits flat on
+    /// the ground, so a genuinely correct reading's "up" direction should
+    /// point close to real gravity-up, which a mirrored misread usually won't
+    /// - see SettleAndSample's own "GRAVITY-UP SANITY CHECK" comment. This
+    /// reduces but cannot fully eliminate the risk (a
     /// steep/grazing scan angle makes the ambiguity worse and is the one thing
     /// code-side can't fully compensate for) - scanning closer to head-on is
     /// the physical-side complement to this fix, same conclusion reached
@@ -426,7 +437,16 @@ namespace ARReveal
 
             if (!firstTime) ResetCount++;
             _lockedWorldRotation = settledRot;
-            SeedAnchorPosition(settledPos.Value);
+
+            // Give the Instant Tracker SOME starting point so its SLAM tracking
+            // begins - the exact value no longer matters for where content
+            // ends up displayed (see below), only that it's a sane, bounded
+            // placement (matching the SDK's own pre-placement default) rather
+            // than depending on whatever arbitrary offset happened to be
+            // active. See SeedAnchorPosition's own doc comment for why this
+            // changed from "the seed IS the placement" to "the seed is just a
+            // SLAM starting point."
+            SeedAnchorPosition(DefaultAnchorSeedOffset);
             _slamSeededAtLeastOnce = true;
             _hasLeftSinceLastLock = false;
 
@@ -434,17 +454,35 @@ namespace ARReveal
             // just seeded before we read its transform below.
             yield return null;
 
+            // THE ACTUAL PLACEMENT: set ContentWrapper's WORLD position
+            // directly to the settled ground-marker reading, via a plain
+            // Unity Transform assignment - not by trying to make the Instant
+            // Tracker's OWN native camera-relative seed be numerically
+            // accurate. Unity computes the correct LOCAL offset under
+            // InstantTarget automatically, using ordinary transform
+            // composition - the exact same guaranteed-correct math that
+            // already makes the ground marker/plane always line up right,
+            // with none of the native camera-relative conversion this class
+            // used to depend on for position. From this point, position is
+            // deliberately left alone (see LateUpdate) - SLAM moves
+            // InstantTarget as the camera moves, and ContentWrapper's now-
+            // fixed local offset from it rides along, correctly, regardless
+            // of whatever InstantTarget's own absolute pose is doing.
+            if (ContentWrapper != null) ContentWrapper.position = settledPos.Value;
+
             ApplyLockedTransform();
             NormalizeContentScale();
 
-            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - offset {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames).");
+            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - world position {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames).");
 
             if (firstTime) RevealContent();
         }
 
         /// <summary>
-        /// Samples ImageTarget.AnchorPoseCameraRelative()'s position AND
-        /// ImageTarget.transform.rotation every frame the QR is visible, and
+        /// Samples ImageTarget.transform.position AND .rotation - the QR's
+        /// already-correct, Unity-composed world transform, the same values
+        /// that make the ground marker/plane always line up right - every
+        /// frame the QR is visible, and
         /// waits for requiredFrames CONSECUTIVE samples to all agree with
         /// the previous one (position within SettlePositionTolerance, rotation
         /// within SettleRotationToleranceDegrees) before calling onSettled with
@@ -494,7 +532,7 @@ namespace ARReveal
                 }
                 notVisibleStreak = 0;
 
-                Vector3 pos = Z.GetPosition(ImageTarget.AnchorPoseCameraRelative());
+                Vector3 pos = ImageTarget.transform.position;
                 Quaternion rot = ImageTarget.transform.rotation;
                 if (!IsFinite(pos) || !IsFinite(rot))
                 {
@@ -679,10 +717,35 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Re-seeds the instant tracker's anchor at cameraRelativeOffsetToQR (a
-        /// settled, agreed-upon reading from SettleAndSample).
-        /// MINUS_Z_AWAY_FROM_USER, not WORLD - see this class's own doc comment
-        /// for why (confirmed against Zappar's own reference usage).
+        /// Zappar's default pre-placement offset for ZapparInstantTrackingTarget
+        /// (confirmed by reading the SDK source directly -
+        /// m_anchorOffsetFromCamera's own default) - reused here deliberately,
+        /// since HandoffRoutine no longer needs this offset to be numerically
+        /// ACCURATE (see SeedAnchorPosition's own doc comment for why), only a
+        /// sane, bounded starting point for SLAM to begin tracking from.
+        /// </summary>
+        private static readonly Vector3 DefaultAnchorSeedOffset = new Vector3(0f, 0f, -3f);
+
+        /// <summary>
+        /// Places the instant tracker's anchor at cameraRelativeOffsetToQR,
+        /// giving SLAM a starting point to track from. MINUS_Z_AWAY_FROM_USER,
+        /// not WORLD - see this class's own doc comment for why (confirmed
+        /// against Zappar's own reference usage).
+        ///
+        /// This USED to be where the actual content placement came from -
+        /// feeding a settled QR reading through Zappar's native camera-relative
+        /// seeding API. That depended on this class's own conversion math
+        /// exactly matching whatever convention that native API expects, which
+        /// - even after tracing through Zappar's ConvertToUnityPose to confirm
+        /// the two ends were self-consistent (see this class's own "MIRRORED/
+        /// BEHIND-THE-USER" doc) - was still an unnecessary detour: content's
+        /// actual displayed position is now set directly, via a plain Unity
+        /// world-position assignment on ContentWrapper (see HandoffRoutine),
+        /// using the SAME already-guaranteed-correct math that makes the QR/
+        /// ground-plane itself always line up right - no native conversion
+        /// needed at all for that. This method now ONLY needs to give the
+        /// Instant Tracker SOME starting point so its own SLAM tracking begins;
+        /// the exact value no longer affects where content ends up.
         /// </summary>
         private void SeedAnchorPosition(Vector3 cameraRelativeOffsetToQR)
         {

@@ -115,21 +115,24 @@ namespace ARReveal
     /// longer needs to be numerically accurate at all, since ContentWrapper's
     /// displayed position doesn't come from it anymore.
     ///
-    /// This does NOT fully eliminate a separate, genuine risk: a flat marker
-    /// like a QR code has a well-known SECOND, mirrored solution to "where is
-    /// the camera relative to this square" that can be just as frame-to-frame
-    /// stable as the correct one from certain viewing angles - consistency
-    /// checking alone (SettleAndSample's original check) cannot distinguish
+    /// A separate, genuine risk remains, NOT solved by any of the above: a
+    /// flat marker like a QR code has a well-known SECOND, mirrored solution
+    /// to "where is the camera relative to this square" that can be just as
+    /// frame-to-frame stable as the correct one from certain viewing angles -
+    /// consistency checking alone (SettleAndSample's check) cannot distinguish
     /// the two, since the wrong solution can hold just as steady as the right
-    /// one. Added a second, independent check that can: the QR sits flat on
-    /// the ground, so a genuinely correct reading's "up" direction should
-    /// point close to real gravity-up, which a mirrored misread usually won't
-    /// - see SettleAndSample's own "GRAVITY-UP SANITY CHECK" comment. This
-    /// reduces but cannot fully eliminate the risk (a
-    /// steep/grazing scan angle makes the ambiguity worse and is the one thing
-    /// code-side can't fully compensate for) - scanning closer to head-on is
-    /// the physical-side complement to this fix, same conclusion reached
-    /// earlier this session for the same underlying phenomenon.
+    /// one. A gravity-up sanity check was tried (reject a reading whose "up"
+    /// direction disagrees with real world-up) and immediately PULLED - a
+    /// real-device test got stuck at "0/10 agreeing frames" forever right
+    /// after adding it, meaning the assumption behind it (which local axis
+    /// ends up "up" after Zappar's own Flat-orientation correction) was wrong,
+    /// not verified against a real device before shipping. See
+    /// GravityUpToleranceDegrees's own doc comment - now logged only
+    /// (HandoffRoutine's lock-completed log line), not enforced, so a future
+    /// session can see the real number and fix this properly instead of
+    /// guessing again. Until then: scanning closer to head-on (not a steep,
+    /// grazing angle) remains the only mitigation for this specific ambiguity,
+    /// same conclusion reached earlier this session for the same phenomenon.
     ///
     /// SYNC CHECK (SyncPositionDelta/SyncRotationDeltaDegrees, see Update):
     /// whenever the QR happens to be visible again after the initial handoff,
@@ -243,7 +246,24 @@ namespace ARReveal
         /// <summary>Consecutive not-visible frames tolerated as a brief detection blip DURING a settle attempt, without aborting it - see SettleAndSample.</summary>
         public const int VisibilityGraceFrames = 8;
 
-        /// <summary>How far (degrees) a sampled reading's "up" direction may disagree with real world-up (gravity) before being rejected outright - see SettleAndSample's own "GRAVITY-UP SANITY CHECK" comment for why. The QR is mounted flat on the ground, so a genuinely correct reading should be well within a tight tolerance of straight up; a generous-but-not-huge default catches a mirrored/flipped misread (which tends to be wildly off, often sideways or downward) without being so tight it rejects ordinary handheld tilt while scanning.</summary>
+        /// <summary>
+        /// NOT ENFORCED - diagnostic only (see HandoffRoutine's lock-completed
+        /// log line, "up-vector X degrees from world-up"). Was briefly a hard
+        /// gate rejecting any settle reading whose "up" direction disagreed
+        /// with real gravity-up by more than this, on the theory that a
+        /// mirrored/flipped misread of the flat-lying QR would show up as a
+        /// wrong up-vector. Pulled after a real-device test got stuck at
+        /// "0/10 agreeing frames" FOREVER, immediately after this was added -
+        /// consistent with the assumption behind it being wrong (which of
+        /// Zappar's own post-correction local axes actually ends up "up" for
+        /// a Flat-oriented target was never actually verified on a device,
+        /// only reasoned about) rather than the mirrored-lock theory itself
+        /// being wrong. Left as a constant + logged number so a future
+        /// real-device session can read the ACTUAL angle a known-correct lock
+        /// reports, and figure out the right check (probably a different axis
+        /// or a very different tolerance) with real data instead of guessing
+        /// again under deadline pressure.
+        /// </summary>
         public const float GravityUpToleranceDegrees = 25f;
 
         /// <summary>
@@ -473,7 +493,10 @@ namespace ARReveal
             ApplyLockedTransform();
             NormalizeContentScale();
 
-            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - world position {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames).");
+            // Diagnostic only, never gates anything - see GravityUpToleranceDegrees's
+            // own doc comment for why this is logged instead of enforced.
+            float upAngle = Vector3.Angle(settledRot * Vector3.up, Vector3.up);
+            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - world position {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames, up-vector {upAngle:F0} degrees from world-up).");
 
             if (firstTime) RevealContent();
         }
@@ -539,35 +562,6 @@ namespace ARReveal
                     // Same reasoning as ApplyLockedTransform's NaN guard - skip
                     // a degenerate frame rather than let it poison the running
                     // agreement check.
-                    haveLast = false;
-                    SettleProgress = 0;
-                    sum = Vector3.zero;
-                    yield return null;
-                    continue;
-                }
-
-                // GRAVITY-UP SANITY CHECK: a real-device report ("first lock
-                // mirrored, behind me, wrong side of the QR") traced to a
-                // genuine limitation of frame-to-frame consistency checking,
-                // not a math bug - verified by reading Zappar's own SDK source
-                // (ConvertToUnityPose is a pure Z-axis flip, and the position
-                // math here uses matching conventions on both ends, confirmed
-                // by tracing the actual matrix multiplication). A flat marker
-                // like a QR code can have a SECOND, mirrored solution to
-                // "where is the camera relative to this square" that looks
-                // just as stable/self-consistent as the correct one from
-                // certain viewing angles - consecutive-frame agreement alone
-                // can't tell them apart, since the wrong solution can hold
-                // just as steady as the right one. But the QR lies FLAT ON THE
-                // GROUND, so a genuinely correct reading's "up" direction
-                // should point close to real gravity-up - a mirrored misread
-                // usually won't. Rejecting (and never letting count toward
-                // SettleProgress) any reading whose up direction disagrees
-                // with world-up by more than GravityUpToleranceDegrees adds a
-                // second, independent check that catches this specific
-                // failure mode instead of just measuring self-agreement.
-                if (Vector3.Angle(rot * Vector3.up, Vector3.up) > GravityUpToleranceDegrees)
-                {
                     haveLast = false;
                     SettleProgress = 0;
                     sum = Vector3.zero;

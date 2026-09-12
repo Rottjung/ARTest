@@ -32,8 +32,8 @@ namespace ARReveal
         /// distinct colors (not just a version number bump) since the whole point
         /// is to be readable as "different" at a glance, from across a room.
         /// </summary>
-        private const string BuildTag = "build-19";
-        private const string BuildTagColorHex = "#40E0D0"; // turquoise - change alongside BuildTag above
+        private const string BuildTag = "build-20";
+        private const string BuildTagColorHex = "#FFA500"; // orange - change alongside BuildTag above
 
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
@@ -44,40 +44,36 @@ namespace ARReveal
         private ZapparImageTrackingTarget _target;
 
         // --- Camera/anchor-movement odometers + live distance (diagnostic only) -
-        // Added while chasing the "building stays at the same distance no matter
-        // how far I walk" bug with Unity closed/no device to test on. First pass
-        // was just "Cam moved" - real-device testing then showed that number
-        // climbing even while genuinely standing still, which "Cam moved" alone
-        // can't explain: it could be ordinary handheld jitter (a real phone is
-        // never perfectly still - a few cm of drift from natural hand shake is
-        // normal and NOT itself a bug), or it could mean something odder. Two
-        // more numbers added to actually tell those apart:
-        //   - "Anchor moved" - the SAME odometer, but for the InstantTarget
-        //     (the content's own anchor) instead of the camera. In Zappar's
-        //     "origin mode" (AnchorOrigin set, which this project uses) the
-        //     anchor is SUPPOSED to stay close to fixed in world space while the
-        //     CAMERA moves realistically around it - that's the whole mechanism
-        //     that's meant to make walking around content work. If this number
-        //     climbs in step with "Cam moved" (rather than staying near 0), the
-        //     content is drifting right along with the camera instead of staying
-        //     put - which would explain "stays at the same distance/screen
-        //     position" even though the camera really is moving: both ends of
-        //     the measurement are moving together, canceling out the parallax
-        //     that should otherwise be visible.
-        //   - "Dist" - the LIVE (not cumulative) straight-line distance from
-        //     camera to anchor right now. This is the single most direct number
-        //     for the actual bug: if it doesn't change while someone deliberately
-        //     walks toward/away from the anchor, the building genuinely isn't
-        //     getting closer/further, regardless of what either odometer above
-        //     is doing individually - this is the number to watch during a real
-        //     walk test, the odometers are just there to explain WHY if it
-        //     doesn't move.
+        //
+        // "Cam moved"/"Anchor moved" are SINCE-THE-LAST-LOCK odometers, not
+        // since-app-start cumulative totals anymore. A real-device report found
+        // the old cumulative version climbing to "ridiculous 2-3000m+" over a
+        // long troubleshooting session with the phone barely moving - a plain
+        // running sum of frame-to-frame distance CANNOT distinguish "genuinely
+        // walked around" from "ordinary tracking jitter, summed over tens of
+        // thousands of frames with no reset point ever" - even sub-centimeter
+        // noise per frame adds up to kilometers eventually, since back-and-forth
+        // jitter never cancels out in a pure running total, and a noise-floor
+        // filter (tried first) only slows that down, it doesn't fix the actual
+        // problem (no reset point). Resetting both odometers every time
+        // Handoff.TotalLocksCompleted changes (see Update) makes them answer a
+        // bounded, always-meaningful question - "how much has this moved since
+        // the most recent lock/reset" - instead of an ever-growing total that's
+        // guaranteed to look broken given enough real time.
+        //
+        // "Anchor" here means InstantTarget specifically - the internal SLAM
+        // helper this class seeds with a throwaway fixed offset (see
+        // HandoffToInstantTracking.DefaultAnchorSeedOffset's own doc) - NOT
+        // where content actually is (that's ContentRoot, driven directly from
+        // the QR's own reading). This odometer is about SLAM tracking quality/
+        // stability in general, not content position specifically.
         private Transform _zCamTransform;
         private Vector3 _lastCamPos;
         private float _totalCamMovement;
         private Vector3 _lastAnchorPos;
         private float _totalAnchorMovement;
         private bool _posInitialized;
+        private int _lastSeenLockCount = -1;
         // A real-device test showed "Anchor moved" latching permanently to NaN -
         // Vector3.Distance returns NaN if EITHER position it's given has any NaN
         // component, and float NaN poisons every += after it forever, so a single
@@ -117,6 +113,18 @@ namespace ARReveal
             var anchorTransform = Handoff != null && Handoff.InstantTarget != null ? Handoff.InstantTarget.transform : null;
             if (_zCamTransform == null || Handoff == null || !Handoff.HasHandedOff) return;
 
+            // Reset both odometers every time a NEW lock/reset completes - see
+            // this class's own doc comment on _totalCamMovement/_totalAnchorMovement
+            // for why "since the last lock" replaced "since app start".
+            if (Handoff.TotalLocksCompleted != _lastSeenLockCount)
+            {
+                _lastSeenLockCount = Handoff.TotalLocksCompleted;
+                _totalCamMovement = 0f;
+                _totalAnchorMovement = 0f;
+                _anchorNaNFrames = 0;
+                _posInitialized = false;
+            }
+
             if (!_posInitialized)
             {
                 _lastCamPos = _zCamTransform.position;
@@ -128,17 +136,10 @@ namespace ARReveal
             // Same NaN guard on the camera side, for the same reason - cheap
             // insurance even though it hasn't actually been observed there yet.
             //
-            // NoiseFloorMeters guard added after a real-device report: these
-            // odometers ran up to "ridiculous 2-3000m+" over a long
-            // troubleshooting session with the phone barely moving. A naive
-            // cumulative sum of frame-to-frame distance CANNOT distinguish
-            // "genuinely walked around" from "ordinary handheld jitter, summed
-            // over tens of thousands of frames" - even a fraction of a
-            // millimeter of noise per frame adds up to kilometers over a long
-            // enough session, since back-and-forth jitter never cancels out in
-            // a pure running total. Frame-to-frame deltas smaller than this
-            // floor are treated as noise and simply not added - genuine
-            // walking (centimeters or more per frame) is unaffected.
+            // Frame-to-frame deltas below this floor are treated as noise and
+            // not added, so ordinary sub-millimeter tracking jitter doesn't
+            // slowly creep the total up even within a single lock's window -
+            // genuine movement (centimeters or more per frame) is unaffected.
             const float noiseFloorMeters = 0.01f;
 
             Vector3 camPos = _zCamTransform.position;
@@ -223,10 +224,24 @@ namespace ARReveal
                 // tracking regardless of whether the QR is currently in view - so
                 // this always reads as active, never "lost". The QR-visible note is
                 // a quiet aside, not an alarm.
-                bool haveAnchor = Handoff != null && Handoff.InstantTarget != null && _zCamTransform != null;
-                Vector3 anchorPosNow = haveAnchor ? Handoff.InstantTarget.transform.position : Vector3.zero;
-                bool distValid = haveAnchor && IsFinite(anchorPosNow) && IsFinite(_zCamTransform.position);
-                float liveDist = distValid ? Vector3.Distance(_zCamTransform.position, anchorPosNow) : -1f;
+                //
+                // "QR dist" measures camera-to-QR distance directly from
+                // ImageTarget.transform - NOT InstantTarget. A real-device
+                // report correctly caught this reading a fixed ~3-4m regardless
+                // of true scanning distance: it used to measure distance to
+                // InstantTarget, which is now seeded with a throwaway fixed
+                // offset (see HandoffToInstantTracking.DefaultAnchorSeedOffset's
+                // own doc) since content no longer comes from that anchor's
+                // absolute position at all - wrong thing being measured, not a
+                // tracking bug. Only updates while the QR is genuinely visible
+                // (ImageTarget freezes its own transform otherwise, same as
+                // everywhere else in this project) - shows the last known value
+                // rather than n/a while out of view, same spirit as "Resets"
+                // not resetting just because the QR left frame.
+                bool haveQr = Handoff != null && Handoff.ImageTarget != null && _zCamTransform != null;
+                Vector3 qrPosNow = haveQr ? Handoff.ImageTarget.transform.position : Vector3.zero;
+                bool distValid = haveQr && IsFinite(qrPosNow) && IsFinite(_zCamTransform.position);
+                float liveDist = distValid ? Vector3.Distance(_zCamTransform.position, qrPosNow) : -1f;
 
                 // See HandoffToInstantTracking's own "SYNC CHECK" doc comment -
                 // how far the QR's own live detection currently disagrees with
@@ -250,10 +265,10 @@ namespace ARReveal
                     : "";
 
                 text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") + lockLine +
-                    $"\nCam moved: {_totalCamMovement:F2}m" +
-                    $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
+                    $"\nCam moved (since lock): {_totalCamMovement:F2}m" +
+                    $"\nAnchor moved (since lock): {_totalAnchorMovement:F2}m" +
                     (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +
-                    (distValid ? $"\nDist: {liveDist:F2}m" : "\nDist: n/a (bad anchor pose)") +
+                    (distValid ? $"\nQR dist: {liveDist:F2}m" : "\nQR dist: n/a (QR never seen)") +
                     syncLine;
                 color = Color.green;
             }

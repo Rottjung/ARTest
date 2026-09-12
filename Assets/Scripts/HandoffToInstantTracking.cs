@@ -412,6 +412,17 @@ namespace ARReveal
         }
 
         /// <summary>
+        /// <summary>
+        /// True once InstantTarget has been placed (PlaceTrackerAnchor called)
+        /// for the FIRST time, regardless of whether that happened via a real
+        /// QR lock or the early, QR-independent placement below. Distinct from
+        /// _slamSeededAtLeastOnce, which specifically means "a real, QR-based
+        /// lock has completed" - kept separate so the diagnostics/sync-check
+        /// still mean what their names say.
+        /// </summary>
+        private bool _earlyAnchorPlaced;
+
+        /// <summary>
         /// SYNC CHECK - see this class's own doc comment. Only meaningful while
         /// the QR is genuinely visible (ImageTarget freezes its own transform
         /// otherwise, which would make a stale comparison look like a real,
@@ -420,6 +431,49 @@ namespace ARReveal
         /// </summary>
         private void Update()
         {
+            // EARLY ANCHOR PLACEMENT - fixes the actual root cause of "first
+            // lock specifically comes out wrong". Verified by reading Zappar's
+            // own SDK source directly (ZapparBaseCamera.UpdatePose): this
+            // scene's ZapparCamera.AnchorOrigin is InstantTarget (correctly -
+            // see this class's own doc comment for why it must NOT be the QR
+            // image target instead), which means the CAMERA's own Unity pose
+            // is computed EVERY FRAME from
+            // Z.PipelineCameraPoseWithOrigin(pipeline, InstantTarget.AnchorPoseCameraRelative()) -
+            // i.e. the camera's pose is derived FROM the anchor, not the other
+            // way around. Before InstantTarget is ever placed
+            // (PlaceTrackerAnchor), ZapparInstantTrackingTarget's own
+            // pre-placement loop continuously re-pins it to "3m in front of
+            // wherever the camera currently is" (confirmed in its own source)
+            // - a purely circular relationship (anchor = f(camera), camera =
+            // f(anchor)) that isn't tracking anything real. Since
+            // ImageTarget.transform (what SettleAndSample samples) is ITSELF
+            // computed from that same camera pose, EVERY reading taken before
+            // InstantTarget's first-ever placement is measured against a
+            // meaningless reference frame - and because that circular
+            // relationship is very self-consistent frame to frame (nothing is
+            // really being tracked, so there's no jitter), SettleAndSample's
+            // own consistency check actually converges on it FASTER than a
+            // genuine reading, not slower - explaining "first lock specifically
+            // wrong" as a near-structural certainty, not bad luck. The instant
+            // any lock calls PlaceTrackerAnchor (however wrong its position
+            // turned out), the anchor switches to real SLAM tracking, the
+            // camera's pose starts reflecting genuine device movement, and
+            // every SUBSEQUENT reading is real - matching "works after at
+            // least one reset" exactly.
+            //
+            // Fix: place InstantTarget immediately, independent of the QR
+            // ever being scanned, so this dead window happens before anyone
+            // ever scans anything rather than during the one scan that
+            // matters most. The seed value is irrelevant (see
+            // SeedAnchorPosition's own doc - never used for content placement)
+            // - this exists ONLY to break the circular dependency as early as
+            // technically possible.
+            if (!_earlyAnchorPlaced && InstantTarget != null && InstantTarget.InstantTracker.HasValue)
+            {
+                SeedAnchorPosition(DefaultAnchorSeedOffset);
+                _earlyAnchorPlaced = true;
+            }
+
             if (!_qrVisible || !_slamSeededAtLeastOnce || ImageTarget == null || InstantTarget == null) return;
 
             Vector3 qrPos = ImageTarget.transform.position;

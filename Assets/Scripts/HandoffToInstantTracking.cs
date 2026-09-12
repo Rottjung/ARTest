@@ -89,6 +89,37 @@ namespace ARReveal
     /// InstantTarget's own SLAM-derived scale is never trusted directly either,
     /// same reasoning, same fix.
     ///
+    /// MIRRORED/BEHIND-THE-USER FIRST LOCKS - actually verified, not guessed:
+    /// read Zappar's own SDK source (Library/PackageCache/com.zappar.uar/
+    /// Runtime/*.cs) directly to check whether the position math here
+    /// (feeding ImageTarget.AnchorPoseCameraRelative() into
+    /// InstantWorldTrackerAnchorPoseSetFromCameraOffset) uses matching
+    /// coordinate conventions on both ends. Z.ConvertToUnityPose - applied to
+    /// ImageTarget.transform.position but NOT to AnchorPoseCameraRelative()'s
+    /// raw output - turns out to be a pure Z-axis flip (traced the actual
+    /// matrix multiplication: F*pose*F where F=diag(1,1,-1,1) negates exactly
+    /// the Z component of a translation), used to convert Zappar's native
+    /// camera-space convention into Unity's; both AnchorPoseCameraRelative()
+    /// calls involved here (image tracker's and instant tracker's) skip that
+    /// conversion identically, and MINUS_Z_AWAY_FROM_USER's own semantics
+    /// (matching the SDK's own -3 default offset for "in front") are
+    /// consistent with the NATIVE convention, not Unity's - so this pairing is
+    /// self-consistent and NOT the source of the bug. The real explanation: a
+    /// flat marker like a QR code has a well-known SECOND, mirrored solution
+    /// to "where is the camera relative to this square" that can be just as
+    /// stable/self-consistent as the correct one from certain viewing angles -
+    /// frame-to-frame agreement (SettleAndSample's original check) genuinely
+    /// cannot distinguish the two, since the wrong solution can hold just as
+    /// steady as the right one. Added a second, independent check that can:
+    /// the QR sits flat on the ground, so a genuinely correct reading's "up"
+    /// direction should point close to real gravity-up, which a mirrored
+    /// misread usually won't - see SettleAndSample's own "GRAVITY-UP SANITY
+    /// CHECK" comment. This reduces but cannot fully eliminate the risk (a
+    /// steep/grazing scan angle makes the ambiguity worse and is the one thing
+    /// code-side can't fully compensate for) - scanning closer to head-on is
+    /// the physical-side complement to this fix, same conclusion reached
+    /// earlier this session for the same underlying phenomenon.
+    ///
     /// SYNC CHECK (SyncPositionDelta/SyncRotationDeltaDegrees, see Update):
     /// whenever the QR happens to be visible again after the initial handoff,
     /// this compares its own live detected world transform against wherever the
@@ -200,6 +231,9 @@ namespace ARReveal
 
         /// <summary>Consecutive not-visible frames tolerated as a brief detection blip DURING a settle attempt, without aborting it - see SettleAndSample.</summary>
         public const int VisibilityGraceFrames = 8;
+
+        /// <summary>How far (degrees) a sampled reading's "up" direction may disagree with real world-up (gravity) before being rejected outright - see SettleAndSample's own "GRAVITY-UP SANITY CHECK" comment for why. The QR is mounted flat on the ground, so a genuinely correct reading should be well within a tight tolerance of straight up; a generous-but-not-huge default catches a mirrored/flipped misread (which tends to be wildly off, often sideways or downward) without being so tight it rejects ordinary handheld tilt while scanning.</summary>
+        public const float GravityUpToleranceDegrees = 25f;
 
         /// <summary>
         /// Live distance (meters) between the QR's own currently-detected world
@@ -467,6 +501,35 @@ namespace ARReveal
                     // Same reasoning as ApplyLockedTransform's NaN guard - skip
                     // a degenerate frame rather than let it poison the running
                     // agreement check.
+                    haveLast = false;
+                    SettleProgress = 0;
+                    sum = Vector3.zero;
+                    yield return null;
+                    continue;
+                }
+
+                // GRAVITY-UP SANITY CHECK: a real-device report ("first lock
+                // mirrored, behind me, wrong side of the QR") traced to a
+                // genuine limitation of frame-to-frame consistency checking,
+                // not a math bug - verified by reading Zappar's own SDK source
+                // (ConvertToUnityPose is a pure Z-axis flip, and the position
+                // math here uses matching conventions on both ends, confirmed
+                // by tracing the actual matrix multiplication). A flat marker
+                // like a QR code can have a SECOND, mirrored solution to
+                // "where is the camera relative to this square" that looks
+                // just as stable/self-consistent as the correct one from
+                // certain viewing angles - consecutive-frame agreement alone
+                // can't tell them apart, since the wrong solution can hold
+                // just as steady as the right one. But the QR lies FLAT ON THE
+                // GROUND, so a genuinely correct reading's "up" direction
+                // should point close to real gravity-up - a mirrored misread
+                // usually won't. Rejecting (and never letting count toward
+                // SettleProgress) any reading whose up direction disagrees
+                // with world-up by more than GravityUpToleranceDegrees adds a
+                // second, independent check that catches this specific
+                // failure mode instead of just measuring self-agreement.
+                if (Vector3.Angle(rot * Vector3.up, Vector3.up) > GravityUpToleranceDegrees)
+                {
                     haveLast = false;
                     SettleProgress = 0;
                     sum = Vector3.zero;

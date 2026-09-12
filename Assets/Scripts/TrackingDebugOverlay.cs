@@ -166,13 +166,27 @@ namespace ARReveal
 
             string text;
             Color color;
-            if (!handedOff)
+            bool settling = Handoff != null && Handoff.IsSettling;
+            if (!handedOff && !settling)
             {
                 // Genuinely still waiting - the QR has never been seen (or was seen
                 // but the handoff hasn't finished this frame yet) - this is the ONE
                 // state that should read as "not there yet", since content really
                 // isn't live.
                 text = "WAITING FOR QR...";
+                color = Color.yellow;
+            }
+            else if (Handoff != null && !Handoff.ContentRevealed)
+            {
+                // Handoff has started (the QR was seen) but content hasn't
+                // actually been placed yet - it's mid-settle (see
+                // HandoffToInstantTracking.SettleAndSample), sampling several
+                // consecutive frames before trusting a reading, which can now
+                // take a fraction of a second rather than a single frame. Shown
+                // as its own state so this isn't misread as "TRACKING ACTIVE"
+                // before the anchor has actually been seeded.
+                text = $"LOCKING ANCHOR...\n{Handoff.SettleProgress}/{HandoffToInstantTracking.SettleFramesRequired} agreeing frames" +
+                    (_qrVisible ? "\n(QR in view)" : "\n(QR out of view - waiting)");
                 color = Color.yellow;
             }
             else
@@ -185,41 +199,12 @@ namespace ARReveal
                 Vector3 anchorPosNow = haveAnchor ? Handoff.InstantTarget.transform.position : Vector3.zero;
                 bool distValid = haveAnchor && IsFinite(anchorPosNow) && IsFinite(_zCamTransform.position);
                 float liveDist = distValid ? Vector3.Distance(_zCamTransform.position, anchorPosNow) : -1f;
-                // See HandoffToInstantTracking.LastSecondaryReanchorDelta's own
-                // doc comment - shows exactly how far off a secondary source's
-                // WorldPositionRelativeToQR estimate was the last time it fired,
-                // so a real-device test reporting this number back gives a
-                // precise correction instead of another guess.
-                //
-                // Gated on Completions > 0, NOT "delta != zero" (a real-device
-                // test showed the line never appearing even though the secondary
-                // target clearly fired and moved content, badly - the old
-                // zero-check couldn't tell "the delta genuinely is zero" apart
-                // from "something threw before ever setting it", so it just
-                // stayed silently blank either way). Also always shows the
-                // Attempts/Completions counts once ANY attempt has happened -
-                // if those two numbers ever differ, something between "the event
-                // fired" and "the delta got recorded" is failing silently, which
-                // is itself the answer if the delta line still doesn't show.
-                int attempts = Handoff != null ? Handoff.SecondaryReanchorAttempts : 0;
-                int completions = Handoff != null ? Handoff.SecondaryReanchorCompletions : 0;
-                string reanchorLine = "";
-                if (attempts > 0)
-                {
-                    reanchorLine = $"\nReanchor tries: {attempts}/{completions}";
-                    if (completions > 0)
-                    {
-                        Vector3 d = Handoff.LastSecondaryReanchorDelta;
-                        reanchorLine += $"\nReanchor: ({d.x:F2}, {d.y:F2}, {d.z:F2})";
-                    }
-                }
 
                 text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
                     $"\nCam moved: {_totalCamMovement:F2}m" +
                     $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
                     (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +
-                    (distValid ? $"\nDist: {liveDist:F2}m" : "\nDist: n/a (bad anchor pose)") +
-                    reanchorLine;
+                    (distValid ? $"\nDist: {liveDist:F2}m" : "\nDist: n/a (bad anchor pose)");
                 color = Color.green;
             }
 

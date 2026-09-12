@@ -29,21 +29,6 @@ namespace ARReveal
     }
 
     /// <summary>
-    /// A SECOND (or third...) real-world image target that re-anchors POSITION
-    /// ONLY whenever it's seen, on top of the primary QR - see
-    /// HandoffToInstantTracking's own class doc ("SECONDARY RE-ANCHOR SOURCES")
-    /// for the full reasoning on why this is position-only.
-    /// </summary>
-    [System.Serializable]
-    public class SecondaryReanchorSource
-    {
-        public string Name = "Building Facade";
-        public ZapparImageTrackingTarget Target;
-        [Tooltip("This target's real-world position, in the SAME coordinate system the rest of the scene already places things in relative to the QR (which sits at the scene/world origin, X/Z along the ground, Y up) - concretely: if you dropped an empty GameObject at this target's real mounted spot in the Editor and read its Transform Position, that's this value. Get this wrong and every re-anchor from this source is off by exactly that error - a rough estimate is fine to start with (see ReanchorFromSecondary's own comment for how it's used), refine after a real on-site test.")]
-        public Vector3 WorldPositionRelativeToQR;
-    }
-
-    /// <summary>
     /// The moment the QR image target is first seen, seeds a ZapparInstantTrackingTarget's
     /// anchor at that same real-world position (via Zappar's own persistent 6DOF/SLAM
     /// world tracking) and hands off to it - so content stays correctly anchored even
@@ -125,56 +110,40 @@ namespace ARReveal
     /// odometer specifically to test this theory on the next real-device
     /// session - see that class's own doc comment for what each outcome means.
     ///
-    /// SECONDARY RE-ANCHOR SOURCES (AdditionalReanchorSources): the QR only gets
-    /// glimpsed once at the very start, so between then and whenever someone
-    /// finally reaches the building, position drift has nothing to correct it -
-    /// exactly the mechanism behind the still-open bug above. A second image
-    /// target trained on part of the real building's own facade (see
-    /// BuildingFacadeTarget.jpg under Assets/Images) stays recognisable for most
-    /// of the experience instead of one early glimpse, so it can correct drift
-    /// continuously. The secondary target's OWN detected rotation is never used
-    /// (see ReanchorFromSecondaryRoutine's own comment) - the QR's detected
-    /// rotation can be used directly as ContentWrapper's target world rotation
-    /// only because the whole scene was authored around that exact convention
-    /// (QR flat on the ground, building rotation authored relative to it) - a
-    /// second target trained on a vertical wall has no guaranteed equivalent
-    /// relationship without dedicated on-device calibration, and getting it wrong
-    /// would reintroduce the exact "tipped on its side" bug already fixed once for
-    /// the QR path. HOWEVER - real-device testing found that re-seeding position
-    /// ALONE still isn't rotation-neutral: the native anchor's rotation gets
-    /// re-seeded as a side effect of re-seeding its position (whichever real-world
-    /// feature triggered it), so ContentWrapper's existing rotation correction
-    /// (from whenever the QR last set it) silently stops matching and content
-    /// tips over anyway - same visible bug, different cause than the original.
-    /// The actual fix (see ReanchorFromSecondaryRoutine): capture ContentWrapper's
-    /// WORLD rotation before re-seeding, then re-derive its local rotation
-    /// afterward to land back on that exact same world rotation - this only ever
-    /// CANCELS OUT the anchor's incidental rotation change, it never introduces
-    /// any new rotation information from the secondary target, so "this source
-    /// only affects position" still holds in the sense that matters (the
-    /// building's real-world orientation is neither read from nor changed by it).
+    /// A SECONDARY re-anchor source (a second image target trained on part of the
+    /// real building's facade, correcting position drift continuously instead of
+    /// relying on one early QR glimpse) was tried and then removed. It surfaced a
+    /// chain of real bugs (re-seeding silently re-seeds rotation and scale too,
+    /// not just position; a coordinate-frame mismatch between camera-local and
+    /// world-space vectors) which all got fixed in turn - see git history around
+    /// "secondary re-anchor"/"reanchor" commits if any of that reasoning is needed
+    /// again - but it was never actually testable (it requires physically
+    /// standing at the real building; a desk test with a printed copy of the
+    /// training image inherently produces nonsensical position results,
+    /// regardless of code correctness), so it was removed rather than shipped
+    /// unverified. Back to QR-only: one accurate lock, then SLAM holds it.
     ///
-    /// A THIRD side effect turned up the same way (real-device test: "content
-    /// looks a lot smaller" after tracking the secondary target): re-seeding
-    /// position also silently re-seeds SCALE, not just rotation - see
-    /// NormalizeContentScale's own doc comment. Fixed the same way in spirit
-    /// (cancel out the anchor's incidental change rather than trust it), applied
-    /// after EVERY re-anchor now, QR included, not just the secondary source.
-    ///
-    /// A genuinely separate FOURTH bug (not a side effect of re-seeding this
-    /// time - a plain math error in this class's own code) turned up the same
-    /// way again (real-device test: content tracked via the secondary target
-    /// ended up several metres above the ground, viewed from a bird's-eye angle
-    /// instead of sitting on it): ReanchorFromSecondaryRoutine's position math
-    /// was subtracting a fixed WORLD-space offset (WorldPositionRelativeToQR)
-    /// directly from a CAMERA-LOCAL vector (AnchorPoseCameraRelative() - despite
-    /// the name, expressed along the camera's own current axes, not fixed world
-    /// directions - confirmed by how the QR path itself uses this same kind of
-    /// value). Mixing those two frames without first rotating one into the
-    /// other is only valid when the camera happens to be perfectly
-    /// world-axis-aligned, which in practice it almost never is - see that
-    /// routine's own doc comment for the fix (rotate WorldPositionRelativeToQR
-    /// into the camera's current local frame before subtracting).
+    /// SEEDING FROM A SETTLED, AVERAGED READING (not the first detection frame):
+    /// real-device testing found that rescanning the QR several times in a row -
+    /// standing still, same QR - produced a noticeably different position AND
+    /// rotation each time. That's not a bug in the correction math above (all of
+    /// which only runs AFTER seeding) - it traces to WHEN the original code
+    /// sampled the QR's detected pose: HandoffRoutine used to read
+    /// ImageTarget.AnchorPoseCameraRelative() on the exact frame OnSeenEvent first
+    /// fires, i.e. the instant the detector just barely crossed its confidence
+    /// threshold - the single noisiest possible sample. Compounding that, small
+    /// flat markers (a QR code is a good example) have a well-known planar-pose
+    /// ambiguity: viewed at anything but head-on, the "camera relative to this
+    /// square" solve can have two nearly-equally-valid answers that flip between
+    /// each other on tiny viewpoint differences - matching "different result each
+    /// rescan" exactly, with no code bug required to explain it. Fixed by
+    /// HandoffRoutine now sampling several consecutive frames and only seeding
+    /// once they agree within a tolerance (see SettleAndSample) - trading a
+    /// fraction of a second of extra wait for a genuinely converged reading
+    /// instead of the first noisy one. This does NOT fully eliminate the planar-
+    /// pose-ambiguity risk (a print scanned at a steep angle can still converge
+    /// on the wrong one of the two solutions) - printing the QR larger and
+    /// scanning closer to head-on remains the physical-side mitigation for that.
     /// </summary>
     public class HandoffToInstantTracking : MonoBehaviour
     {
@@ -183,12 +152,6 @@ namespace ARReveal
 
         [Tooltip("Everything that should stay anchored - hidden until handoff, then carries a one-time rotation correction and rides along with the instant tracker's ongoing SLAM tracking.")]
         public Transform ContentWrapper;
-
-        [Header("Secondary re-anchor sources (optional)")]
-        [Tooltip("Extra image targets (e.g. the building's own facade) that also correct position drift whenever seen, in addition to the QR. See SecondaryReanchorSource's own doc comment for how to set one up and why it's position-only.")]
-        public SecondaryReanchorSource[] AdditionalReanchorSources;
-
-        private readonly List<UnityEngine.Events.UnityAction> _secondaryListeners = new List<UnityEngine.Events.UnityAction>();
 
         [Header("Burst stagger")]
         [Tooltip("Each burst point (see Pairs below) or unpaired tentacle/hole/debris waits its own random delay (seconds) in this range before triggering, instead of all bursting in the same frame - purely a start-time offset, doesn't touch any of their own grow/open timings. Set both to 0 to burst everything at once.")]
@@ -210,50 +173,44 @@ namespace ARReveal
 
         /// <summary>
         /// The building's real-world rotation, as last established by the QR (the
-        /// only source ever trusted for rotation - see this class's own
-        /// "SECONDARY RE-ANCHOR SOURCES" doc). Re-applied to ContentWrapper EVERY
-        /// FRAME in LateUpdate, not just once right after a re-seed - see
+        /// only source ever trusted for rotation). Re-applied to ContentWrapper
+        /// EVERY FRAME in LateUpdate, not just once right after a re-seed - see
         /// LateUpdate's own doc comment for why a one-shot correction turned out
         /// not to be enough.
         /// </summary>
         private Quaternion _lockedWorldRotation = Quaternion.identity;
 
         /// <summary>
-        /// How far InstantTarget's world position moved the LAST time a secondary
-        /// source re-anchored it - i.e. exactly how wrong that source's
-        /// WorldPositionRelativeToQR estimate was, assuming the camera itself
-        /// didn't move in the brief moment between whatever last set the anchor
-        /// (the QR, or an earlier secondary re-anchor) and this one. Added because
-        /// "content ends up a few metres above ground / bird's-eye view" after
-        /// tracking the secondary target is consistent with the coordinate-frame
-        /// fix (see ReanchorFromSecondaryRoutine) being correct but the estimated
-        /// WorldPositionRelativeToQR itself (a rough guess from photos, never an
-        /// actual on-site measurement) being off - this turns the next real-device
-        /// test into a precise correction instead of another guess: whatever this
-        /// reads (see TrackingDebugOverlay's "Reanchor" line), that's
-        /// approximately the (x,y,z) error to subtract from WorldPositionRelativeToQR
-        /// (e.g. if this reads "Reanchor: (0.2, -6.1, 1.0)", the anchor jumped
-        /// 6.1m LOWER when the secondary source fired, meaning that source's
-        /// Y estimate was about 6.1m too LARGE - reduce it by roughly that much).
-        /// Vector3.zero until the first secondary re-anchor happens.
-        ///
-        /// TWO counters below exist because a real-device test showed the
-        /// overlay's "Reanchor" line never appearing even though the secondary
-        /// target was clearly detected and DID move the content (visibly, badly)
-        /// - the original display logic hid the line whenever this Vector3
-        /// happened to still read exactly zero, which is indistinguishable from
-        /// "the coroutine never actually reached the line that sets it" (e.g. an
-        /// exception partway through) with no way to tell the two apart from the
-        /// overlay alone. SecondaryReanchorAttempts increments the INSTANT the
-        /// event fires (before anything that could go wrong); SecondaryReanchorCompletions
-        /// increments only once LastSecondaryReanchorDelta has actually been set.
-        /// If a real test shows Attempts > Completions, something between those
-        /// two points is failing silently - genuinely useful to know, not just
-        /// display plumbing.
+        /// True from the moment HandoffOnce starts sampling until the settle loop
+        /// (see SettleAndSample) either converges and seeds, or aborts because the
+        /// QR dropped out of view - exposed so TrackingDebugOverlay can show a
+        /// distinct "locking..." state instead of jumping straight to "tracking
+        /// active" before content has actually been placed (seeding can now take
+        /// up to SettleTimeoutFrames, not just a single frame, since it no longer
+        /// trusts the first detection - see this class's own doc comment).
         /// </summary>
-        public Vector3 LastSecondaryReanchorDelta { get; private set; }
-        public int SecondaryReanchorAttempts { get; private set; }
-        public int SecondaryReanchorCompletions { get; private set; }
+        public bool IsSettling { get; private set; }
+
+        /// <summary>
+        /// Consecutive frames the sampled QR pose has agreed within tolerance so
+        /// far during the current settle attempt (see SettleAndSample) - live
+        /// progress toward SettleFramesRequired, for on-screen feedback while
+        /// locking. Reset to 0 whenever a fresh sample disagrees with the
+        /// previous one, or a new settle attempt starts.
+        /// </summary>
+        public int SettleProgress { get; private set; }
+
+        /// <summary>Required consecutive agreeing frames before a reading is trusted enough to seed from - see SettleAndSample. Untested constant (no reference usage anywhere to check against, same caveat this project's other real-device-only constants carry) - tune from an actual device if locking feels too slow or too twitchy.</summary>
+        public const int SettleFramesRequired = 10;
+
+        /// <summary>Position tolerance (meters) between consecutive samples to count as "agreeing" - see SettleAndSample. Same untested-constant caveat as SettleFramesRequired.</summary>
+        public const float SettlePositionTolerance = 0.12f;
+
+        /// <summary>Hard cap on how long one settle attempt waits for convergence before giving up and seeding from the last sample anyway - fail OPEN, not closed: a client demo should never end up with content that never appears just because a reading never fully converged. See SettleAndSample.</summary>
+        public const int SettleTimeoutFrames = 90;
+
+        /// <summary>True once content has actually been revealed (RevealContent has run) - distinct from HasHandedOff, which goes true as soon as the QR is first seen, before the settle loop has necessarily finished. See IsSettling's own doc for why TrackingDebugOverlay needs both.</summary>
+        public bool ContentRevealed { get; private set; }
 
         /// <summary>
         /// True once the FIRST handoff has completed (content revealed). Exposed for
@@ -281,41 +238,34 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Subscribes each AdditionalReanchorSources entry's OWN OnSeenEvent -
-        /// unlike the QR (wired once, manually, in the Inspector to HandoffOnce,
-        /// since that's the one event that also has to trigger the very first
-        /// reveal), secondary sources are wired here in code so adding a new one
-        /// is just "assign the Target field", no Inspector event wiring to
-        /// remember or get wrong. Delegates are kept in _secondaryListeners so
-        /// OnDisable can remove the exact same instances - a lambda re-created
-        /// fresh in OnDisable would NOT match the one AddListener actually added,
-        /// silently leaking the subscription instead of removing it.
+        /// Tracks whether the QR is CURRENTLY visible, independent of the
+        /// Inspector-wired OnSeenEvent -> HandoffOnce() call - HandoffRoutine's
+        /// settle-and-sample loop (see SettleAndSample) needs to know if the QR
+        /// drops out of view mid-settle, so it can abort that attempt instead of
+        /// quietly seeding from a stale last-known pose once ZapparImageTrackingTarget
+        /// stops updating (its own Update() skips UpdateTargetPose() entirely once
+        /// the image is no longer detected - confirmed by reading the SDK source -
+        /// so a frozen stale reading would otherwise look identical to a
+        /// genuinely-converged one).
         /// </summary>
+        private bool _qrVisible;
+
         private void OnEnable()
         {
-            if (AdditionalReanchorSources == null) return;
-            foreach (var source in AdditionalReanchorSources)
-            {
-                if (source?.Target == null) continue;
-                var capturedSource = source; // local copy - avoids the classic captured-loop-variable bug
-                UnityEngine.Events.UnityAction listener = () => ReanchorFromSecondary(capturedSource);
-                _secondaryListeners.Add(listener);
-                source.Target.OnSeenEvent.AddListener(listener);
-            }
+            if (ImageTarget == null) return;
+            ImageTarget.OnSeenEvent.AddListener(HandleQrSeen);
+            ImageTarget.OnNotSeenEvent.AddListener(HandleQrNotSeen);
         }
 
         private void OnDisable()
         {
-            if (AdditionalReanchorSources == null) return;
-            int i = 0;
-            foreach (var source in AdditionalReanchorSources)
-            {
-                if (source?.Target == null) continue;
-                if (i < _secondaryListeners.Count) source.Target.OnSeenEvent.RemoveListener(_secondaryListeners[i]);
-                i++;
-            }
-            _secondaryListeners.Clear();
+            if (ImageTarget == null) return;
+            ImageTarget.OnSeenEvent.RemoveListener(HandleQrSeen);
+            ImageTarget.OnNotSeenEvent.RemoveListener(HandleQrNotSeen);
         }
+
+        private void HandleQrSeen() => _qrVisible = true;
+        private void HandleQrNotSeen() => _qrVisible = false;
 
         /// <summary>
         /// Structural guarantee, not a checkbox to remember: every script under
@@ -353,34 +303,55 @@ namespace ARReveal
         {
             if (_handedOff) return;
             _handedOff = true;
+            ContentRevealed = true;
             RevealContent();
         }
+
+        private Coroutine _handoffCoroutine;
+        private int _handoffGeneration;
 
         /// <summary>
         /// Wire this to ImageTarget's OnSeenEvent - despite the name (kept as-is so
         /// existing OnSeenEvent wiring in the scene doesn't need to be redone),
         /// this now runs every time the QR is (re)detected, not just the first.
-        /// The FIRST call reveals content (unchanged) - every call, including that
-        /// first one, re-seeds the instant tracker's anchor from THIS fresh
-        /// detection, correcting any position/rotation drift the SLAM tracking may
-        /// have accumulated while the QR was out of view. Content itself is never
-        /// re-revealed or re-burst on a re-detection - only the anchor is refreshed,
-        /// which is why RevealContent() is still gated on firstTime.
+        /// The FIRST call reveals content - every call, including that first one,
+        /// re-seeds the instant tracker's anchor from THIS fresh detection (once
+        /// it settles - see SettleAndSample), correcting any position/rotation
+        /// drift the SLAM tracking may have accumulated while the QR was out of
+        /// view. Content itself is never re-revealed or re-burst on a
+        /// re-detection - only the anchor is refreshed, which is why
+        /// RevealContent() is still gated on firstTime. A generation counter
+        /// guards against overlapping attempts: if the QR is glimpsed, lost, and
+        /// re-seen again before the first attempt finished settling, the stale
+        /// coroutine is stopped and a fresh one takes over rather than both
+        /// racing to seed the anchor.
         /// </summary>
         public void HandoffOnce()
         {
             bool firstTime = !_handedOff;
             _handedOff = true;
-            if (!firstTime) ResetCount++;
-            StartCoroutine(HandoffRoutine(firstTime));
+            if (_handoffCoroutine != null) StopCoroutine(_handoffCoroutine);
+            int generation = ++_handoffGeneration;
+            _handoffCoroutine = StartCoroutine(HandoffRoutine(firstTime, generation));
         }
 
-        private IEnumerator HandoffRoutine(bool firstTime)
+        private IEnumerator HandoffRoutine(bool firstTime, int generation)
         {
-            // Camera-relative offset of the QR at the exact moment of detection - this
-            // is what places the instant anchor at the same real-world spot.
-            Matrix4x4 cameraRelative = ImageTarget.AnchorPoseCameraRelative();
-            SeedAnchorPosition(Z.GetPosition(cameraRelative));
+            IsSettling = true;
+            SettleProgress = 0;
+
+            Vector3? settled = null;
+            yield return SettleAndSample(generation, v => settled = v);
+
+            IsSettling = false;
+
+            // Superseded by a newer HandoffOnce call while this one was still
+            // settling, or the QR dropped out of view before ever converging -
+            // either way, this attempt just quietly stops.
+            if (generation != _handoffGeneration || settled == null) yield break;
+
+            if (!firstTime) ResetCount++;
+            SeedAnchorPosition(settled.Value);
 
             // Wait a frame so InstantTarget's own Update() applies the pose we just
             // seeded before we read its transform below.
@@ -394,7 +365,83 @@ namespace ARReveal
             // which is all this used to do, wasn't enough.
             _lockedWorldRotation = ImageTarget.transform.rotation;
             ApplyLockedTransform();
-            if (firstTime) RevealContent();
+
+            // Logged every lock (not just #if UNITY_EDITOR) so a real-device
+            // console/remote-log during testing shows exactly what got seeded and
+            // how convinced the settle loop was (SettleProgress vs
+            // SettleFramesRequired) - the concrete ask behind this: measure
+            // lock-to-lock drift/error across repeated scans, not just eyeball it.
+            Debug.Log($"[HandoffToInstantTracking] Locked anchor - seeded position {settled.Value}, rotation {_lockedWorldRotation.eulerAngles} (settle reached {SettleProgress}/{SettleFramesRequired} agreeing frames).");
+
+            if (firstTime)
+            {
+                ContentRevealed = true;
+                RevealContent();
+            }
+        }
+
+        /// <summary>
+        /// Samples ImageTarget.AnchorPoseCameraRelative()'s position every frame
+        /// and waits for SettleFramesRequired CONSECUTIVE samples to all agree
+        /// within SettlePositionTolerance of each other before calling onSettled
+        /// with the average of that agreeing run - see this class's own doc
+        /// comment ("SEEDING FROM A SETTLED, AVERAGED READING") for why the very
+        /// first detection frame isn't trusted directly. Aborts (never calls
+        /// onSettled) if the QR drops out of view before converging (_qrVisible,
+        /// tracked via HandleQrSeen/HandleQrNotSeen) or a newer HandoffOnce call
+        /// supersedes this one (generation check). Falls back to seeding from
+        /// whatever the last sample was after SettleTimeoutFrames rather than
+        /// risking content that never appears at all - see that constant's own
+        /// doc for why (fail open, not closed).
+        /// </summary>
+        private IEnumerator SettleAndSample(int generation, System.Action<Vector3> onSettled)
+        {
+            Vector3 sum = Vector3.zero;
+            Vector3 lastSample = Vector3.zero;
+            bool haveLastSample = false;
+
+            for (int frame = 0; frame < SettleTimeoutFrames; frame++)
+            {
+                if (generation != _handoffGeneration || !_qrVisible) yield break;
+
+                Vector3 sample = Z.GetPosition(ImageTarget.AnchorPoseCameraRelative());
+                if (!IsFinite(sample))
+                {
+                    // Same reasoning as ApplyLockedTransform's NaN guard elsewhere
+                    // in this class - skip a degenerate frame rather than let it
+                    // poison the running agreement check.
+                    haveLastSample = false;
+                    SettleProgress = 0;
+                    sum = Vector3.zero;
+                    yield return null;
+                    continue;
+                }
+
+                if (haveLastSample && Vector3.Distance(sample, lastSample) <= SettlePositionTolerance)
+                {
+                    SettleProgress++;
+                    sum += sample;
+                }
+                else
+                {
+                    SettleProgress = 1;
+                    sum = sample;
+                }
+                lastSample = sample;
+                haveLastSample = true;
+
+                if (SettleProgress >= SettleFramesRequired)
+                {
+                    onSettled(sum / SettleProgress);
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            // Timed out without converging - seed from the last sample anyway,
+            // see SettleTimeoutFrames's own doc comment for why.
+            if (haveLastSample) onSettled(lastSample);
         }
 
         /// <summary>
@@ -406,8 +453,8 @@ namespace ARReveal
         /// tracking engine on EVERY SINGLE FRAME, not just at explicit re-seed
         /// moments (Z.InstantWorldTrackerAnchorPose(tracker, cameraPose, ...) is
         /// called unconditionally in its Update()). A one-shot correction right
-        /// after HandoffRoutine/ReanchorFromSecondaryRoutine looked right for
-        /// exactly one frame, then silently drifted wrong again as ordinary
+        /// after HandoffRoutine looked right for exactly one frame, then silently
+        /// drifted wrong again as ordinary
         /// per-frame tracking noise/uncertainty (which is what the anchor's
         /// rotation and scale actually represent - see NormalizeContentScale's
         /// own doc on why scale in particular is inherently unstable, especially
@@ -509,14 +556,10 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Shared by both the QR's HandoffRoutine and a secondary source's
-        /// ReanchorFromSecondary - re-seeds the instant tracker's anchor at
-        /// cameraRelativeOffsetToQR (interpreted the same way regardless of which
-        /// real-world feature was actually detected to compute it - see
-        /// ReanchorFromSecondary for how a secondary source converts ITS OWN
-        /// detection into this same "as if the QR itself were detected" quantity).
-        /// MINUS_Z_AWAY_FROM_USER, not WORLD - see this class's own doc comment
-        /// for why (confirmed against Zappar's own reference usage).
+        /// Re-seeds the instant tracker's anchor at cameraRelativeOffsetToQR (the
+        /// settled, averaged reading from SettleAndSample). MINUS_Z_AWAY_FROM_USER,
+        /// not WORLD - see this class's own doc comment for why (confirmed
+        /// against Zappar's own reference usage).
         /// </summary>
         private void SeedAnchorPosition(Vector3 cameraRelativeOffsetToQR)
         {
@@ -525,95 +568,6 @@ namespace ARReveal
                 cameraRelativeOffsetToQR.x, cameraRelativeOffsetToQR.y, cameraRelativeOffsetToQR.z,
                 Z.InstantTrackerTransformOrientation.MINUS_Z_AWAY_FROM_USER);
             InstantTarget.PlaceTrackerAnchor();
-        }
-
-        /// <summary>
-        /// Fired (via the lambda wired in OnEnable) whenever a secondary source's
-        /// OnSeenEvent triggers. Never runs before the QR's own first handoff -
-        /// see this class's "SECONDARY RE-ANCHOR SOURCES" doc for why that stays
-        /// exclusively the QR's job.
-        ///
-        /// The math: source.Target.AnchorPoseCameraRelative() gives THIS target's
-        /// position as seen from the camera right now. We don't want to anchor
-        /// there though - we want the anchor to end up exactly where the QR
-        /// itself sits, same as every QR-triggered re-seed. See
-        /// ReanchorFromSecondaryRoutine's own comment for the corrected math -
-        /// an earlier version of this comment described a plain component-wise
-        /// subtraction as sufficient, which turned out to be wrong: real-device
-        /// testing showed content ending up several metres above the ground
-        /// (a bird's-eye view) whenever the secondary target was tracked, which
-        /// traced back to exactly the coordinate-frame bug described there.
-        /// </summary>
-        private void ReanchorFromSecondary(SecondaryReanchorSource source)
-        {
-            if (!_handedOff || source?.Target == null) return;
-            ResetCount++;
-            SecondaryReanchorAttempts++;
-            StartCoroutine(ReanchorFromSecondaryRoutine(source));
-        }
-
-        /// <summary>
-        /// Position-only, same as ever - this never reads or sets
-        /// _lockedWorldRotation, so it can't introduce any rotation information
-        /// from the secondary target (see this class's "SECONDARY RE-ANCHOR
-        /// SOURCES" doc for why that's avoided on purpose). Used to also do a
-        /// one-shot rotation/scale correction here directly; that's now handled
-        /// continuously by LateUpdate/ApplyLockedTransform instead (every frame,
-        /// not just once after this routine finishes) - see LateUpdate's own doc
-        /// comment for why one-shot wasn't enough. Still worth calling
-        /// ApplyLockedTransform once here anyway, for immediate same-frame
-        /// feedback rather than waiting for the next LateUpdate.
-        ///
-        /// REAL BUG FOUND AND FIXED HERE (real-device test: content tracked via
-        /// the secondary target ended up several metres above the ground, a
-        /// bird's-eye view instead of sitting on it): source.WorldPositionRelativeToQR
-        /// is a FIXED WORLD-SPACE offset (the facade target's real position minus
-        /// the QR's, expressed in the scene's ordinary world axes - X/Z along the
-        /// ground, Y up - same as any other position you'd read off a Transform
-        /// in the Editor). But source.Target.AnchorPoseCameraRelative() is NOT
-        /// world-space - "camera relative" here means expressed along the
-        /// CAMERA's OWN current axes (confirmed by how the QR path itself
-        /// actually works: HandoffRoutine feeds ImageTarget.AnchorPoseCameraRelative()'s
-        /// raw vector straight into SetFromCameraOffset with
-        /// MINUS_Z_AWAY_FROM_USER, and the native engine interprets those
-        /// components along whichever way the camera happens to be facing at
-        /// that instant, not fixed world directions). The original version of
-        /// this method subtracted a world-space vector from a camera-local one
-        /// directly - mixing two different coordinate frames, valid only in the
-        /// impossible special case where the camera happens to be perfectly
-        /// world-axis-aligned. The fix: rotate WorldPositionRelativeToQR INTO the
-        /// camera's current local frame first (multiply by the inverse of the
-        /// camera's current world rotation), so both vectors being subtracted are
-        /// actually expressed in the same frame before combining them.
-        /// </summary>
-        private IEnumerator ReanchorFromSecondaryRoutine(SecondaryReanchorSource source)
-        {
-            Vector3 targetCameraRelative = Z.GetPosition(source.Target.AnchorPoseCameraRelative());
-
-            Quaternion cameraRotation = ZapparCamera.Instance != null
-                ? ZapparCamera.Instance.transform.rotation
-                : Quaternion.identity;
-            Vector3 worldOffsetInCameraFrame = Quaternion.Inverse(cameraRotation) * source.WorldPositionRelativeToQR;
-            Vector3 qrEquivalentOffset = targetCameraRelative - worldOffsetInCameraFrame;
-
-            // See LastSecondaryReanchorDelta's own doc comment - captured before
-            // seeding so the delta below reflects exactly what THIS re-anchor
-            // changed, nothing else.
-            Vector3 positionBefore = InstantTarget != null ? InstantTarget.transform.position : Vector3.zero;
-
-            SeedAnchorPosition(qrEquivalentOffset);
-
-            // Same reason as HandoffRoutine - wait a frame so InstantTarget's own
-            // Update() applies the freshly-seeded pose before reading its rotation.
-            yield return null;
-
-            if (InstantTarget != null)
-            {
-                LastSecondaryReanchorDelta = InstantTarget.transform.position - positionBefore;
-                SecondaryReanchorCompletions++;
-            }
-
-            ApplyLockedTransform();
         }
 
         /// <summary>

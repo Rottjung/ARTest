@@ -361,6 +361,15 @@ namespace ARReveal
         public bool HasSeededAtLeastOnce => _slamSeededAtLeastOnce;
         private bool _slamSeededAtLeastOnce;
 
+        /// <summary>The settled world position from the MOST RECENT completed lock (first or reset) - see LastLockWasReveal's own doc. Requested directly, to show on TrackingDebugOverlay for each reset, since content sometimes locking onto a plausible-but-invisible position (not a "wrong place", just never appearing at all) is otherwise impossible to diagnose from the overlay alone.</summary>
+        public Vector3 LastLockedPosition { get; private set; }
+
+        /// <summary>True if the MOST RECENT completed lock was the one that actually called RevealContent() (i.e. it was the true first lock) - false for every reset after that, since RevealContent() only ever runs once. Shown alongside LastLockedPosition so it's clear which lock, if any, was "the reveal moment".</summary>
+        public bool LastLockWasReveal { get; private set; }
+
+        /// <summary>How many completed locks (first + resets) have happened total - distinct from ResetCount (which only counts RE-locks, not the first) - shown on the overlay so "reveal never happened yet, 3 locks so far" is distinguishable from "reveal happened on lock 1".</summary>
+        public int TotalLocksCompleted { get; private set; }
+
         private Coroutine _handoffCoroutine;
         private int _handoffGeneration;
 
@@ -572,6 +581,13 @@ namespace ARReveal
                 // Harmless no-op if already active.
                 ContentRoot.gameObject.SetActive(true);
             }
+
+            // Exposed for TrackingDebugOverlay - see each property's own doc
+            // comment. Requested directly so a live on-site session can watch
+            // the position for each reset without needing a console.
+            LastLockedPosition = settledPos.Value;
+            LastLockWasReveal = firstTime;
+            TotalLocksCompleted++;
 
             // Diagnostic only, never gates anything - see GravityUpToleranceDegrees's
             // own doc comment for why this is logged instead of enforced.

@@ -32,8 +32,8 @@ namespace ARReveal
         /// distinct colors (not just a version number bump) since the whole point
         /// is to be readable as "different" at a glance, from across a room.
         /// </summary>
-        private const string BuildTag = "build-17";
-        private const string BuildTagColorHex = "#7FFF00"; // chartreuse - change alongside BuildTag above
+        private const string BuildTag = "build-18";
+        private const string BuildTagColorHex = "#FF6EC7"; // hot pink - change alongside BuildTag above
 
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
@@ -127,10 +127,25 @@ namespace ARReveal
 
             // Same NaN guard on the camera side, for the same reason - cheap
             // insurance even though it hasn't actually been observed there yet.
+            //
+            // NoiseFloorMeters guard added after a real-device report: these
+            // odometers ran up to "ridiculous 2-3000m+" over a long
+            // troubleshooting session with the phone barely moving. A naive
+            // cumulative sum of frame-to-frame distance CANNOT distinguish
+            // "genuinely walked around" from "ordinary handheld jitter, summed
+            // over tens of thousands of frames" - even a fraction of a
+            // millimeter of noise per frame adds up to kilometers over a long
+            // enough session, since back-and-forth jitter never cancels out in
+            // a pure running total. Frame-to-frame deltas smaller than this
+            // floor are treated as noise and simply not added - genuine
+            // walking (centimeters or more per frame) is unaffected.
+            const float noiseFloorMeters = 0.01f;
+
             Vector3 camPos = _zCamTransform.position;
             if (IsFinite(camPos))
             {
-                _totalCamMovement += Vector3.Distance(camPos, _lastCamPos);
+                float camDelta = Vector3.Distance(camPos, _lastCamPos);
+                if (camDelta >= noiseFloorMeters) _totalCamMovement += camDelta;
                 _lastCamPos = camPos;
             }
 
@@ -139,7 +154,8 @@ namespace ARReveal
                 Vector3 anchorPos = anchorTransform.position;
                 if (IsFinite(anchorPos))
                 {
-                    _totalAnchorMovement += Vector3.Distance(anchorPos, _lastAnchorPos);
+                    float anchorDelta = Vector3.Distance(anchorPos, _lastAnchorPos);
+                    if (anchorDelta >= noiseFloorMeters) _totalAnchorMovement += anchorDelta;
                     _lastAnchorPos = anchorPos;
                 }
                 else
@@ -223,7 +239,17 @@ namespace ARReveal
                     ? $"\nQR/SLAM sync: {Handoff.SyncPositionDelta:F2}m, {Handoff.SyncRotationDeltaDegrees:F1}deg"
                     : "";
 
-                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
+                // Requested directly - print the settled position for EVERY
+                // lock/reset, and whether that particular one was the true
+                // "reveal moment" (the only one that actually calls
+                // RevealContent()) - so a bad-but-invisible lock can be
+                // compared against a good-and-visible one without needing a
+                // console.
+                string lockLine = Handoff != null
+                    ? $"\nLock #{Handoff.TotalLocksCompleted}{(Handoff.LastLockWasReveal ? " (REVEAL)" : "")}: {Handoff.LastLockedPosition:F2}"
+                    : "";
+
+                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") + lockLine +
                     $"\nCam moved: {_totalCamMovement:F2}m" +
                     $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
                     (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +

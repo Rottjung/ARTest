@@ -427,7 +427,8 @@ namespace ARReveal
         /// before its own pair's timer elapses - Start() simply never fires until this
         /// re-enables that exact component. Only TentacleController/WallHoleEffect/
         /// DebrisRing get re-enabled, exactly when RevealContent() is about to trigger
-        /// them (see TriggerPairAfterDelay/TriggerAfterDelay) - anything else stays
+        /// them (immediately if unpaired, or via TriggerPairAfterDelay if part of a
+        /// Pairs entry) - anything else stays
         /// disabled forever, which is the point: a forgotten test script can no longer
         /// fire early no matter what its own flags say.
         ///
@@ -892,23 +893,31 @@ namespace ARReveal
 
         /// <summary>
         /// Activates ContentWrapper, then starts every paired burst point (Pairs -
-        /// tentacle+hole+debris+smoke+rubble together on one shared random delay) plus
-        /// every remaining TentacleController/WallHoleEffect/DebrisRing/SmokePuff/
-        /// FallingRubble found under it that isn't part of a pair (each on its own
-        /// independent random delay), so nothing added under ContentWrapper but never
-        /// wired into Pairs gets silently skipped. SetActive(true) alone isn't enough -
-        /// each one waits for its own Grow()/Open() call (Unfold-style tentacles
-        /// otherwise just sit static in their curled rest pose; Punch-style ones stay
-        /// invisible, since they zero their own scale in Awake() until told to grow).
+        /// tentacle+hole+debris+smoke+rubble together on one shared random delay).
+        /// Anything else found under ContentWrapper - a TentacleController/
+        /// WallHoleEffect/DebrisRing/SmokePuff/FallingRubble that isn't part of
+        /// any Pairs entry - fires IMMEDIATELY instead, no delay at all: staggering
+        /// is only ever meant for the deliberately choreographed burst points
+        /// listed in Pairs, not for anything left unwired. (Previously,
+        /// unpaired items ALSO got their own independent random delay, on the
+        /// reasoning that nothing should be silently skipped - per direct
+        /// request, changed so "not in Pairs" now means "show immediately the
+        /// moment tracking locks", not "show on some other random delay".)
+        /// SetActive(true) alone isn't enough for any of these - each one waits
+        /// for its own Grow()/Open() call (Unfold-style tentacles otherwise
+        /// just sit static in their curled rest pose; Punch-style ones stay
+        /// invisible, since they zero their own scale in Awake() until told to
+        /// grow) - "immediately" here means that call happens right in this
+        /// method, not via a delayed coroutine.
         ///
-        /// Every non-hero burst point's random delay is drawn together as ONE batch
-        /// (see GenerateSpacedDelays/MinDelayBetweenBursts) rather than each one
-        /// calling Random.Range independently the instant its own StartCoroutine
-        /// runs - independent draws could land close enough by pure chance to read
-        /// as a simultaneous double-burst, which a shared minimum-gap batch avoids.
-        /// The hero (if any) is excluded from that batch entirely - it always gets
-        /// the separate guaranteed-FIRST delay from HeroStartDelay(), unaffected by
-        /// this spacing.
+        /// Every non-hero Pairs entry's random delay is drawn together as ONE
+        /// batch (see GenerateSpacedDelays/MinDelayBetweenBursts) rather than
+        /// each one calling Random.Range independently the instant its own
+        /// StartCoroutine runs - independent draws could land close enough by
+        /// pure chance to read as a simultaneous double-burst, which a shared
+        /// minimum-gap batch avoids. The hero Pairs entry (if any) is excluded
+        /// from that batch entirely - it always gets the separate guaranteed-
+        /// FIRST delay from HeroStartDelay(), unaffected by this spacing.
         /// </summary>
         private void RevealContent()
         {
@@ -922,8 +931,9 @@ namespace ARReveal
             var pairedRubble = new HashSet<FallingRubble>();
 
             // Collects every trigger that should draw from the shared spaced-random
-            // batch below - hero pairs/tentacles fire immediately with their own
-            // guaranteed delay instead of being added here.
+            // batch below - ONLY Pairs entries go through this now (see this
+            // method's own doc comment) - the hero pair fires immediately with
+            // its own guaranteed delay instead of being added here.
             var pendingRandomTriggers = new List<System.Action<float>>();
 
             if (Pairs != null)
@@ -946,26 +956,18 @@ namespace ARReveal
                 }
             }
 
+            // Not part of any Pairs entry - show immediately, no delay, no
+            // stagger, hero or not (see this method's own doc comment).
             foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true))
-            {
-                if (pairedTentacles.Contains(tentacle)) continue;
-                if (tentacle.IsHero)
-                    StartCoroutine(TriggerAfterDelay(() => { tentacle.enabled = true; tentacle.Grow(); }, HeroStartDelay()));
-                else
-                    pendingRandomTriggers.Add(delay => StartCoroutine(TriggerAfterDelay(() => { tentacle.enabled = true; tentacle.Grow(); }, delay)));
-            }
+                if (!pairedTentacles.Contains(tentacle)) { tentacle.enabled = true; tentacle.Grow(); }
             foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true))
-                if (!pairedHoles.Contains(hole))
-                    pendingRandomTriggers.Add(delay => StartCoroutine(TriggerAfterDelay(() => { hole.enabled = true; hole.Open(); }, delay)));
+                if (!pairedHoles.Contains(hole)) { hole.enabled = true; hole.Open(); }
             foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true))
-                if (!pairedDebris.Contains(debris))
-                    pendingRandomTriggers.Add(delay => StartCoroutine(TriggerAfterDelay(() => { debris.enabled = true; debris.Open(); }, delay)));
+                if (!pairedDebris.Contains(debris)) { debris.enabled = true; debris.Open(); }
             foreach (var smoke in ContentWrapper.GetComponentsInChildren<SmokePuff>(true))
-                if (!pairedSmoke.Contains(smoke))
-                    pendingRandomTriggers.Add(delay => StartCoroutine(TriggerAfterDelay(() => { smoke.enabled = true; smoke.Open(); }, delay)));
+                if (!pairedSmoke.Contains(smoke)) { smoke.enabled = true; smoke.Open(); }
             foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true))
-                if (!pairedRubble.Contains(rubble))
-                    pendingRandomTriggers.Add(delay => StartCoroutine(TriggerAfterDelay(() => { rubble.enabled = true; rubble.Open(); }, delay)));
+                if (!pairedRubble.Contains(rubble)) { rubble.enabled = true; rubble.Open(); }
 
             float[] delays = GenerateSpacedDelays(pendingRandomTriggers.Count, MinStartDelay, MaxStartDelay, MinDelayBetweenBursts);
             for (int i = 0; i < pendingRandomTriggers.Count; i++)
@@ -1042,11 +1044,5 @@ namespace ARReveal
             }
         }
 
-        /// <summary>delay is passed in already resolved by the caller (RevealContent) - either the hero's guaranteed-first HeroStartDelay(), or this trigger's own slot from the shared spaced-random batch (see GenerateSpacedDelays).</summary>
-        private IEnumerator TriggerAfterDelay(System.Action trigger, float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            trigger();
-        }
     }
 }

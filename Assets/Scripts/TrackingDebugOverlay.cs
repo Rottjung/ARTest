@@ -32,8 +32,8 @@ namespace ARReveal
         /// distinct colors (not just a version number bump) since the whole point
         /// is to be readable as "different" at a glance, from across a room.
         /// </summary>
-        private const string BuildTag = "build-6";
-        private const string BuildTagColorHex = "#FF3D9A"; // pink - change alongside BuildTag above
+        private const string BuildTag = "build-7";
+        private const string BuildTagColorHex = "#7CFC00"; // lawn green - change alongside BuildTag above
 
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
@@ -188,12 +188,28 @@ namespace ARReveal
                 text = "WAITING FOR QR...";
                 color = Color.yellow;
             }
+            else if (Handoff != null && Handoff.IsFollowingQrLive)
+            {
+                // ContentWrapper is a live child of the QR's own transform right
+                // now - the same mechanism the QR/ground-plane itself always
+                // used, and just as consistent. Still show the sync line if
+                // it's ever been computed (e.g. from a previous SLAM phase),
+                // since it's independent of which phase is currently active.
+                bool syncValid = Handoff.SyncCheckValid;
+                string syncLine = syncValid
+                    ? $"\nQR/SLAM sync: {Handoff.SyncPositionDelta:F2}m, {Handoff.SyncRotationDeltaDegrees:F1}deg"
+                    : "";
+                text = "TRACKING ACTIVE\n(LIVE on QR)" + $"\nSLAM handoffs: {resets}" + syncLine;
+                color = Color.green;
+            }
             else
             {
-                // Content is live and anchored via the instant tracker's own SLAM
-                // tracking regardless of whether the QR is currently in view - so
-                // this always reads as active, never "lost". The QR-visible note is
-                // a quiet aside, not an alarm.
+                // QR is out of view - content is riding on the Instant Tracker's
+                // own SLAM tracking instead, with rotation/scale continuously
+                // re-locked to the QR's last known values (see
+                // HandoffToInstantTracking.ApplyLockedTransform). Still reads as
+                // active, never "lost" - this is the expected fallback state
+                // whenever someone tilts up from the QR to look at the building.
                 bool haveAnchor = Handoff != null && Handoff.InstantTarget != null && _zCamTransform != null;
                 Vector3 anchorPosNow = haveAnchor ? Handoff.InstantTarget.transform.position : Vector3.zero;
                 bool distValid = haveAnchor && IsFinite(anchorPosNow) && IsFinite(_zCamTransform.position);
@@ -202,16 +218,17 @@ namespace ARReveal
                 // See HandoffToInstantTracking's own "SYNC CHECK" doc comment -
                 // how far the QR's own live detection currently disagrees with
                 // where SLAM has the anchor, whenever the QR happens to be in
-                // view to compare against. Only shown once SyncCheckValid (the
-                // QR has been visible at least one good frame since handoff) -
-                // a big/growing number here is a direct measurement of SLAM
-                // drift, not just a guess from the odometers below.
+                // view to compare against (possible even during this fallback
+                // phase, if the QR is glimpsed again but hasn't stayed visible
+                // long enough yet to re-latch). A big/growing number here is a
+                // direct measurement of SLAM drift, not just a guess from the
+                // odometers below.
                 bool syncValid = Handoff != null && Handoff.SyncCheckValid;
                 string syncLine = syncValid
                     ? $"\nQR/SLAM sync: {Handoff.SyncPositionDelta:F2}m, {Handoff.SyncRotationDeltaDegrees:F1}deg"
                     : "";
 
-                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
+                text = "TRACKING ACTIVE\n(SLAM fallback)" + $"\nSLAM handoffs: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
                     $"\nCam moved: {_totalCamMovement:F2}m" +
                     $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
                     (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +

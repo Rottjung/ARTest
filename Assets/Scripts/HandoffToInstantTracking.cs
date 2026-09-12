@@ -29,53 +29,62 @@ namespace ARReveal
     }
 
     /// <summary>
-    /// REDESIGNED around a real-device finding (separate UCI-RE-Marker test
-    /// scene): raw ZapparImageTrackingTarget tracking of the QR - position AND
-    /// rotation, read directly, no Instant Tracker involved at all - lands
-    /// accurately on the real QR every single scan, at any rotation. That's
-    /// exactly the ground truth to trust, and directly parenting ContentWrapper
-    /// under the QR's own live transform while it's actually visible is simpler
-    /// and more reliable than the previous approach (seed the Instant Tracker's
-    /// anchor from one reading, then fight to re-derive rotation/scale from it
-    /// every frame) - which turned out not to reliably reproduce the QR's real
-    /// rotation at all (real-device test: rotating the printed QR 90/180 degrees
-    /// left the building's rotation completely unchanged - a genuine defect in
-    /// that indirection, not something to keep patching further).
+    /// The moment the QR image target is (re)seen, seeds a ZapparInstantTrackingTarget's
+    /// anchor at that same real-world position (via Zappar's own persistent
+    /// 6DOF/SLAM world tracking) and hands off to it IMMEDIATELY - content is
+    /// driven by SLAM from the very first detection onward, re-seeded on every
+    /// subsequent (re)detection too (see HandoffOnce), not just once the QR
+    /// later leaves view. This is back to the very first version of this handoff
+    /// that was confirmed working well on a real device, after a detour (see git
+    /// history around "Directly follow the QR live"/"REDESIGNED" commits) into
+    /// instead directly parenting ContentWrapper under the QR's own live
+    /// transform whenever visible - that had a real bug of its own: the QR's own
+    /// detected SCALE isn't reliably 1:1 with real-world metres, so trusting it
+    /// directly made the whole building render at a wildly wrong size (real-
+    /// device test: content invisible, or filling the entire screen with one
+    /// giant flat surface - consistent with being scaled up far too large and
+    /// standing millimetres from it). Reverting to "SLAM drives everything,
+    /// seeded from the QR" avoids that risk entirely: the Instant Tracker's own
+    /// scale was already confirmed reliable (see NormalizeContentScale), and the
+    /// QR is only ever trusted for POSITION (AnchorPoseCameraRelative) and
+    /// ROTATION (ImageTarget.transform.rotation) - never scale.
     ///
-    /// So: WHILE the QR is visible, ContentWrapper is a literal child of
-    /// ImageTarget's transform (see HandoffOnce) - not "seeded from" it, not
-    /// "corrected toward" it, just parented under it, exactly as if it had
-    /// always been authored that way (which, at rest, it effectively was - its
-    /// authored local transform relative to its original parent is identity).
-    /// Zappar's own tracking does all the work; nothing here fights it.
+    /// The instant tracker only supports seeding position precisely, plus one of a few
+    /// coarse fixed rotation modes (WORLD, MINUS_Z_AWAY_FROM_USER, etc.) - not the QR's
+    /// exact detected rotation. So ContentWrapper (everything that should be anchored)
+    /// gets a rotation correction applied EVERY FRAME (see LateUpdate/ApplyLockedTransform),
+    /// not just once right after handoff - since ContentWrapper is a CHILD of InstantTarget
+    /// (that's what "rides along with the instant tracker's ongoing SLAM tracking" means
+    /// structurally), this has to be Inverse(InstantTarget.rotation) * _lockedWorldRotation,
+    /// the specific quaternion that makes InstantTarget.rotation * ContentWrapper.localRotation
+    /// come out equal to the QR's actual detected rotation. An earlier version had the two
+    /// operands the other way around, which - quaternion multiplication doesn't commute -
+    /// produced a CONJUGATION of the correct answer instead: the same rotation ANGLE
+    /// as the QR's real orientation, but around the WRONG AXIS (content ending up
+    /// tipped onto its side). A one-shot correction (rather than every frame) isn't
+    /// enough either: ZapparInstantTrackingTarget.Update() re-reads the native anchor's
+    /// full pose - position, rotation, AND scale - fresh from the tracking engine every
+    /// single frame, silently drifting the one-shot result wrong again within moments.
     ///
-    /// The Instant Tracker (SLAM) is used for exactly the one thing it's
-    /// actually needed for: ZapparImageTrackingTarget only updates its transform
-    /// while the image is CURRENTLY, continuously visible (confirmed by reading
-    /// the SDK source - there's no persistence built into image tracking
-    /// itself), so content would freeze in place mid-air the instant someone
-    /// tilts up to look at the building instead of the QR. The moment the QR is
-    /// confirmed genuinely out of view (see HandOffToSlamRoutine and
-    /// LossGraceFrames), its LAST known pose is captured and used to seed the
-    /// Instant Tracker's anchor, and ContentWrapper is reparented onto THAT -
-    /// from there, SLAM keeps it roughly in place while the QR stays out of
-    /// frame. If the QR comes back into view later, HandoffOnce re-latches
-    /// ContentWrapper directly onto it again, correcting any drift SLAM
-    /// accumulated in between - for free, using a source already confirmed
-    /// accurate, instead of the removed secondary-facade-target mechanism that
-    /// tried to do the same thing with a much less reliable signal (see git
-    /// history around "secondary re-anchor"/"reanchor" commits if that
-    /// reasoning is ever needed again).
+    /// Re-seeded on EVERY (re)detection of the QR, not just the first - in normal
+    /// use the QR only gets glimpsed briefly (someone scans it, then looks up at
+    /// the building), so re-seeding whenever it happens to be re-detected
+    /// corrects whatever position/rotation drift SLAM accumulated while it was
+    /// out of view - this exact mechanism is what was originally "confirmed
+    /// working amazingly well" on a real device, before any of this session's
+    /// investigation began.
     ///
-    /// The instant tracker only supports seeding position precisely, plus one of
-    /// a few coarse fixed rotation modes (WORLD, MINUS_Z_AWAY_FROM_USER, etc.) -
-    /// not the QR's exact detected rotation, which is why the SLAM-fallback
-    /// phase still needs a continuous correction: ContentWrapper's rotation and
-    /// scale are re-locked to the QR's own last-known values EVERY FRAME (see
-    /// LateUpdate/ApplyLockedTransform) rather than trusting the Instant
-    /// Tracker's own coarse/drifting values for either. Position is never
-    /// touched there - letting it update freely from SLAM as the camera moves
-    /// is the entire reason the Instant Tracker phase exists at all.
+    /// SYNC CHECK (SyncPositionDelta/SyncRotationDeltaDegrees, see Update): while
+    /// the QR remains (or becomes) visible, continuously compares its own live
+    /// detected world transform against wherever the SLAM anchor (InstantTarget)
+    /// currently is - both sit at the exact same authored world position at rest
+    /// (world origin, confirmed in the serialized scene), so in a well-tracked
+    /// session these should stay close to identical; a growing gap is a direct,
+    /// quantified measurement of how far SLAM has drifted from the real QR since
+    /// it was last seeded - a much more concrete on-site diagnostic than
+    /// guessing from odometers alone. Purely a diagnostic (shown on
+    /// TrackingDebugOverlay, logged) - it never feeds back into ContentWrapper's
+    /// actual transform, at least for now.
     ///
     /// STILL OPEN, investigated with Unity closed/no device to test on (this
     /// feature is explicitly undocumented/unsupported in Editor PlayMode per
@@ -102,7 +111,7 @@ namespace ARReveal
         public ZapparImageTrackingTarget ImageTarget;
         public ZapparInstantTrackingTarget InstantTarget;
 
-        [Tooltip("Everything that should stay anchored - hidden until first seen. While the QR is visible this is a live child of ImageTarget's transform; while it isn't, a child of InstantTarget's (SLAM), with rotation/scale continuously re-locked to the QR's last known values.")]
+        [Tooltip("Everything that should stay anchored - hidden until handoff, then rides along with the instant tracker's ongoing SLAM tracking, with rotation/scale continuously re-locked to the QR's last known values (see this class's own doc comment).")]
         public Transform ContentWrapper;
 
         [Header("Burst stagger")]
@@ -124,44 +133,50 @@ namespace ARReveal
         private bool _handedOff;
 
         /// <summary>
-        /// The QR's last known real-world rotation - captured directly from
-        /// ImageTarget.transform.rotation, either continuously (while
-        /// _followingQrLive) or once, at the moment visibility was lost, as the
-        /// SLAM-fallback phase's standing "correct" value. Re-applied to
-        /// ContentWrapper EVERY FRAME during the SLAM phase (see LateUpdate) -
-        /// while following the QR live, Unity's own parenting already keeps
-        /// ContentWrapper's rotation correct with zero extra code, so this field
-        /// only matters once _followingQrLive goes false.
+        /// The building's real-world rotation, as last established by the QR
+        /// (the only source ever trusted for rotation). Re-applied to
+        /// ContentWrapper EVERY FRAME in LateUpdate, not just once right after a
+        /// re-seed - see LateUpdate's own doc comment for why a one-shot
+        /// correction turned out not to be enough.
         /// </summary>
         private Quaternion _lockedWorldRotation = Quaternion.identity;
 
         /// <summary>
-        /// True while ContentWrapper is a live child of ImageTarget's transform
-        /// (the QR is visible, or was until fewer than LossGraceFrames frames
-        /// ago) - false once it's been hand off to the Instant Tracker/SLAM
-        /// fallback (see HandOffToSlamRoutine). Exposed for TrackingDebugOverlay.
-        /// </summary>
-        public bool IsFollowingQrLive { get; private set; }
-
-        /// <summary>
-        /// True once the FIRST handoff has completed (content revealed, the
-        /// instant the QR is first seen - no settling delay needed anymore,
-        /// since directly following the QR's own live transform is trusted
-        /// immediately). Exposed for TrackingDebugOverlay - "waiting for the QR"
-        /// and "tracking active" are genuinely different states worth telling
-        /// apart on screen.
+        /// True once the FIRST handoff has completed (content revealed).
+        /// Exposed for TrackingDebugOverlay - "waiting for the QR" and "tracking
+        /// active" are genuinely different states worth telling apart on screen.
         /// </summary>
         public bool HasHandedOff => _handedOff;
 
         /// <summary>
-        /// How many times ContentWrapper has been handed off to the Instant
-        /// Tracker/SLAM fallback (i.e. how many times the QR was lost after
-        /// being found) - see HandOffToSlamRoutine. Exposed for
-        /// TrackingDebugOverlay: in ordinary use this should be 0 or 1 per
-        /// session (found the QR once, walked away once) - a climbing count
-        /// means the QR is being lost and re-found repeatedly.
+        /// How many times the instant-tracker anchor has been RE-seeded from a
+        /// fresh QR detection after the first handoff - see HandoffOnce's own
+        /// doc for why this happens on every (re)detection, not just the first.
+        /// Exposed for TrackingDebugOverlay: this, not raw QR visibility, is the
+        /// actually meaningful diagnostic for judging tracking quality on-site -
+        /// losing sight of the QR after the first handoff is normal/expected
+        /// (SLAM keeps content anchored regardless), and a climbing count here
+        /// just means it keeps getting re-found and re-corrected, not that
+        /// anything is failing.
         /// </summary>
         public int ResetCount { get; private set; }
+
+        /// <summary>
+        /// Live distance (meters) between the QR's own currently-detected world
+        /// position and wherever the SLAM anchor (InstantTarget) currently sits
+        /// - see this class's own "SYNC CHECK" doc comment. Only updated while
+        /// the QR is actually visible; check SyncCheckValid before trusting it
+        /// (stays at its last value, not reset to 0, while the QR is out of
+        /// view - so TrackingDebugOverlay can still show "last measured drift"
+        /// rather than a misleading fresh-looking 0).
+        /// </summary>
+        public float SyncPositionDelta { get; private set; }
+
+        /// <summary>Angle (degrees) between the QR's own currently-detected rotation and the SLAM anchor's current rotation - see SyncPositionDelta's own doc, same validity caveat (check SyncCheckValid).</summary>
+        public float SyncRotationDeltaDegrees { get; private set; }
+
+        /// <summary>True once SyncPositionDelta/SyncRotationDeltaDegrees have been computed from at least one genuinely-visible frame - guards TrackingDebugOverlay from showing 0/0 as if it were a real (and suspiciously perfect) measurement before the QR has ever been visible long enough to check.</summary>
+        public bool SyncCheckValid { get; private set; }
 
         private void Awake()
         {
@@ -170,31 +185,17 @@ namespace ARReveal
             DisableAllChildScripts();
         }
 
-        /// <summary>
-        /// Tracks whether the QR is CURRENTLY visible - Update() watches this to
-        /// decide when a loss has lasted long enough (LossGraceFrames) to be
-        /// genuine rather than a momentary detection blip, before actually
-        /// committing to the SLAM handoff.
-        /// </summary>
+        /// <summary>Tracks whether the QR is CURRENTLY visible - used only by the sync check (Update) to know when a fresh comparison is meaningful; HandoffOnce itself doesn't depend on this (it's only ever invoked as a direct result of the QR having just been seen, so it needs no separate visibility tracking of its own).</summary>
         private bool _qrVisible;
-        private int _notVisibleStreak;
-        private Coroutine _slamHandoffCoroutine;
-
-        /// <summary>Consecutive not-visible frames tolerated as a detection blip before actually committing to the SLAM handoff (see Update/HandOffToSlamRoutine) - avoids reacting to a single marginal/borderline not-seen frame as if the QR were genuinely gone. Untested constant - tune from an actual device if the handoff feels too eager or too sluggish.</summary>
-        public const int LossGraceFrames = 8;
 
         private void OnEnable()
         {
             if (ImageTarget == null) return;
             // OnSeenEvent is deliberately NOT subscribed here - it stays
-            // Inspector-wired directly to HandoffOnce (see that method's own
-            // doc), so there's exactly one listener on it, not two racing for
-            // order (an earlier version added a second runtime listener here
-            // purely to track _qrVisible, and a real-device test found that
-            // could run BEFORE the Inspector-wired one on the very first
-            // detection, since UnityEvent doesn't guarantee persistent listeners
-            // run after runtime-added ones - HandoffOnce now sets _qrVisible
-            // itself instead).
+            // Inspector-wired directly to HandoffOnce, so there's exactly one
+            // listener on it (HandoffOnce sets _qrVisible itself - see its own
+            // doc - rather than depending on a second listener here, avoiding
+            // any dependence on UnityEvent listener ordering).
             ImageTarget.OnNotSeenEvent.AddListener(HandleQrNotSeen);
         }
 
@@ -207,23 +208,26 @@ namespace ARReveal
         private void HandleQrNotSeen() => _qrVisible = false;
 
         /// <summary>
-        /// Not-visible streak/grace check - see LossGraceFrames's own doc. Only
-        /// does anything while _followingQrLive (nothing to debounce once
-        /// already on the SLAM fallback; HandoffOnce is what re-latches).
+        /// SYNC CHECK - see this class's own doc comment. Only meaningful while
+        /// the QR is genuinely visible (ImageTarget freezes its own transform
+        /// otherwise, which would make a stale comparison look like a real,
+        /// possibly-misleading measurement) and only once handed off (nothing
+        /// to compare against before InstantTarget has ever been seeded).
         /// </summary>
         private void Update()
         {
-            if (!IsFollowingQrLive) return;
+            if (!_handedOff || !_qrVisible || ImageTarget == null || InstantTarget == null) return;
 
-            if (_qrVisible)
-            {
-                _notVisibleStreak = 0;
+            Vector3 qrPos = ImageTarget.transform.position;
+            Quaternion qrRot = ImageTarget.transform.rotation;
+            Vector3 anchorPos = InstantTarget.transform.position;
+            Quaternion anchorRot = InstantTarget.transform.rotation;
+            if (!IsFinite(qrPos) || !IsFinite(anchorPos) || !IsFinite(qrRot) || !IsFinite(anchorRot))
                 return;
-            }
 
-            _notVisibleStreak++;
-            if (_notVisibleStreak > LossGraceFrames && _slamHandoffCoroutine == null)
-                _slamHandoffCoroutine = StartCoroutine(HandOffToSlamRoutine());
+            SyncPositionDelta = Vector3.Distance(qrPos, anchorPos);
+            SyncRotationDeltaDegrees = Quaternion.Angle(qrRot, anchorRot);
+            SyncCheckValid = true;
         }
 
         /// <summary>
@@ -266,89 +270,37 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Wire this to ImageTarget's OnSeenEvent (kept as the same Inspector
-        /// wiring/method name this project has always used, so existing scene
-        /// setup doesn't need to be redone) - runs every time the QR is
-        /// (re)detected, whether that's the very first sighting or a re-latch
-        /// after being lost and found again. (Re-)attaches ContentWrapper
-        /// directly as a live child of ImageTarget's transform - see this
-        /// class's own doc comment for why that's trusted directly rather than
-        /// seeded/corrected through the Instant Tracker. Cancels a pending SLAM
-        /// handoff if one was mid-grace-period (the QR came back before that
-        /// commit actually happened). Only reveals content the very first time;
-        /// later re-latches just correct position/rotation/scale for whatever
-        /// was already visible.
+        /// Wire this to ImageTarget's OnSeenEvent - runs every time the QR is
+        /// (re)detected, not just the first. The FIRST call reveals content
+        /// (unchanged) - every call, including that first one, re-seeds the
+        /// instant tracker's anchor from THIS fresh detection, correcting any
+        /// position/rotation drift the SLAM tracking may have accumulated while
+        /// the QR was out of view. Content itself is never re-revealed or
+        /// re-burst on a re-detection - only the anchor is refreshed, which is
+        /// why RevealContent() is still gated on firstTime.
         /// </summary>
         public void HandoffOnce()
         {
             bool firstTime = !_handedOff;
             _handedOff = true;
             _qrVisible = true;
-            _notVisibleStreak = 0;
+            if (!firstTime) ResetCount++;
 
-            if (_slamHandoffCoroutine != null)
-            {
-                StopCoroutine(_slamHandoffCoroutine);
-                _slamHandoffCoroutine = null;
-            }
-
-            if (ContentWrapper != null && ImageTarget != null)
-            {
-                // worldPositionStays: false - this is a deliberate SNAP to
-                // wherever the QR is actually detected right now (identity local
-                // position/rotation, matching ContentWrapper's authored rest
-                // position relative to its original parent), not "keep wherever
-                // it currently is" - if the QR was re-found after drifting on
-                // SLAM, this is exactly the correction that's wanted. Scale is
-                // NOT reset to identity here - see LateUpdate/NormalizeContentScale,
-                // which corrects it continuously in BOTH phases instead, since
-                // trusting ImageTarget's own scale directly turned out to be a
-                // real bug (see this class's own doc comment - real-device
-                // testing showed content not rendering AT ALL immediately after
-                // switching to this live-follow design, consistent with
-                // inheriting a wildly wrong scale factor from the QR target).
-                ContentWrapper.SetParent(ImageTarget.transform, false);
-                ContentWrapper.localPosition = Vector3.zero;
-                ContentWrapper.localRotation = Quaternion.identity;
-            }
-            IsFollowingQrLive = true;
-
-            if (firstTime) RevealContent();
-        }
-
-        /// <summary>
-        /// Committed only after the QR has been continuously not-visible for
-        /// more than LossGraceFrames (see Update) - captures its LAST known pose
-        /// (ImageTarget freezes its own transform the instant it's no longer
-        /// detected, confirmed by reading the SDK source, so reading it now,
-        /// mid-grace-period, is identical to reading it at the exact instant
-        /// visibility was lost) and seeds the Instant Tracker's anchor there,
-        /// then reparents ContentWrapper onto it (worldPositionStays: true this
-        /// time - the point is NOT to move content at the moment of the switch,
-        /// only to change what it's riding on going forward).
-        /// </summary>
-        private IEnumerator HandOffToSlamRoutine()
-        {
+            // Camera-relative offset of the QR at the exact moment of detection
+            // - this is what places the instant anchor at the same real-world
+            // spot. The QR is the ONLY source ever trusted for rotation - record
+            // its detected world rotation as the standing "correct" value.
+            // LateUpdate (not a one-off assignment here) is what actually keeps
+            // ContentWrapper's rotation pinned to it every frame from here on -
+            // see LateUpdate's own doc comment for why a one-shot correction
+            // wasn't enough.
             Vector3 cameraRelativeOffset = Z.GetPosition(ImageTarget.AnchorPoseCameraRelative());
             _lockedWorldRotation = ImageTarget.transform.rotation;
-
             SeedAnchorPosition(cameraRelativeOffset);
-            ResetCount++;
 
-            // Wait a frame so InstantTarget's own Update() applies the pose we
-            // just seeded before ContentWrapper is reparented onto it below -
-            // same reasoning this class has always used after a fresh seed.
-            yield return null;
+            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - offset {cameraRelativeOffset}, rotation {_lockedWorldRotation.eulerAngles}.");
 
-            if (ContentWrapper != null && InstantTarget != null)
-                ContentWrapper.SetParent(InstantTarget.transform, true);
-
-            IsFollowingQrLive = false;
-            ApplyLockedTransform();
-
-            Debug.Log($"[HandoffToInstantTracking] Handed off to SLAM fallback - QR out of view, locked rotation {_lockedWorldRotation.eulerAngles}.");
-
-            _slamHandoffCoroutine = null;
+            if (firstTime) RevealContent();
         }
 
         /// <summary>
@@ -359,48 +311,20 @@ namespace ARReveal
         /// - fresh from the tracking engine on EVERY SINGLE FRAME, not just at
         /// explicit re-seed moments (Z.InstantWorldTrackerAnchorPose(tracker,
         /// cameraPose, ...) is called unconditionally in its Update()). A
-        /// one-shot correction right after the SLAM handoff looked right for
-        /// exactly one frame, then silently drifted wrong again as ordinary
-        /// per-frame tracking noise/uncertainty kept overwriting InstantTarget's
-        /// transform underneath it - exactly matching a real-device report of
-        /// content going invisible/sideways again despite an earlier one-shot
-        /// fix seeming to work at first. Position is deliberately NOT touched
-        /// here - that's meant to update continuously as the camera moves
-        /// relative to the anchor, that's the entire point of world tracking;
-        /// only rotation, which should never change for a real static building,
-        /// gets continuously re-locked. Scale is handled separately, in
-        /// LateUpdate below, in BOTH phases - see NormalizeContentScale.
-        ///
-        /// Skipped entirely while IsFollowingQrLive - ContentWrapper's rotation
-        /// is a direct child of ImageTarget's transform then, so Unity's own
-        /// parenting already keeps it correctly oriented with zero extra code;
-        /// this correction only matters once it's riding on the Instant Tracker.
+        /// one-shot correction right after HandoffOnce looked right for exactly
+        /// one frame, then silently drifted wrong again as ordinary per-frame
+        /// tracking noise/uncertainty kept overwriting InstantTarget's transform
+        /// underneath it. Position is deliberately NOT touched here - that's
+        /// meant to update continuously as the camera moves relative to the
+        /// anchor, that's the entire point of world tracking; only rotation and
+        /// scale, which should never change for a real static building, get
+        /// continuously re-locked.
         /// </summary>
         private void LateUpdate()
         {
             if (!_handedOff) return;
-
-            // Never trust whichever transform ContentWrapper is CURRENTLY
-            // parented under for real-world SCALE, in EITHER phase - see
-            // NormalizeContentScale's own doc comment. Originally this only ran
-            // during the SLAM-fallback phase (InstantTarget's own SLAM-derived
-            // scale is a known, previously-fixed source of this exact problem),
-            // but a real-device test found content not rendering AT ALL right
-            // after the QR was first scanned - i.e. during the LIVE phase, no
-            // SLAM involved yet - which is only consistent with the QR's OWN
-            // image-tracking target ALSO not supplying a reliable real-world
-            // scale (an untrained/incorrect-DPI target produces exactly this,
-            // the same underlying bug class already found and fixed once for a
-            // different training image this session). The old QR-seeds-SLAM
-            // design never had this problem because it never used the QR's
-            // scale for anything at all - only its position.
-            Transform reference = IsFollowingQrLive
-                ? (ImageTarget != null ? ImageTarget.transform : null)
-                : (InstantTarget != null ? InstantTarget.transform : null);
-            NormalizeContentScale(reference);
-
-            if (IsFollowingQrLive) return;
             ApplyLockedTransform();
+            NormalizeContentScale();
         }
 
         private void ApplyLockedTransform()
@@ -446,29 +370,26 @@ namespace ARReveal
 
         /// <summary>
         /// Forces ContentWrapper's WORLD scale to exactly (1,1,1), cancelling out
-        /// whichever transform it's CURRENTLY parented under (reference -
-        /// InstantTarget during the SLAM fallback, ImageTarget during the live
-        /// phase - see LateUpdate) - trusting either one's own scale directly is
-        /// a real, previously-confirmed bug, not a hypothetical: InstantTarget's
-        /// SLAM-derived scale is monocular SLAM's inherently uncertain internal
+        /// InstantTarget.lossyScale - the native anchor pose's own scale
+        /// component, which is monocular SLAM's inherently uncertain internal
         /// estimate of the ratio between its tracking units and real metres (the
         /// same scale-ambiguity problem behind the still-open "walks meters,
-        /// registers as decimetres" bug); ImageTarget's own scale depends on the
-        /// QR's trained target actually having a correct real-world physical size
-        /// baked in, which a real-device test found NOT to hold - content simply
-        /// didn't render at all the moment ContentWrapper first inherited it
-        /// directly (see this class's own doc comment). Neither is a meaningful
-        /// real-world quantity worth preserving from either source - called every
-        /// frame in BOTH phases, not just once after a re-seed, since a
-        /// tracked transform's scale can drift moment to moment even when its
-        /// position/rotation are being trusted directly. Assumes uniform,
-        /// non-sheared scale throughout (true here - neither ImageTarget nor
-        /// InstantTarget has a scaled parent above it).
+        /// registers as decimetres" bug), NOT a meaningful real-world quantity
+        /// worth preserving or trusting - especially unstable in the first few
+        /// frames after a fresh seed, before tracking has had time to settle.
+        /// (The QR's OWN scale is never used for anything, on purpose - a real-
+        /// device test during a brief detour into trusting it directly found it
+        /// unreliable too, see this class's own doc comment - InstantTarget's
+        /// scale is the only one ever read here.) Called every frame from
+        /// LateUpdate, not just once after a re-seed - see that method's own doc
+        /// for why that matters. Assumes uniform, non-sheared scale throughout
+        /// (true here - InstantTarget sits at scene root with no scaled parent
+        /// above it).
         /// </summary>
-        private void NormalizeContentScale(Transform reference)
+        private void NormalizeContentScale()
         {
-            if (ContentWrapper == null || reference == null) return;
-            Vector3 s = reference.lossyScale;
+            if (ContentWrapper == null || InstantTarget == null) return;
+            Vector3 s = InstantTarget.transform.lossyScale;
 
             // Same reasoning as ApplyLockedTransform's rotation guard - skip a
             // degenerate frame entirely rather than let NaN/Infinity poison
@@ -493,7 +414,7 @@ namespace ARReveal
 
         /// <summary>
         /// Re-seeds the instant tracker's anchor at cameraRelativeOffsetToQR (the
-        /// QR's last known pose, captured by HandOffToSlamRoutine).
+        /// QR's current camera-relative position, captured by HandoffOnce).
         /// MINUS_Z_AWAY_FROM_USER, not WORLD - see this class's own doc comment
         /// for why (confirmed against Zappar's own reference usage).
         /// </summary>

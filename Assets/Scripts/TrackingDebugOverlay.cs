@@ -32,8 +32,8 @@ namespace ARReveal
         /// distinct colors (not just a version number bump) since the whole point
         /// is to be readable as "different" at a glance, from across a room.
         /// </summary>
-        private const string BuildTag = "build-3";
-        private const string BuildTagColorHex = "#00E5FF"; // cyan - change alongside BuildTag above
+        private const string BuildTag = "build-4";
+        private const string BuildTagColorHex = "#FF9100"; // orange - change alongside BuildTag above
 
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
@@ -179,41 +179,38 @@ namespace ARReveal
 
             string text;
             Color color;
-            bool settling = Handoff != null && Handoff.IsSettling;
-            if (!handedOff && !settling)
+            if (!handedOff)
             {
-                // Genuinely still waiting - the QR has never been seen (or was seen
-                // but the handoff hasn't finished this frame yet) - this is the ONE
-                // state that should read as "not there yet", since content really
-                // isn't live.
+                // Genuinely still waiting - the QR has never been seen - this is
+                // the ONE state that should read as "not there yet", since
+                // content really isn't live. Reveal is now immediate on first
+                // sighting (see HandoffToInstantTracking.HandoffOnce), so there's
+                // no separate "locking..." delay state to show anymore.
                 text = "WAITING FOR QR...";
                 color = Color.yellow;
             }
-            else if (Handoff != null && !Handoff.ContentRevealed)
+            else if (Handoff != null && Handoff.IsFollowingQrLive)
             {
-                // Handoff has started (the QR was seen) but content hasn't
-                // actually been placed yet - it's mid-settle (see
-                // HandoffToInstantTracking.SettleAndSample), sampling several
-                // consecutive frames before trusting a reading, which can now
-                // take a fraction of a second rather than a single frame. Shown
-                // as its own state so this isn't misread as "TRACKING ACTIVE"
-                // before the anchor has actually been seeded.
-                text = $"LOCKING ANCHOR...\n{Handoff.SettleProgress}/{HandoffToInstantTracking.SettleFramesRequired} agreeing frames" +
-                    (_qrVisible ? "\n(QR in view)" : "\n(QR out of view - waiting)");
-                color = Color.yellow;
+                // ContentWrapper is a live child of the QR's own transform right
+                // now - the most accurate state, straight from Zappar's image
+                // tracking with nothing in between.
+                text = "TRACKING ACTIVE\n(LIVE on QR)" + $"\nSLAM handoffs: {resets}";
+                color = Color.green;
             }
             else
             {
-                // Content is live and anchored via the instant tracker's own SLAM
-                // tracking regardless of whether the QR is currently in view - so
-                // this always reads as active, never "lost". The QR-visible note is
-                // a quiet aside, not an alarm.
+                // QR is out of view - content is riding on the Instant Tracker's
+                // own SLAM tracking instead, with rotation/scale continuously
+                // re-locked to the QR's last known values (see
+                // HandoffToInstantTracking.ApplyLockedTransform). Still reads as
+                // active, never "lost" - this is the expected fallback state
+                // whenever someone tilts up from the QR to look at the building.
                 bool haveAnchor = Handoff != null && Handoff.InstantTarget != null && _zCamTransform != null;
                 Vector3 anchorPosNow = haveAnchor ? Handoff.InstantTarget.transform.position : Vector3.zero;
                 bool distValid = haveAnchor && IsFinite(anchorPosNow) && IsFinite(_zCamTransform.position);
                 float liveDist = distValid ? Vector3.Distance(_zCamTransform.position, anchorPosNow) : -1f;
 
-                text = "TRACKING ACTIVE" + $"\nResets: {resets}" + (_qrVisible ? "\n(QR in view)" : "") +
+                text = "TRACKING ACTIVE\n(SLAM fallback)" + $"\nSLAM handoffs: {resets}" +
                     $"\nCam moved: {_totalCamMovement:F2}m" +
                     $"\nAnchor moved: {_totalAnchorMovement:F2}m" +
                     (_anchorNaNFrames > 0 ? $" ({_anchorNaNFrames} bad frames)" : "") +

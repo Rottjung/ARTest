@@ -332,6 +332,19 @@ namespace ARReveal
         {
             if (ContentWrapper == null) return;
             ContentWrapper.gameObject.SetActive(false);
+            // Explicit, not just relied on via ContentWrapper's own cascading
+            // active-state - a real-device test found content nested under
+            // ContentRoot (itself nested under ContentWrapper) simply never
+            // appearing, while the exact same content temporarily moved OUT
+            // to the scene root (bypassing ContentWrapper's hide/reveal
+            // entirely) showed up fine the moment its position was set. That
+            // points at ContentWrapper's own SetActive(true)/RevealContent
+            // path not reliably reaching a nested ContentRoot in this
+            // project's actual final hierarchy - rather than chase exactly
+            // why, this makes ContentRoot's own visibility independently,
+            // explicitly controlled here, so it doesn't matter whether
+            // cascading through ContentWrapper alone would have worked.
+            if (ContentRoot != null) ContentRoot.gameObject.SetActive(false);
             DisableAllChildScripts();
         }
 
@@ -543,7 +556,15 @@ namespace ARReveal
             ApplyLockedTransform();
             NormalizeContentScale();
 
-            if (ContentRoot != null) ContentRoot.position = settledPos.Value;
+            if (ContentRoot != null)
+            {
+                ContentRoot.position = settledPos.Value;
+                // Explicit, every lock (not just firstTime) - see Awake's own
+                // comment on ContentRoot's SetActive(false) for why this isn't
+                // just left to ContentWrapper's own cascading active-state.
+                // Harmless no-op if already active.
+                ContentRoot.gameObject.SetActive(true);
+            }
 
             // Diagnostic only, never gates anything - see GravityUpToleranceDegrees's
             // own doc comment for why this is logged instead of enforced.

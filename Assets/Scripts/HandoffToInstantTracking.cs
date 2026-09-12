@@ -287,6 +287,47 @@ namespace ARReveal
         /// <summary>True once SyncPositionDelta/SyncRotationDeltaDegrees have been computed from at least one genuinely meaningful comparison (QR visible AND InstantTarget seeded at least once) - guards TrackingDebugOverlay from showing 0/0 as if it were a real (and suspiciously perfect) measurement before there's anything real to compare.</summary>
         public bool SyncCheckValid { get; private set; }
 
+        /// <summary>
+        /// OPTIONAL - a child of ContentWrapper holding the actual content
+        /// (cube/building/tentacles/plane), one level deeper than
+        /// ContentWrapper itself. If assigned, the settled position is set on
+        /// THIS instead of being computed per-frame on ContentWrapper. Leave
+        /// blank to fall back to the (correct, but less complete) per-frame
+        /// correction in ApplyLockedTransform.
+        ///
+        /// WHY THIS IS THE MORE ROBUST OPTION: a real-device test found
+        /// content invisible despite sane tracking numbers, traced to
+        /// InstantTarget's own SCALE (monocular SLAM's known-unstable
+        /// internal estimate) multiplying directly into ContentWrapper's
+        /// WORLD POSITION once it had a real, non-zero local offset from
+        /// InstantTarget (a child's world position in Unity is parentPos +
+        /// parentRotation * (parentScale * childLocalPos) - scale genuinely
+        /// affects position, not just size). The fallback re-derives
+        /// ContentWrapper's local position every frame, dividing out
+        /// InstantTarget's current scale so it cancels - correct, but
+        /// incomplete: that same formula still multiplies by InstantTarget's
+        /// CURRENT ROTATION every frame, so any rotation jitter (the exact
+        /// kind ApplyLockedTransform's own rotation-lock exists to correct
+        /// for CONTENT's rotation) makes the position term wobble/orbit
+        /// around InstantTarget's origin too.
+        ///
+        /// Assigning this field fixes that completely: ContentWrapper's own
+        /// world rotation and scale are ALREADY forced stable every frame
+        /// (ApplyLockedTransform/NormalizeContentScale) - a child's position,
+        /// set once relative to an already-stable parent, composes into a
+        /// stable world position automatically, with no per-frame correction
+        /// needed and no dependence on InstantTarget's raw rotation OR scale -
+        /// only on ContentWrapper's own locked values, plus InstantTarget's
+        /// POSITION (which really is meant to update freely as the camera
+        /// moves - the entire point of SLAM). Set up in the Editor (move
+        /// every existing child of ContentWrapper one level deeper, under a
+        /// new empty child GameObject, and assign that GameObject here)
+        /// rather than created dynamically in code, so nothing about it
+        /// depends on script execution timing.
+        /// </summary>
+        [Tooltip("Optional - see this field's own doc comment. A child of ContentWrapper holding the actual content one level deeper; if assigned, position placement is simpler and more robust than the ApplyLockedTransform fallback used when this is left blank.")]
+        public Transform ContentRoot;
+
         private void Awake()
         {
             if (ContentWrapper == null) return;
@@ -478,17 +519,22 @@ namespace ARReveal
             // just seeded before we read its transform below.
             yield return null;
 
-            // THE ACTUAL PLACEMENT: set ContentWrapper's WORLD position
-            // directly to the settled ground-marker reading. NOT a one-time
-            // Transform.position assignment (that was a real bug, found and
-            // fixed here - see _lockedLocalOffset's own doc comment for why):
-            // captures the REAL METRIC offset (meters) from InstantTarget to
-            // the settled position, in InstantTarget's rotation frame,
-            // UNSCALED - ApplyLockedTransform re-derives ContentWrapper's
-            // actual local position from this every frame, cancelling out
-            // InstantTarget's own scale the same way NormalizeContentScale
-            // already cancels it for visual size.
-            if (InstantTarget != null)
+            // THE ACTUAL PLACEMENT - two ways, see ContentRoot's own doc
+            // comment for why the first is more robust:
+            //  - If ContentRoot is assigned (a child of ContentWrapper holding
+            //    the real content, one level deeper): stabilise ContentWrapper
+            //    first (rotation/scale, below), THEN set ContentRoot's WORLD
+            //    position once. Since ContentWrapper's own rotation/scale are
+            //    already locked stable by that point, this one-time
+            //    assignment composes into a permanently-stable world position
+            //    with no further correction ever needed.
+            //  - Otherwise (fallback): capture the real metric offset from
+            //    InstantTarget to the settled position, in InstantTarget's
+            //    rotation frame, UNSCALED - ApplyLockedTransform re-derives
+            //    ContentWrapper's own local position from this every frame,
+            //    cancelling InstantTarget's scale (but not its rotation
+            //    jitter - see ContentRoot's own doc for the gap this leaves).
+            if (ContentRoot == null && InstantTarget != null)
             {
                 _lockedLocalOffset = Quaternion.Inverse(InstantTarget.transform.rotation) *
                     (settledPos.Value - InstantTarget.transform.position);
@@ -496,6 +542,8 @@ namespace ARReveal
 
             ApplyLockedTransform();
             NormalizeContentScale();
+
+            if (ContentRoot != null) ContentRoot.position = settledPos.Value;
 
             // Diagnostic only, never gates anything - see GravityUpToleranceDegrees's
             // own doc comment for why this is logged instead of enforced.
@@ -701,20 +749,31 @@ namespace ARReveal
             // reading as content tipped onto its side - the original QR bug).
             ContentWrapper.localRotation = Quaternion.Inverse(instantRotation) * _lockedWorldRotation;
 
-            // See _lockedLocalOffset's own doc comment - dividing the locked
-            // REAL metric offset by InstantTarget's CURRENT scale here exactly
-            // cancels the multiplication Unity applies when computing world
-            // position, so the scale term drops out entirely and ContentWrapper's
-            // world position tracks ONLY InstantTarget's position/rotation
-            // (real camera-relative movement) - never its scale noise. Same
-            // minimum-magnitude clamp as NormalizeContentScale, same reason:
-            // bounds how extreme a single near-zero-scale frame's compensation
-            // can be.
-            const float minMagnitude = 0.05f;
-            ContentWrapper.localPosition = new Vector3(
-                _lockedLocalOffset.x / (Mathf.Sign(instantScale.x == 0f ? 1f : instantScale.x) * Mathf.Max(Mathf.Abs(instantScale.x), minMagnitude)),
-                _lockedLocalOffset.y / (Mathf.Sign(instantScale.y == 0f ? 1f : instantScale.y) * Mathf.Max(Mathf.Abs(instantScale.y), minMagnitude)),
-                _lockedLocalOffset.z / (Mathf.Sign(instantScale.z == 0f ? 1f : instantScale.z) * Mathf.Max(Mathf.Abs(instantScale.z), minMagnitude)));
+            // Only needed as a FALLBACK when ContentRoot isn't assigned - see
+            // that field's own doc comment. When it IS assigned, the settled
+            // position lives there instead (set once in HandoffRoutine,
+            // composing correctly on its own against ContentWrapper's
+            // already-stable rotation/scale), and this block would just be
+            // redundant, less-complete work.
+            if (ContentRoot == null)
+            {
+                // Dividing the locked REAL metric offset by InstantTarget's
+                // CURRENT scale here exactly cancels the multiplication Unity
+                // applies when computing world position, so the scale term
+                // drops out entirely and ContentWrapper's world position
+                // tracks ONLY InstantTarget's position/rotation (real camera-
+                // relative movement) - never its scale noise. Same minimum-
+                // magnitude clamp as NormalizeContentScale, same reason:
+                // bounds how extreme a single near-zero-scale frame's
+                // compensation can be. Does NOT protect against InstantTarget's
+                // own ROTATION jitter the same way - see ContentRoot's own
+                // doc comment for why assigning that field is more complete.
+                const float minMagnitude = 0.05f;
+                ContentWrapper.localPosition = new Vector3(
+                    _lockedLocalOffset.x / (Mathf.Sign(instantScale.x == 0f ? 1f : instantScale.x) * Mathf.Max(Mathf.Abs(instantScale.x), minMagnitude)),
+                    _lockedLocalOffset.y / (Mathf.Sign(instantScale.y == 0f ? 1f : instantScale.y) * Mathf.Max(Mathf.Abs(instantScale.y), minMagnitude)),
+                    _lockedLocalOffset.z / (Mathf.Sign(instantScale.z == 0f ? 1f : instantScale.z) * Mathf.Max(Mathf.Abs(instantScale.z), minMagnitude)));
+            }
         }
 
         /// <summary>Same finiteness check TrackingDebugOverlay uses for its own NaN guard on this exact tracking data - a quaternion is finite iff all four components are.</summary>

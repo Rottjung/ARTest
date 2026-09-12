@@ -177,8 +177,11 @@ namespace ARReveal
         /// </summary>
         public int ResetCount { get; private set; }
 
-        /// <summary>Live progress (consecutive agreeing frames so far) toward SettleFramesRequired during the current settle attempt (see SettleAndSample) - for on-screen feedback while locking.</summary>
+        /// <summary>Live progress (consecutive agreeing frames so far) toward CurrentSettleFramesRequired during the current settle attempt (see SettleAndSample) - for on-screen feedback while locking.</summary>
         public int SettleProgress { get; private set; }
+
+        /// <summary>The ACTUAL required-frames target for whichever settle attempt is currently running (SettleFramesRequired normally, or +FirstLockExtraSettleFrames for the very first lock) - overlay should show progress against this, not the bare SettleFramesRequired constant, since the first lock's real target is larger.</summary>
+        public int CurrentSettleFramesRequired { get; private set; } = SettleFramesRequired;
 
         /// <summary>Required consecutive agreeing frames (both position AND rotation within tolerance of the previous sample) before a reading is trusted enough to seed from - see SettleAndSample. Untested constant - tune from an actual device if locking feels too slow or too twitchy.</summary>
         public const int SettleFramesRequired = 10;
@@ -191,6 +194,9 @@ namespace ARReveal
 
         /// <summary>Hard cap on how long one settle attempt waits for convergence before giving up and seeding from the last sample anyway - fail OPEN, not closed: a client demo should never end up with content that never appears just because a reading never fully converged. See SettleAndSample.</summary>
         public const int SettleTimeoutFrames = 90;
+
+        /// <summary>Extra consecutive agreeing frames required ONLY for the very first lock (added on top of SettleFramesRequired), as a hedge against a real-device finding: the first lock was sometimes mirrored/placed behind the user, "mostly" only that first time - see HandoffRoutine's own doc comment for the working theory (Zappar's underlying camera/world-tracking pipeline not yet fully stabilised in the first moment or two). Untested constant, same caveat as the other Settle* ones - cheap to widen further if the first lock is still occasionally wrong.</summary>
+        public const int FirstLockExtraSettleFrames = 15;
 
         /// <summary>Consecutive not-visible frames tolerated as a brief detection blip DURING a settle attempt, without aborting it - see SettleAndSample.</summary>
         public const int VisibilityGraceFrames = 8;
@@ -248,7 +254,24 @@ namespace ARReveal
             ImageTarget.OnNotSeenEvent.RemoveListener(HandleQrNotSeen);
         }
 
-        private void HandleQrNotSeen() => _qrVisible = false;
+        /// <summary>
+        /// Set the instant the QR is confirmed not-visible - used by
+        /// HandoffOnce to require a genuine "left, then came back" cycle before
+        /// allowing a re-lock, rather than recalibrating on every re-detection.
+        /// Requested directly after real-device testing showed repeated
+        /// re-locks (from marginal/flickery detection, not a deliberate
+        /// look-away) each risking a fresh, independently-noisy result -
+        /// recalibrating only on a deliberate return is both what was asked for
+        /// and a cheap way to cut down how often the anchor gets touched at
+        /// all once it's already good.
+        /// </summary>
+        private bool _hasLeftSinceLastLock;
+
+        private void HandleQrNotSeen()
+        {
+            _qrVisible = false;
+            _hasLeftSinceLastLock = true;
+        }
 
         /// <summary>
         /// SYNC CHECK - see this class's own doc comment. Only meaningful while
@@ -313,22 +336,25 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Wire this to ImageTarget's OnSeenEvent - runs every time the QR is
-        /// (re)detected, not just the first. The FIRST call reveals content
-        /// (unchanged) - every call, including that first one, waits for a
-        /// SETTLED reading (see SettleAndSample) then re-seeds the instant
-        /// tracker's anchor from it, correcting any position/rotation drift
-        /// SLAM may have accumulated while the QR was out of view. Content
-        /// itself is never re-revealed or re-burst on a re-detection - only the
-        /// anchor is refreshed, which is why RevealContent() is still gated on
-        /// firstTime. A generation counter guards against overlapping attempts:
-        /// if the QR is glimpsed, lost, and re-seen again before the first
-        /// attempt finished settling, the stale coroutine is stopped and a
-        /// fresh one takes over rather than both racing to seed the anchor.
+        /// Wire this to ImageTarget's OnSeenEvent - the FIRST call always
+        /// reveals content and locks the anchor. After that, per direct
+        /// request, a re-lock only happens if the QR has genuinely gone
+        /// not-visible and come back since the last lock (_hasLeftSinceLastLock)
+        /// - repeated OnSeenEvent firings from the SAME continuous viewing
+        /// (marginal/flickery detection re-triggering it, not a deliberate
+        /// look-away) are ignored instead of recalibrating from scratch each
+        /// time, which only risked introducing a fresh, independently-noisy
+        /// result for no reason. A generation counter still guards against
+        /// overlapping attempts: if the QR is glimpsed, lost, and re-seen again
+        /// before the first attempt finished settling, the stale coroutine is
+        /// stopped and a fresh one takes over rather than both racing to seed
+        /// the anchor.
         /// </summary>
         public void HandoffOnce()
         {
             bool firstTime = !_handedOff;
+            if (!firstTime && !_hasLeftSinceLastLock) return;
+
             _handedOff = true;
             _qrVisible = true;
             if (_handoffCoroutine != null) StopCoroutine(_handoffCoroutine);
@@ -338,9 +364,26 @@ namespace ARReveal
 
         private IEnumerator HandoffRoutine(bool firstTime, int generation)
         {
+            // Real-device testing found the FIRST-EVER lock specifically was
+            // sometimes mirrored/placed behind the user - the working theory
+            // (not fully confirmed, but the only thing that explains "mostly
+            // just the first lock") is that Zappar's own underlying camera/
+            // world-tracking pipeline hasn't fully stabilised in the first
+            // moment or two after the page loads, which a QR reading can look
+            // internally consistent against (agreeing with itself frame to
+            // frame) while still being wrong relative to a not-yet-settled
+            // world frame. Cheap, low-risk hedge: require extra settle frames
+            // for the first lock only, giving that pipeline a bit more time to
+            // stabilise before anything is ever trusted. If a first lock still
+            // looks wrong on-site, the fix is simply to move the QR out of
+            // frame and rescan - the new _hasLeftSinceLastLock gate above
+            // means that will now properly trigger a full recalibration.
+            int requiredFrames = firstTime ? SettleFramesRequired + FirstLockExtraSettleFrames : SettleFramesRequired;
+            CurrentSettleFramesRequired = requiredFrames;
+
             Vector3? settledPos = null;
             Quaternion settledRot = Quaternion.identity;
-            yield return SettleAndSample(generation, (p, r) => { settledPos = p; settledRot = r; });
+            yield return SettleAndSample(generation, requiredFrames, (p, r) => { settledPos = p; settledRot = r; });
 
             // Superseded by a newer HandoffOnce call while this one was still
             // settling, or the QR dropped out of view before ever converging -
@@ -351,6 +394,7 @@ namespace ARReveal
             _lockedWorldRotation = settledRot;
             SeedAnchorPosition(settledPos.Value);
             _slamSeededAtLeastOnce = true;
+            _hasLeftSinceLastLock = false;
 
             // Wait a frame so InstantTarget's own Update() applies the pose we
             // just seeded before we read its transform below.
@@ -359,7 +403,7 @@ namespace ARReveal
             ApplyLockedTransform();
             NormalizeContentScale();
 
-            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - offset {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{SettleFramesRequired} agreeing frames).");
+            Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - offset {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames).");
 
             if (firstTime) RevealContent();
         }
@@ -367,7 +411,7 @@ namespace ARReveal
         /// <summary>
         /// Samples ImageTarget.AnchorPoseCameraRelative()'s position AND
         /// ImageTarget.transform.rotation every frame the QR is visible, and
-        /// waits for SettleFramesRequired CONSECUTIVE samples to all agree with
+        /// waits for requiredFrames CONSECUTIVE samples to all agree with
         /// the previous one (position within SettlePositionTolerance, rotation
         /// within SettleRotationToleranceDegrees) before calling onSettled with
         /// the averaged position and the latest agreeing rotation - see this
@@ -375,7 +419,9 @@ namespace ARReveal
         /// trusted directly: this is what gives a one-shot SLAM seed the same
         /// precision the continuously-live QR/ground-plane gets for free, by
         /// requiring several independent readings to actually agree before
-        /// ever committing.
+        /// ever committing. requiredFrames is normally SettleFramesRequired,
+        /// but HandoffRoutine passes a larger value for the very first lock
+        /// (see FirstLockExtraSettleFrames's own doc).
         ///
         /// A brief not-visible blip (up to VisibilityGraceFrames) is tolerated
         /// WITHOUT resetting progress or sampling that frame - ImageTarget only
@@ -386,10 +432,12 @@ namespace ARReveal
         /// itself). Only a SUSTAINED loss (longer than VisibilityGraceFrames)
         /// actually aborts (yield break) - along with a newer HandoffOnce call
         /// superseding this one (generation check). Falls back to seeding from
-        /// whatever the last sample was after SettleTimeoutFrames rather than
+        /// whatever the last sample was after SettleTimeoutFrames (scaled up
+        /// proportionally to requiredFrames, so the first lock's larger
+        /// requirement gets a correspondingly longer timeout) rather than
         /// risking content that never appears at all (fail open, not closed).
         /// </summary>
-        private IEnumerator SettleAndSample(int generation, System.Action<Vector3, Quaternion> onSettled)
+        private IEnumerator SettleAndSample(int generation, int requiredFrames, System.Action<Vector3, Quaternion> onSettled)
         {
             Vector3 sum = Vector3.zero;
             Vector3 lastPos = Vector3.zero;
@@ -397,8 +445,9 @@ namespace ARReveal
             bool haveLast = false;
             int notVisibleStreak = 0;
             SettleProgress = 0;
+            int timeoutFrames = SettleTimeoutFrames * requiredFrames / SettleFramesRequired;
 
-            for (int frame = 0; frame < SettleTimeoutFrames; frame++)
+            for (int frame = 0; frame < timeoutFrames; frame++)
             {
                 if (generation != _handoffGeneration) yield break;
 
@@ -443,7 +492,7 @@ namespace ARReveal
                 lastRot = rot;
                 haveLast = true;
 
-                if (SettleProgress >= SettleFramesRequired)
+                if (SettleProgress >= requiredFrames)
                 {
                     onSettled(sum / SettleProgress, rot);
                     yield break;

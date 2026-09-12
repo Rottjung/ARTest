@@ -32,8 +32,8 @@ namespace ARReveal
         /// distinct colors (not just a version number bump) since the whole point
         /// is to be readable as "different" at a glance, from across a room.
         /// </summary>
-        private const string BuildTag = "build-8";
-        private const string BuildTagColorHex = "#FFD700"; // gold - change alongside BuildTag above
+        private const string BuildTag = "build-9";
+        private const string BuildTagColorHex = "#FF4500"; // orange-red - change alongside BuildTag above
 
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;
@@ -197,7 +197,7 @@ namespace ARReveal
                 // reading enough to seed the anchor from it. Shown as its own
                 // state so this isn't misread as "TRACKING ACTIVE" before the
                 // anchor has actually been seeded.
-                text = $"LOCKING ANCHOR...\n{Handoff.SettleProgress}/{HandoffToInstantTracking.SettleFramesRequired} agreeing frames" +
+                text = $"LOCKING ANCHOR...\n{Handoff.SettleProgress}/{Handoff.CurrentSettleFramesRequired} agreeing frames" +
                     (_qrVisible ? "\n(QR in view)" : "\n(QR out of view - waiting)");
                 color = Color.yellow;
             }

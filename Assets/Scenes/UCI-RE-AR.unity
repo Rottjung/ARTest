@@ -354,7 +354,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: SineFrequency
-      value: 0.47
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: PunchOvershoot
@@ -409,6 +409,10 @@ PrefabInstance:
       value: 0.124
       objectReference: {fileID: 0}
     - target: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
+      propertyPath: PunchStraightenTip
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278230703876849884, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: AimBelowCameraOffset
       value: 3
       objectReference: {fileID: 0}
@@ -446,15 +450,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3792304484818674708, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: m_LocalScale.x
-      value: 10
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 3792304484818674708, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: m_LocalScale.y
-      value: 12.500001
+      value: 10.000001
       objectReference: {fileID: 0}
     - target: {fileID: 3792304484818674708, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: m_LocalScale.z
-      value: 12.5
+      value: 10.000001
       objectReference: {fileID: 0}
     - target: {fileID: 3792304484818674708, guid: fb9b1263b5cac874fad5e232cb92555e, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2272,7 +2276,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
   Handoff: {fileID: 0}
   LogoSprite: {fileID: 21300000, guid: 4d200fd8bbc1b620134551535e0b89fc, type: 3}
-  Page1TextSprite: {fileID: 21300000, guid: 174c4fc2f459149986bd19038ecc7855, type: 3}
   Page2TextTopSprite: {fileID: 21300000, guid: a01b1650ce98869b2509ec88de247726, type: 3}
   Page2TextBottomSprite: {fileID: 21300000, guid: 3b73fb1cbe162c14c69ef97858e36f98, type: 3}
   Page3TextSprite: {fileID: 21300000, guid: 6614db6b208ec6ab2d42b25f7792f7ef, type: 3}
@@ -2280,7 +2283,6 @@ MonoBehaviour:
   FotoButtonSprite: {fileID: 21300000, guid: 8352507cbbcea4a200baf474ed37dc9c, type: 3}
   TeilenButtonSprite: {fileID: 21300000, guid: 6fb66b66cef7d86657f6aee55e5bcb63, type: 3}
   RecordButtonSprite: {fileID: 21300000, guid: d9cab713d0a52ae43aab3539119be879, type: 3}
-  Page1GroupOverride: {fileID: 1130067225}
   Page2GroupOverride: {fileID: 1923040463}
   Page3GroupOverride: {fileID: 1040004405}
   RestartButtonOverride: {fileID: 468097233}

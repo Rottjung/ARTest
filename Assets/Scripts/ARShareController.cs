@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
 using Zappar;
@@ -278,19 +279,37 @@ namespace ARReveal
             return Sprite.Create(tex, new Rect(0f, 0f, diameter, diameter), new Vector2(0.5f, 0.5f), 100f);
         }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")]
+        private static extern void ARReveal_ReloadPage();
+#endif
+
         /// <summary>
         /// Reloads the page - the simplest, most reliable "restart everything"
         /// for a WebGL AR experience (re-running the tracking/reveal state
         /// machine in place would need resetting a lot of independent state -
         /// HandoffToInstantTracking, every TentacleController/WallHoleEffect/
         /// DebrisRing, this controller's own screen state - a full reload
-        /// guarantees a genuinely clean slate). No-ops outside a WebGL build
-        /// (Application.absoluteURL is empty in the Editor/other platforms).
+        /// guarantees a genuinely clean slate).
+        ///
+        /// Deliberately NOT Application.OpenURL(Application.absoluteURL) - on
+        /// WebGL that can call window.open(url, "_blank") depending on the
+        /// template, opening a SECOND tab and leaving the original (with its
+        /// live camera feed) still running behind it. Instead this calls a
+        /// tiny native plugin (Plugins/WebGL/ARReveal_Reload.jslib) that does
+        /// window.location.reload() directly - guaranteed same-tab, in-place.
+        ///
+        /// Because the reload stays on the same origin, the browser does NOT
+        /// re-prompt for camera/microphone permission - permissions are
+        /// granted per-origin, not per page-load, so whatever the user
+        /// already granted carries straight over automatically. No-ops
+        /// outside a WebGL build (nothing to reload in the Editor/other
+        /// platforms).
         /// </summary>
         public void Restart()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            Application.OpenURL(Application.absoluteURL);
+            ARReveal_ReloadPage();
 #else
             Debug.Log("[ARShareController] Restart requested - only reloads the page in an actual WebGL build.");
 #endif

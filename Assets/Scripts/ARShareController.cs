@@ -1,7 +1,7 @@
 using System.Collections;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
-using Zappar.Additional.SNS;
 
 namespace ARReveal
 {
@@ -40,37 +40,42 @@ namespace ARReveal
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
-    /// anymore). Sharing itself is unchanged from before - Zappar's WebGL
-    /// Save & Share package (com.zappar.sns, class ZSaveNShare) captures the
-    /// composited AR view (not just the raw camera feed) and opens the
-    /// device's native share sheet, which is what actually offers
-    /// Instagram/Messages/etc as destinations - a web page has no way to post
-    /// directly into a specific platform's own feed/API, this native-share-sheet
-    /// approach is the only way any website can "share to Instagram".
+    /// anymore).
     ///
     /// RESTART, per direct request, means replay the tentacle/hole/FX burst in
     /// place - NOT reload the browser page (an earlier version did exactly
     /// that via a same-tab jslib reload; superseded, see Restart()'s own doc
     /// comment and HandoffToInstantTracking.RestartRevealSequence()).
     ///
-    /// CAPTURE FEEDBACK: a website cannot silently write an image into the
-    /// device's photo gallery - no permission grants that, it's a hard
-    /// browser security boundary, not a Zappar/Unity limitation. The only
-    /// way to get a captured photo into Photos/gallery is the native OS
-    /// save/share sheet ZSaveNShare.OpenSNSSnapPrompt() opens (the user taps
-    /// "Save" in THAT sheet - one tap, no separate permission dialog) - once
-    /// that opens, it's entirely the OS's own UI, "let the phone do its
-    /// thing" from there, nothing further for this code to do. The round
-    /// record button (RetakePhoto) is the only thing that opens it, right
-    /// after capturing. The flash (PlayCaptureFlash) fires AFTER capture
+    /// SHARING BYPASSES ZAPPAR'S OWN UI ENTIRELY, per direct request ("skip
+    /// zappars ui and go native os"). An earlier version used Zappar's WebGL
+    /// Save & Share package (com.zappar.sns, ZSaveNShare) - convenient, but
+    /// it opens ITS OWN custom overlay (a "ZapparSnapshotContainer" div with
+    /// Save/Share/Close buttons Zappar's own script renders, NOT a native OS
+    /// dialog), and on-device testing found its Share button unreliable
+    /// (silently inert on some devices, "Permission denied" from
+    /// navigator.share() on others - confirmed by reading the actual
+    /// minified zappar-sharing.min.js: Save is a plain `<a download>`, only
+    /// Share attempts navigator.share(), wrapped in try/catch that logs but
+    /// never surfaces the failure to the user). Now this project captures
+    /// the photo itself (CapturePhotoBytes - same ReadPixels/EncodeToJPG
+    /// technique, just our own code) and hands the raw bytes straight to a
+    /// small custom plugin (Plugins/WebGL/ARReveal_Share.jslib,
+    /// ShareLastPhoto/ARReveal_ShareImage) that calls navigator.share()
+    /// DIRECTLY - the true native OS share sheet, a real system UI, appears
+    /// with no custom overlay from either Zappar or this project in between.
+    /// Falls back to a plain download in that same plugin if the browser/
+    /// device has no file-sharing support at all, so tapping never silently
+    /// does nothing. Whether navigator.share() actually succeeds still
+    /// depends on the browser/device's own Web Share API support (not
+    /// something any code can force) - notably, an in-app browser (e.g.
+    /// Instagram/TikTok's own webview, plausible for a QR-driven promo) may
+    /// restrict or lack it entirely, same as any other website would hit.
+    ///
+    /// CAPTURE FEEDBACK: the flash (PlayCaptureFlash) fires AFTER capture
     /// completes, not before/during - firing it first (an earlier version's
-    /// bug) meant TakeSnapshot's ReadPixels captured the flash overlay
-    /// ITSELF, coming out an almost-all-white photo. Whether that native
-    /// sheet offers "Share" as well as "Save" depends on the browser's own
-    /// Web Share API support (not something this code controls) - notably,
-    /// an in-app browser (e.g. Instagram/TikTok's own webview, plausible for
-    /// a QR-driven promo) may only offer a save/download fallback with no
-    /// share option at all.
+    /// bug) meant the captured screenshot included the flash overlay
+    /// ITSELF, coming out an almost-all-white photo.
     /// </summary>
     public class ARShareController : MonoBehaviour
     {
@@ -131,9 +136,6 @@ namespace ARReveal
                 AttachToExistingUI(existingCanvas);
             else
                 BuildUI();
-
-            // Per the package's own docs - call once at scene start before TakeSnapshot/OpenSNSSnapPrompt are used.
-            ZSaveNShare.Initialize();
         }
 
         /// <summary>
@@ -457,20 +459,22 @@ namespace ARReveal
         /// The round record button on the Share Prompt screen - THE actual
         /// "take the photo" action (can be tapped more than once to retake,
         /// in case the first one didn't land right). Captures the composited
-        /// AR view, then hands off to the phone's own native save/share
-        /// sheet (ZSaveNShare.OpenSNSSnapPrompt) - from that point on it's
-        /// entirely the OS's own UI, nothing further for this code to do.
+        /// AR view (our own code - see CapturePhotoBytes, NOT Zappar's
+        /// ZSaveNShare package), then calls straight into the phone's real
+        /// native OS share sheet (see ShareLastPhoto/ARReveal_ShareImage) -
+        /// no custom Save/Share/Close overlay of Zappar's own in between at
+        /// all, per direct request ("skip zappars ui and go native os").
         ///
         /// The whole Canvas is switched off for the capture itself (see
         /// RetakePhotoRoutine) so none of our own buttons/text end up baked
         /// into the photo - per direct request, the saved image should be a
         /// clean AR view only. The flash then fires AFTER capture completes
         /// (and after the UI is back on), not before/during - firing it
-        /// first (an earlier version's bug) meant TakeSnapshot's ReadPixels
-        /// captured the flash overlay ITSELF, coming out an almost-all-white
+        /// first (an earlier version's bug) meant a captured screenshot
+        /// included the flash overlay ITSELF, coming out an almost-all-white
         /// photo. Capturing on a clean, UI-free frame first, then restoring
         /// the UI and flashing, guarantees neither can ever contaminate what
-        /// actually gets saved/shared.
+        /// actually gets shared.
         /// </summary>
         public void RetakePhoto()
         {
@@ -481,21 +485,68 @@ namespace ARReveal
         {
             if (_canvas != null) _canvas.enabled = false;
             // Let a fully rendered, UI-free frame actually happen before
-            // TakeSnapshot does its own WaitForEndOfFrame + ReadPixels -
-            // Canvas.enabled takes effect immediately, but without waiting a
-            // frame here, TakeSnapshot could still read back whatever the
-            // GPU had already queued up from the moment the button was tapped.
+            // ReadPixels - Canvas.enabled takes effect immediately, but
+            // without waiting a frame here, ReadPixels could still read back
+            // whatever the GPU had already queued up from the moment the
+            // button was tapped.
             yield return new WaitForEndOfFrame();
-            yield return ZSaveNShare.TakeSnapshot();
+            CapturePhotoBytes();
             if (_canvas != null) _canvas.enabled = true;
             PlayCaptureFlash();
-            ZSaveNShare.OpenSNSSnapPrompt();
+            ShareLastPhoto();
         }
 
-        /// <summary>Re-opens the native save/share dialog for whichever photo was most recently captured, without taking a new one - useful if the dialog from Foto/RetakePhoto was dismissed by mistake.</summary>
+        /// <summary>
+        /// The most recently captured photo's raw JPEG bytes - kept around
+        /// so Teilen can re-share the same photo without recapturing.
+        /// </summary>
+        private byte[] _lastPhotoBytes;
+
+        /// <summary>
+        /// Reads the current frame straight off the screen and encodes it to
+        /// JPEG - same technique Zappar's own ZSaveNShare.TakeSnapshot uses
+        /// internally, just done directly so this project owns the bytes
+        /// and can hand them to its own native-share plugin instead of
+        /// Zappar's overlay. Must be called right after a WaitForEndOfFrame
+        /// with the Canvas already disabled - see RetakePhotoRoutine.
+        /// </summary>
+        private void CapturePhotoBytes()
+        {
+            var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0, false);
+            tex.Apply();
+            _lastPhotoBytes = tex.EncodeToJPG(85);
+            Destroy(tex);
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")]
+        private static extern void ARReveal_ShareImage(byte[] data, int length);
+#endif
+
+        /// <summary>
+        /// Hands the most recently captured photo straight to the real OS
+        /// native share sheet (Plugins/WebGL/ARReveal_Share.jslib calls
+        /// navigator.share() directly) - bypassing Zappar's own
+        /// zappar-sharing.js overlay entirely, per direct request. Falls
+        /// back to a plain download inside that same plugin if this
+        /// browser/device has no file-sharing support at all, so this never
+        /// silently does nothing.
+        /// </summary>
+        private void ShareLastPhoto()
+        {
+            if (_lastPhotoBytes == null) return;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            ARReveal_ShareImage(_lastPhotoBytes, _lastPhotoBytes.Length);
+#else
+            Debug.Log("[ARShareController] Share requested - only works in an actual WebGL build.");
+#endif
+        }
+
+        /// <summary>Re-shares whichever photo was most recently captured, without taking a new one - useful if the native share sheet from Foto/RetakePhoto was dismissed by mistake.</summary>
         public void Teilen()
         {
-            ZSaveNShare.OpenSNSSnapPrompt();
+            ShareLastPhoto();
         }
     }
 }

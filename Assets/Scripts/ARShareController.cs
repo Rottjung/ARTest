@@ -2,6 +2,7 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
+using Zappar;
 
 namespace ARReveal
 {
@@ -14,9 +15,10 @@ namespace ARReveal
     /// exactly per convention, just constructed at runtime instead of hand-placed
     /// in the Editor.
     ///
-    /// Two screens, both built from the final design's own PNGs (every screen's
-    /// text is pre-rendered INTO its image asset - no font/TextMeshPro needed at
-    /// all, just positioned Image components):
+    /// Two of these screens are built from the final design's own PNGs (every
+    /// screen's text is pre-rendered INTO its image asset - no font/TextMeshPro
+    /// needed at all, just positioned Image components); the calibration screen
+    /// below is the one exception, see its own doc paragraph for why:
     ///
     ///  - CALL TO ACTION (shown Page2DelaySeconds after tracking locks): logo +
     ///    "Heute: dieses Kino... die ganze Welt" two-line text (split into
@@ -37,6 +39,28 @@ namespace ARReveal
     /// A third "Distance Alert" screen (warning the viewer to step back) was
     /// tried and then removed entirely per direct request - see git history
     /// around "Distance Alert" if it's ever wanted back.
+    ///
+    /// CALIBRATION SCREEN (Page0_Calibration - see BuildCalibrationScreen):
+    /// shown as soon as the Zappar camera feed is actually live
+    /// (ZapparCamera.CameraSourceInitialized), for as long as tracking hasn't
+    /// handed off yet (!Handoff.HasHandedOff) - a rounded-square viewfinder
+    /// frame to place the QR in, "scan the QR to calibrate" instructional
+    /// text, and a spinning indicator + "CALIBRATING..." label at the
+    /// bottom. Shown EXACTLY ONCE per session, never again after the first
+    /// successful lock - this falls straight out of HasHandedOff's own
+    /// existing semantics (set true on the very first handoff and never
+    /// reset back to false by anything, including a later re-scan/re-lock -
+    /// see HandoffToInstantTracking's own doc), so a re-scan after that first
+    /// lock silently just re-corrects the anchor as it always did, with no
+    /// UI interruption at all - "if we scan the AR again just keep what we
+    /// have now" per direct request. The frame and spinner are generated at
+    /// runtime (CreateRoundedFrameSprite/CreateSpinnerSprite, same
+    /// procedural-texture approach as CreateCircleSprite below) since no
+    /// design asset exists for this screen yet; the two text labels use a
+    /// plain UnityEngine.UI.Text with Unity's built-in font as a placeholder
+    /// for the same reason - EVERY OTHER screen's text in this class is a
+    /// pre-rendered PNG per this project's own convention, swap these two
+    /// Text components for Image components once real assets exist.
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
@@ -94,6 +118,7 @@ namespace ARReveal
         public Sprite RecordButtonSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
+        public GameObject Page0GroupOverride;
         public GameObject Page2GroupOverride;
         public GameObject Page3GroupOverride;
         public Button RestartButtonOverride;
@@ -105,14 +130,21 @@ namespace ARReveal
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
         public float Page2DelaySeconds = 30f;
 
+        [Tooltip("How fast the calibration spinner spins, in degrees/second.")]
+        public float SpinnerDegreesPerSecond = 220f;
+
         [Tooltip("Above CameraSlimeOverlay's 500, so this UI always draws on top of the slime splat.")]
         public int SortingOrder = 600;
 
         private enum UiScreen { None, CallToAction, SharePrompt }
         private UiScreen _screen = UiScreen.None;
 
+        private GameObject _page0Group;
         private GameObject _page2Group;
         private GameObject _page3Group;
+
+        private RectTransform _spinnerRect;
+        private ZapparCamera _zapparCamera;
 
         /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
         private Canvas _canvas;
@@ -125,6 +157,7 @@ namespace ARReveal
         private void Awake()
         {
             if (Handoff == null) Handoff = FindFirstObjectByType<HandoffToInstantTracking>();
+            _zapparCamera = ZapparCamera.Instance != null ? ZapparCamera.Instance : FindFirstObjectByType<ZapparCamera>();
 
             // If a hand-tuned "ARShareCanvas" hierarchy already exists as a
             // child (built via the ARReveal/Build Share UI In Scene menu
@@ -153,14 +186,18 @@ namespace ARReveal
         private void AttachToExistingUI(Transform canvasRoot)
         {
             _canvas = canvasRoot.GetComponent<Canvas>();
+            _page0Group = Page0GroupOverride != null ? Page0GroupOverride : FindChild(canvasRoot, "Page0_Calibration");
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
+            var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
+            _spinnerRect = spinnerTransform != null ? spinnerTransform.GetComponent<RectTransform>() : null;
 
             WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
 
+            SetActiveIfNotNull(_page0Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
 
@@ -191,12 +228,22 @@ namespace ARReveal
         {
             if (Handoff == null || !Handoff.HasHandedOff)
             {
+                // Shown once camera access is actually live, until the FIRST
+                // successful lock - see this class's own "CALIBRATION SCREEN"
+                // doc comment for why HasHandedOff alone is exactly the right
+                // gate (never shows again after that first lock, including on
+                // a later re-scan).
+                bool cameraReady = _zapparCamera != null && _zapparCamera.CameraSourceInitialized;
+                SetActiveIfNotNull(_page0Group, cameraReady);
+
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
                 _handoffStartTime = -1f;
                 _screen = UiScreen.None;
                 return;
             }
+
+            SetActiveIfNotNull(_page0Group, false);
 
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
@@ -205,6 +252,12 @@ namespace ARReveal
 
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
+        }
+
+        private void LateUpdate()
+        {
+            if (_spinnerRect != null && _page0Group != null && _page0Group.activeInHierarchy)
+                _spinnerRect.Rotate(0f, 0f, -SpinnerDegreesPerSecond * Time.deltaTime);
         }
 
         private static void SetActiveIfNotNull(GameObject go, bool active)
@@ -229,9 +282,11 @@ namespace ARReveal
 
             canvasGo.AddComponent<GraphicRaycaster>();
 
+            _page0Group = BuildPage0(canvasGo.transform);
             _page2Group = BuildPage2(canvasGo.transform);
             _page3Group = BuildPage3(canvasGo.transform);
 
+            _page0Group.SetActive(false);
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
 
@@ -317,6 +372,59 @@ namespace ARReveal
             BuildUI();
         }
 #endif
+
+        // --- CALIBRATION ---------------------------------------------------------
+        private GameObject BuildPage0(Transform parent)
+        {
+            var group = new GameObject("Page0_Calibration");
+            group.transform.SetParent(parent, false);
+
+            // Rounded-square viewfinder frame - where the QR should be placed.
+            // Generated at runtime (see CreateRoundedFrameSprite) - no design
+            // asset for this exists yet.
+            var frameSprite = CreateRoundedFrameSprite(new Color(1f, 1f, 1f, 0.9f), 512, 64, 10);
+            AddImage(group.transform, frameSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
+
+            AddPlaceholderText(group.transform, "InstructionText", "Scan the QR to calibrate",
+                48, new Vector2(0f, 620f), new Vector2(800f, 160f));
+
+            var spinnerSprite = CreateSpinnerSprite(Color.white, 128);
+            var spinnerImage = AddImage(group.transform, spinnerSprite, new Vector2(0f, -700f), new Vector2(100f, 100f));
+            spinnerImage.gameObject.name = "Spinner";
+            _spinnerRect = spinnerImage.GetComponent<RectTransform>();
+
+            AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
+                36, new Vector2(0f, -820f), new Vector2(500f, 80f));
+
+            return group;
+        }
+
+        /// <summary>
+        /// Plain UnityEngine.UI.Text with Unity's built-in font - a placeholder
+        /// until a real design asset exists for this screen (every OTHER
+        /// screen's text in this class is a pre-rendered PNG per this
+        /// project's own convention - see this class's own "CALIBRATION
+        /// SCREEN" doc comment for why this one's different for now).
+        /// </summary>
+        private static Text AddPlaceholderText(Transform parent, string name, string text, int fontSize, Vector2 anchoredPos, Vector2 size)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var label = go.AddComponent<Text>();
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.text = text;
+            label.fontSize = fontSize;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.color = Color.white;
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = anchoredPos;
+            return label;
+        }
 
         // --- CALL TO ACTION ----------------------------------------------------
         private GameObject BuildPage2(Transform parent)
@@ -417,6 +525,79 @@ namespace ARReveal
             tex.SetPixels(pixels);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0f, 0f, diameter, diameter), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>
+        /// Generates a rounded-square OUTLINE (transparent fill, so the live
+        /// camera feed shows through the middle - it's a viewfinder, not a
+        /// solid shape) - the "typical QR rounded square window" for the
+        /// calibration screen. Standard rounded-box signed-distance-field
+        /// technique (see RoundedBoxSDF) - thickness is drawn as a band
+        /// around the zero-distance boundary.
+        /// </summary>
+        private static Sprite CreateRoundedFrameSprite(Color color, int size, int cornerRadius, int thickness)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            float half = size / 2f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f - half, y + 0.5f - half);
+                    float dist = RoundedBoxSDF(p, half - 1f, cornerRadius);
+                    bool onBorder = Mathf.Abs(dist) <= thickness * 0.5f;
+                    pixels[y * size + x] = onBorder ? color : new Color(0f, 0f, 0f, 0f);
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>Signed distance from p to the boundary of a square of half-extent halfExtent with rounded corners of the given radius - negative inside, positive outside, zero exactly on the boundary. Standard technique (Inigo Quilez's rounded-box SDF).</summary>
+        private static float RoundedBoxSDF(Vector2 p, float halfExtent, float radius)
+        {
+            Vector2 q = new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - new Vector2(halfExtent - radius, halfExtent - radius);
+            float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
+            float inside = Mathf.Min(Mathf.Max(q.x, q.y), 0f);
+            return outside + inside - radius;
+        }
+
+        /// <summary>
+        /// Generates a ring with one gap (a "C" shape) - rotating this
+        /// continuously (see LateUpdate) reads as a standard loading spinner.
+        /// No design asset exists for this yet - see this class's own
+        /// "CALIBRATION SCREEN" doc comment.
+        /// </summary>
+        private static Sprite CreateSpinnerSprite(Color color, int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            Vector2 center = new Vector2((size - 1) / 2f, (size - 1) / 2f);
+            float outerRadius = size / 2f - 2f;
+            float innerRadius = outerRadius - size * 0.14f;
+            const float gapDegrees = 70f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 p = new Vector2(x, y) - center;
+                    float dist = p.magnitude;
+                    if (dist < innerRadius || dist > outerRadius)
+                    {
+                        pixels[y * size + x] = new Color(0f, 0f, 0f, 0f);
+                        continue;
+                    }
+                    float angle = Mathf.Atan2(p.y, p.x) * Mathf.Rad2Deg;
+                    if (angle < 0f) angle += 360f;
+                    pixels[y * size + x] = angle < gapDegrees ? new Color(0f, 0f, 0f, 0f) : color;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
         }
 
         /// <summary>

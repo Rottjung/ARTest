@@ -2436,7 +2436,6 @@ MonoBehaviour:
   RecordButtonOverride: {fileID: 0}
   TeilenButtonOverride: {fileID: 0}
   Page2DelaySeconds: 30
-  TooCloseDistanceMeters: 3
   SortingOrder: 600
 --- !u!1 &777038240
 GameObject:
@@ -3917,17 +3916,25 @@ PrefabInstance:
       propertyPath: OpenOnStart
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6178885141760728109, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 6178885141760728109, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.8
+      objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.x
-      value: 6
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.y
-      value: 6
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.z
-      value: 6
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.x
@@ -3968,6 +3975,10 @@ PrefabInstance:
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: OpenOnStart

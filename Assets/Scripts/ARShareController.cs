@@ -127,6 +127,8 @@ namespace ARReveal
         public Button FotoButtonOverride;
         public Button RecordButtonOverride;
         public Button TeilenButtonOverride;
+        [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
+        public Image SpinnerImageOverride;
 
         [Header("Timing / thresholds")]
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
@@ -192,7 +194,8 @@ namespace ARReveal
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
             var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
-            _spinnerImage = spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
+            _spinnerImage = SpinnerImageOverride != null ? SpinnerImageOverride
+                : spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
 
             WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
@@ -428,17 +431,21 @@ namespace ARReveal
         /// </summary>
         public void EditorUpgradeSpinnerToRadialFill()
         {
-            var canvasRoot = transform.Find("ARShareCanvas");
-            var spinnerTransform = canvasRoot != null ? canvasRoot.Find("Page0_Calibration/Spinner") : null;
-            if (spinnerTransform == null)
-            {
-                Debug.LogError("[ARShareController] No 'Page0_Calibration/Spinner' found - add the calibration screen first (ARReveal/UI/Add Calibration Screen To Share Prefab).");
-                return;
-            }
-            var image = spinnerTransform.GetComponent<Image>();
+            Image image = SpinnerImageOverride;
             if (image == null)
             {
-                Debug.LogError("[ARShareController] 'Spinner' has no Image component.");
+                var canvasRoot = transform.Find("ARShareCanvas");
+                var spinnerTransform = canvasRoot != null ? canvasRoot.Find("Page0_Calibration/Spinner") : null;
+                if (spinnerTransform == null)
+                {
+                    Debug.LogError("[ARShareController] No 'Page0_Calibration/Spinner' found (and SpinnerImageOverride isn't set) - either drag the Image into SpinnerImageOverride directly, or add the calibration screen first (ARReveal/UI/Add Calibration Screen To Share Prefab).");
+                    return;
+                }
+                image = spinnerTransform.GetComponent<Image>();
+            }
+            if (image == null)
+            {
+                Debug.LogError("[ARShareController] Spinner object has no Image component.");
                 return;
             }
 

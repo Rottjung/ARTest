@@ -2420,7 +2420,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
   Handoff: {fileID: 0}
   LogoSprite: {fileID: 0}
-  Page1TextSprite: {fileID: 0}
   Page2TextTopSprite: {fileID: 0}
   Page2TextBottomSprite: {fileID: 0}
   Page3TextSprite: {fileID: 0}
@@ -2428,7 +2427,6 @@ MonoBehaviour:
   FotoButtonSprite: {fileID: 0}
   TeilenButtonSprite: {fileID: 0}
   RecordButtonSprite: {fileID: 0}
-  Page1GroupOverride: {fileID: 0}
   Page2GroupOverride: {fileID: 0}
   Page3GroupOverride: {fileID: 0}
   RestartButtonOverride: {fileID: 0}
@@ -3926,23 +3924,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.x
-      value: 9
+      value: 10.56
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.y
-      value: 9
+      value: 10.56
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1
+      value: 1.1733334
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 23.701996
+      value: 23.76
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 18.3564
+      value: 17.74
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.z
@@ -3978,7 +3976,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_ConstrainProportionsScale
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: OpenOnStart

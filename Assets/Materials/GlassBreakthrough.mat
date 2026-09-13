@@ -25,10 +25,10 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Active: 0
+    - _Active: 1
     - _CrackWidth: 0.01
-    - _EdgeFadeEnd: 1.153
-    - _EdgeFadeStart: 0.218
+    - _EdgeFadeEnd: 1.25
+    - _EdgeFadeStart: 0.75
     - _EmissionStrength: 0
     - _GlowIntensity: 0
     - _MaxHoleRadius: 0.557
@@ -37,7 +37,7 @@ Material:
     - _PreCrackIntensity: 0.883
     - _PreCrackLineWidth: 0.2
     - _PreCrackScale: 8.1
-    - _Progress: 0
+    - _Progress: 1
     m_Colors:
     - _BaseColor: {r: 0.29803923, g: 0.427451, b: 0.60784316, a: 1}
     - _EmissionColor: {r: 0.43808398, g: 0.4490565, b: 0.43634737, a: 1}

@@ -3316,7 +3316,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 53a46277bb2e24858882d73be7e2e0a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparImageTrackingTarget
-  Target: RE_AR_QR.zpt
+  Target: RE_AR_QR_A4.zpt
   Orientation: 0
   PreviewImageObject: {fileID: 74737118}
   OnSeenEvent:

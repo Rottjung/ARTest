@@ -58,6 +58,17 @@ namespace ARReveal
         public Sprite RestartButtonSprite;
         public Sprite FotoButtonSprite;
         public Sprite TeilenButtonSprite;
+        [Tooltip("The round record/retake button on the Share Prompt screen. Falls back to a plain generated red circle if left blank.")]
+        public Sprite RecordButtonSprite;
+
+        [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
+        public GameObject Page1GroupOverride;
+        public GameObject Page2GroupOverride;
+        public GameObject Page3GroupOverride;
+        public Button RestartButtonOverride;
+        public Button FotoButtonOverride;
+        public Button RecordButtonOverride;
+        public Button TeilenButtonOverride;
 
         [Header("Timing / thresholds")]
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
@@ -84,9 +95,67 @@ namespace ARReveal
             var zCam = ZapparCamera.Instance != null ? ZapparCamera.Instance : FindFirstObjectByType<ZapparCamera>();
             if (zCam != null) _camTransform = zCam.transform;
 
-            BuildUI();
+            // If a hand-tuned "ARShareCanvas" hierarchy already exists as a
+            // child (built via the ARReveal/Build Share UI In Scene menu
+            // command, then saved into the scene or as a prefab), use it
+            // as-is instead of rebuilding procedurally - see
+            // AttachToExistingUI's own doc comment.
+            var existingCanvas = transform.Find("ARShareCanvas");
+            if (existingCanvas != null)
+                AttachToExistingUI(existingCanvas);
+            else
+                BuildUI();
+
             // Per the package's own docs - call once at scene start before TakeSnapshot/OpenSNSSnapPrompt are used.
             ZSaveNShare.Initialize();
+        }
+
+        /// <summary>
+        /// Picks up a hand-tuned hierarchy already saved in the scene/prefab
+        /// (built via ARReveal/Build Share UI In Scene, then laid out by hand)
+        /// instead of building one from scratch - layout can be freely edited
+        /// (RectTransform positions/sizes) as long as the page groups and
+        /// button GameObjects keep their original names, since this looks
+        /// them up by name/path rather than assuming BuildUI()'s exact
+        /// structure. Button onClick listeners are always re-wired here in
+        /// code (never relying on serialized persistent calls) because
+        /// AddListener-based listeners added by the procedural builder are
+        /// never serialized into a prefab in the first place.
+        /// </summary>
+        private void AttachToExistingUI(Transform canvasRoot)
+        {
+            _page1Group = Page1GroupOverride != null ? Page1GroupOverride : FindChild(canvasRoot, "Page1_DistanceAlert");
+            _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
+            _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
+
+            WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
+            WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
+            WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
+            WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
+
+            SetActiveIfNotNull(_page1Group, false);
+            SetActiveIfNotNull(_page2Group, false);
+            SetActiveIfNotNull(_page3Group, false);
+        }
+
+        private static GameObject FindChild(Transform root, string path)
+        {
+            var t = root.Find(path);
+            return t != null ? t.gameObject : null;
+        }
+
+        /// <summary>
+        /// Prefers an explicitly-dragged-in Button (RestartButtonOverride etc.
+        /// - immune to renaming/moving while hand-tuning the layout); falls
+        /// back to finding it by name/path under canvasRoot if left blank.
+        /// </summary>
+        private static void WireButton(Button explicitButton, Transform root, string path, UnityEngine.Events.UnityAction onClick)
+        {
+            var button = explicitButton != null ? explicitButton : root.Find(path)?.GetComponent<Button>();
+            if (button != null)
+                button.onClick.AddListener(onClick);
+            else
+                Debug.LogWarning("[ARShareController] Could not find button at '" + path + "' under " + root.name + " - either drag it into the matching *ButtonOverride field, or make sure it wasn't renamed/deleted while adjusting the layout.");
         }
 
         private void Update()
@@ -163,6 +232,25 @@ namespace ARReveal
             _page3Group.SetActive(false);
         }
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// Entry point for the ARReveal/UI/Build Share UI In Scene menu command
+        /// (see Assets/Editor/BuildShareUIInScene.cs) - destroys any previously-built
+        /// "ARShareCanvas" child and rebuilds it fresh as real, persisted
+        /// GameObjects (instead of the runtime-only ones Awake() creates),
+        /// so it can be hand-tuned in the Scene view and saved as a prefab.
+        /// Never called at runtime - Editor-only, hence the #if.
+        /// </summary>
+        public void EditorRebuildUI()
+        {
+            var existing = transform.Find("ARShareCanvas");
+            if (existing != null)
+                UnityEditor.Undo.DestroyObjectImmediate(existing.gameObject);
+
+            BuildUI();
+        }
+#endif
+
         // --- DISTANCE ALERT ---------------------------------------------------
         private GameObject BuildPage1(Transform parent)
         {
@@ -208,12 +296,11 @@ namespace ARReveal
 
             AddImage(group.transform, Page3TextSprite, new Vector2(0f, 400f), new Vector2(760f, 260f));
 
-            // No dedicated asset was provided for the round record button in the
-            // design (only the three "Use_Button_*" stamp graphics) - built
-            // procedurally instead, same spirit as this project's other
-            // procedural content (ProceduralClouds etc.) rather than leaving it
-            // out. Tapping it retakes the photo without leaving this screen.
-            var recordSprite = CreateCircleSprite(new Color(0.85f, 0.1f, 0.1f, 1f), 128);
+            // Uses RecordButtonSprite (RecButton.png) if assigned; falls back
+            // to a plain generated red circle otherwise so this never breaks
+            // if that field is left blank. Tapping it retakes the photo
+            // without leaving this screen.
+            var recordSprite = RecordButtonSprite != null ? RecordButtonSprite : CreateCircleSprite(new Color(0.85f, 0.1f, 0.1f, 1f), 128);
             BuildImageButton(group.transform, "RecordButton", recordSprite,
                 new Vector2(0f, 0f), new Vector2(140f, 140f), RetakePhoto);
 

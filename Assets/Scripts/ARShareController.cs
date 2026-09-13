@@ -23,9 +23,16 @@ namespace ARReveal
     ///    Page_02_Text_Top.png/Page_02_Text_Bottom.png so the logo can sit
     ///    between them, matching the actual design mockup - the source PNG had
     ///    both lines in one image) + RESTART and FOTO buttons.
-    ///  - SHARE PROMPT (shown after tapping FOTO): "share your photo, win
-    ///    tickets" text + a record button (retakes the photo) + TEILEN (share)
-    ///    button.
+    ///  - SHARE PROMPT / "the selfie screen" (shown after tapping FOTO -
+    ///    Foto() is PURE NAVIGATION, it does not capture anything itself):
+    ///    "share your photo, win tickets" text + the round record button,
+    ///    the ONE real "take the photo" action (RetakePhoto - can be tapped
+    ///    more than once to retake) + TEILEN (share) button. An earlier
+    ///    version had FOTO itself capture + immediately open the save/share
+    ///    dialog, skipping this screen entirely - corrected per direct
+    ///    feedback ("that not the design... foto button make you go to the
+    ///    selfie screen... clicking the red button should make a native
+    ///    screenshot").
     ///
     /// A third "Distance Alert" screen (warning the viewer to step back) was
     /// tried and then removed entirely per direct request - see git history
@@ -33,12 +40,10 @@ namespace ARReveal
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
-    /// anymore). "FOTO" in the new design means something different: take a
-    /// snapshot of the current AR view, then move on to the share prompt - see
-    /// TakePhotoThenShowSharePrompt(). Sharing itself is unchanged from before -
-    /// Zappar's WebGL Save & Share package (com.zappar.sns, class ZSaveNShare)
-    /// captures the composited AR view (not just the raw camera feed) and opens
-    /// the device's native share sheet, which is what actually offers
+    /// anymore). Sharing itself is unchanged from before - Zappar's WebGL
+    /// Save & Share package (com.zappar.sns, class ZSaveNShare) captures the
+    /// composited AR view (not just the raw camera feed) and opens the
+    /// device's native share sheet, which is what actually offers
     /// Instagram/Messages/etc as destinations - a web page has no way to post
     /// directly into a specific platform's own feed/API, this native-share-sheet
     /// approach is the only way any website can "share to Instagram".
@@ -53,18 +58,19 @@ namespace ARReveal
     /// browser security boundary, not a Zappar/Unity limitation. The only
     /// way to get a captured photo into Photos/gallery is the native OS
     /// save/share sheet ZSaveNShare.OpenSNSSnapPrompt() opens (the user taps
-    /// "Save" in THAT sheet - one tap, no separate permission dialog). Both
-    /// Foto and the round record button now open that sheet immediately
-    /// after capturing (previously only Teilen did, so tapping the record
-    /// button silently captured nothing anyone could see or save - the
-    /// reported bug this fixes) - plus a brief white flash (PlayCaptureFlash)
-    /// fires the instant either is tapped, giving immediate "yes, that
-    /// registered" feedback regardless of how long the capture/dialog takes
-    /// to actually appear. Whether that native sheet offers "Share" as well
-    /// as "Save" depends on the browser's own Web Share API support (not
-    /// something this code controls) - notably, an in-app browser (e.g.
-    /// Instagram/TikTok's own webview, plausible for a QR-driven promo) may
-    /// only offer a save/download fallback with no share option at all.
+    /// "Save" in THAT sheet - one tap, no separate permission dialog) - once
+    /// that opens, it's entirely the OS's own UI, "let the phone do its
+    /// thing" from there, nothing further for this code to do. The round
+    /// record button (RetakePhoto) is the only thing that opens it, right
+    /// after capturing. The flash (PlayCaptureFlash) fires AFTER capture
+    /// completes, not before/during - firing it first (an earlier version's
+    /// bug) meant TakeSnapshot's ReadPixels captured the flash overlay
+    /// ITSELF, coming out an almost-all-white photo. Whether that native
+    /// sheet offers "Share" as well as "Save" depends on the browser's own
+    /// Web Share API support (not something this code controls) - notably,
+    /// an in-app browser (e.g. Instagram/TikTok's own webview, plausible for
+    /// a QR-driven promo) may only offer a save/download fallback with no
+    /// share option at all.
     /// </summary>
     public class ARShareController : MonoBehaviour
     {
@@ -428,30 +434,43 @@ namespace ARReveal
             SetActiveIfNotNull(_page3Group, false);
         }
 
-        /// <summary>Takes the snapshot that will later be shared, then advances from the Call To Action screen to the Share Prompt screen. See this class's own "CAPTURE FEEDBACK" doc comment for the flash + why the save/share dialog opens immediately.</summary>
+        /// <summary>
+        /// Just advances from the Call To Action screen to the Share Prompt
+        /// screen ("the selfie screen, the one with the red button" per
+        /// direct correction) - does NOT capture anything itself. An earlier
+        /// version captured + immediately opened the save/share dialog right
+        /// here, skipping that screen entirely - wrong per the actual design,
+        /// where FOTO is purely a navigation step and the round record
+        /// button (RetakePhoto) is the one real "take the photo" action.
+        /// </summary>
         public void Foto()
         {
-            PlayCaptureFlash();
-            StartCoroutine(TakePhotoThenShowSharePrompt());
-        }
-
-        private IEnumerator TakePhotoThenShowSharePrompt()
-        {
-            yield return ZSaveNShare.TakeSnapshot();
             _screen = UiScreen.SharePrompt;
-            ZSaveNShare.OpenSNSSnapPrompt();
         }
 
-        /// <summary>The round record button on the Share Prompt screen - retakes the photo without changing screens, in case the first one didn't land right. See this class's own "CAPTURE FEEDBACK" doc comment - previously this only captured silently with no way to ever save/see it, which is the reported "nothing gets added to my gallery" bug; now it flashes immediately and opens the same native save/share dialog Teilen does.</summary>
+        /// <summary>
+        /// The round record button on the Share Prompt screen - THE actual
+        /// "take the photo" action (can be tapped more than once to retake,
+        /// in case the first one didn't land right). Captures the composited
+        /// AR view, then hands off to the phone's own native save/share
+        /// sheet (ZSaveNShare.OpenSNSSnapPrompt) - from that point on it's
+        /// entirely the OS's own UI, nothing further for this code to do.
+        ///
+        /// The flash fires AFTER capture completes, not before/during -
+        /// firing it first (an earlier version's bug) meant TakeSnapshot's
+        /// ReadPixels captured the flash overlay ITSELF, coming out an
+        /// almost-all-white photo. Capturing first, then flashing, guarantees
+        /// the flash can never contaminate what actually gets saved/shared.
+        /// </summary>
         public void RetakePhoto()
         {
-            PlayCaptureFlash();
             StartCoroutine(RetakePhotoRoutine());
         }
 
         private IEnumerator RetakePhotoRoutine()
         {
             yield return ZSaveNShare.TakeSnapshot();
+            PlayCaptureFlash();
             ZSaveNShare.OpenSNSSnapPrompt();
         }
 

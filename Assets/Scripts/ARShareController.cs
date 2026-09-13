@@ -371,6 +371,42 @@ namespace ARReveal
 
             BuildUI();
         }
+
+        /// <summary>
+        /// Surgical companion to EditorRebuildUI() - adds JUST the
+        /// calibration screen to an already-hand-tuned "ARShareCanvas" if
+        /// it's missing, without touching or rebuilding Page2/Page3 or
+        /// anything else already placed/tuned. For a canvas built before
+        /// the calibration screen existed (e.g. a hand-tuned prefab saved
+        /// from an earlier version of this tool) - EditorRebuildUI() would
+        /// wipe that hand-tuning entirely, this doesn't touch it at all.
+        /// Safe to call repeatedly - no-ops if Page0_Calibration already
+        /// exists. See Assets/Editor/AddCalibrationScreenToSharePrefab.cs
+        /// for the menu command that calls this on a prefab asset directly.
+        /// </summary>
+        public void EditorAddCalibrationScreenIfMissing()
+        {
+            var canvasRoot = transform.Find("ARShareCanvas");
+            if (canvasRoot == null)
+            {
+                Debug.LogError("[ARShareController] No 'ARShareCanvas' child found - build the UI first (ARReveal/UI/Build Share UI In Scene).");
+                return;
+            }
+            if (canvasRoot.Find("Page0_Calibration") != null)
+            {
+                Debug.Log("[ARShareController] Page0_Calibration already exists under " + canvasRoot.name + " - nothing to add.");
+                return;
+            }
+
+            _page0Group = BuildPage0(canvasRoot);
+            _page0Group.transform.SetSiblingIndex(0); // first, ahead of Page2/Page3
+            _page0Group.SetActive(false);
+
+            // Keep the flash overlay on top of the newly-added screen too.
+            EnsureFlashOverlay(canvasRoot);
+
+            Debug.Log("[ARShareController] Added Page0_Calibration under " + canvasRoot.name + ".");
+        }
 #endif
 
         // --- CALIBRATION ---------------------------------------------------------

@@ -45,18 +45,20 @@ namespace ARReveal
     /// (ZapparCamera.CameraSourceInitialized), for as long as tracking hasn't
     /// handed off yet (!Handoff.HasHandedOff) - a rounded-square viewfinder
     /// frame to place the QR in, "scan the QR to calibrate" instructional
-    /// text, and a spinning indicator + "CALIBRATING..." label at the
-    /// bottom. Shown EXACTLY ONCE per session, never again after the first
-    /// successful lock - this falls straight out of HasHandedOff's own
-    /// existing semantics (set true on the very first handoff and never
-    /// reset back to false by anything, including a later re-scan/re-lock -
-    /// see HandoffToInstantTracking's own doc), so a re-scan after that first
-    /// lock silently just re-corrects the anchor as it always did, with no
-    /// UI interruption at all - "if we scan the AR again just keep what we
-    /// have now" per direct request. The frame and spinner are generated at
-    /// runtime (CreateRoundedFrameSprite/CreateSpinnerSprite, same
-    /// procedural-texture approach as CreateCircleSprite below) since no
-    /// design asset exists for this screen yet; the two text labels use a
+    /// text, and a round loading ring (a "loading bar that fills in a loop"
+    /// per direct request - see SetUpAsLoadingRing/LateUpdate) +
+    /// "CALIBRATING..." label at the bottom. Shown EXACTLY ONCE per
+    /// session, never again after the first successful lock - this falls
+    /// straight out of HasHandedOff's own existing semantics (set true on
+    /// the very first handoff and never reset back to false by anything,
+    /// including a later re-scan/re-lock - see HandoffToInstantTracking's
+    /// own doc), so a re-scan after that first lock silently just
+    /// re-corrects the anchor as it always did, with no UI interruption at
+    /// all - "if we scan the AR again just keep what we have now" per
+    /// direct request. The frame and loading ring are generated at runtime
+    /// (CreateRoundedFrameSprite/CreateRingSprite, same procedural-texture
+    /// approach as CreateCircleSprite below) since no design asset exists
+    /// for this screen yet; the two text labels use a
     /// plain UnityEngine.UI.Text with Unity's built-in font as a placeholder
     /// for the same reason - EVERY OTHER screen's text in this class is a
     /// pre-rendered PNG per this project's own convention, swap these two
@@ -130,8 +132,8 @@ namespace ARReveal
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
         public float Page2DelaySeconds = 30f;
 
-        [Tooltip("How fast the calibration spinner spins, in degrees/second.")]
-        public float SpinnerDegreesPerSecond = 220f;
+        [Tooltip("How many times per second the calibration loading ring fills up before looping back to empty and starting over.")]
+        public float SpinnerLoopsPerSecond = 0.8f;
 
         [Tooltip("Above CameraSlimeOverlay's 500, so this UI always draws on top of the slime splat.")]
         public int SortingOrder = 600;
@@ -143,7 +145,7 @@ namespace ARReveal
         private GameObject _page2Group;
         private GameObject _page3Group;
 
-        private RectTransform _spinnerRect;
+        private Image _spinnerImage;
         private ZapparCamera _zapparCamera;
 
         /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
@@ -190,7 +192,7 @@ namespace ARReveal
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
             var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
-            _spinnerRect = spinnerTransform != null ? spinnerTransform.GetComponent<RectTransform>() : null;
+            _spinnerImage = spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
 
             WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
@@ -256,8 +258,13 @@ namespace ARReveal
 
         private void LateUpdate()
         {
-            if (_spinnerRect != null && _page0Group != null && _page0Group.activeInHierarchy)
-                _spinnerRect.Rotate(0f, 0f, -SpinnerDegreesPerSecond * Time.deltaTime);
+            // A radial-fill loading ring (Image.Type.Filled/Radial360), not a
+            // rotated shape - fillAmount sweeps 0 -> 1 on a repeating sawtooth
+            // (Mathf.Repeat), so it fills up, snaps back to empty, and fills
+            // again in an endless loop, exactly "a round loading bar that
+            // fills in a loop" per direct request.
+            if (_spinnerImage != null && _page0Group != null && _page0Group.activeInHierarchy)
+                _spinnerImage.fillAmount = Mathf.Repeat(Time.time * SpinnerLoopsPerSecond, 1f);
         }
 
         private static void SetActiveIfNotNull(GameObject go, bool active)
@@ -407,6 +414,40 @@ namespace ARReveal
 
             Debug.Log("[ARShareController] Added Page0_Calibration under " + canvasRoot.name + ".");
         }
+
+        /// <summary>
+        /// Upgrades an ALREADY-PLACED "Page0_Calibration/Spinner" in place to
+        /// a radial-fill loading ring (per direct request: "a round loading
+        /// bar that fills in a loop") - only touches its sprite and Image
+        /// fill settings (see SetUpAsLoadingRing), leaving whatever
+        /// position/size it was hand-adjusted to completely untouched. For
+        /// a spinner built by an earlier version of this tool (the old
+        /// rotating gapped-ring "C" shape). Safe to re-run. See
+        /// Assets/Editor/UpgradeSpinnerToRadialFill.cs for the menu command
+        /// that applies this to a prefab asset directly.
+        /// </summary>
+        public void EditorUpgradeSpinnerToRadialFill()
+        {
+            var canvasRoot = transform.Find("ARShareCanvas");
+            var spinnerTransform = canvasRoot != null ? canvasRoot.Find("Page0_Calibration/Spinner") : null;
+            if (spinnerTransform == null)
+            {
+                Debug.LogError("[ARShareController] No 'Page0_Calibration/Spinner' found - add the calibration screen first (ARReveal/UI/Add Calibration Screen To Share Prefab).");
+                return;
+            }
+            var image = spinnerTransform.GetComponent<Image>();
+            if (image == null)
+            {
+                Debug.LogError("[ARShareController] 'Spinner' has no Image component.");
+                return;
+            }
+
+            image.sprite = CreateRingSprite(Color.white, 128, 0.16f);
+            SetUpAsLoadingRing(image);
+            _spinnerImage = image;
+
+            Debug.Log("[ARShareController] Spinner upgraded to a radial-fill loading ring - its position/size were left untouched.");
+        }
 #endif
 
         // --- CALIBRATION ---------------------------------------------------------
@@ -424,10 +465,10 @@ namespace ARReveal
             AddPlaceholderText(group.transform, "InstructionText", "Scan the QR to calibrate",
                 48, new Vector2(0f, 620f), new Vector2(800f, 160f));
 
-            var spinnerSprite = CreateSpinnerSprite(Color.white, 128);
-            var spinnerImage = AddImage(group.transform, spinnerSprite, new Vector2(0f, -700f), new Vector2(100f, 100f));
+            var spinnerImage = AddImage(group.transform, CreateRingSprite(Color.white, 128, 0.16f), new Vector2(0f, -700f), new Vector2(100f, 100f));
             spinnerImage.gameObject.name = "Spinner";
-            _spinnerRect = spinnerImage.GetComponent<RectTransform>();
+            SetUpAsLoadingRing(spinnerImage);
+            _spinnerImage = spinnerImage;
 
             AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
                 36, new Vector2(0f, -820f), new Vector2(500f, 80f));
@@ -601,39 +642,53 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Generates a ring with one gap (a "C" shape) - rotating this
-        /// continuously (see LateUpdate) reads as a standard loading spinner.
-        /// No design asset exists for this yet - see this class's own
-        /// "CALIBRATION SCREEN" doc comment.
+        /// Generates a plain, fully-closed ring (donut) - the base shape for
+        /// the calibration loading ring. No design asset exists for this yet
+        /// - see this class's own "CALIBRATION SCREEN" doc comment. The
+        /// actual "loading bar" animation isn't baked into this texture at
+        /// all - see SetUpAsLoadingRing, which uses Unity's own
+        /// Image.Type.Filled/Radial360 to progressively reveal this same
+        /// closed ring around its circumference.
         /// </summary>
-        private static Sprite CreateSpinnerSprite(Color color, int size)
+        private static Sprite CreateRingSprite(Color color, int size, float thicknessFraction)
         {
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
             var pixels = new Color[size * size];
             Vector2 center = new Vector2((size - 1) / 2f, (size - 1) / 2f);
             float outerRadius = size / 2f - 2f;
-            float innerRadius = outerRadius - size * 0.14f;
-            const float gapDegrees = 70f;
+            float innerRadius = outerRadius * (1f - thicknessFraction);
 
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
                 {
-                    Vector2 p = new Vector2(x, y) - center;
-                    float dist = p.magnitude;
-                    if (dist < innerRadius || dist > outerRadius)
-                    {
-                        pixels[y * size + x] = new Color(0f, 0f, 0f, 0f);
-                        continue;
-                    }
-                    float angle = Mathf.Atan2(p.y, p.x) * Mathf.Rad2Deg;
-                    if (angle < 0f) angle += 360f;
-                    pixels[y * size + x] = angle < gapDegrees ? new Color(0f, 0f, 0f, 0f) : color;
+                    float dist = Vector2.Distance(new Vector2(x, y), center);
+                    bool onRing = dist >= innerRadius && dist <= outerRadius;
+                    pixels[y * size + x] = onRing ? color : new Color(0f, 0f, 0f, 0f);
                 }
             }
             tex.SetPixels(pixels);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>
+        /// Configures a plain closed-ring Image as a radial-fill "loading
+        /// bar that fills in a loop" (per direct request) - Unity's built-in
+        /// Image.Type.Filled/Radial360 progressively reveals the ring
+        /// starting from the top, clockwise, as fillAmount goes 0 -> 1 (see
+        /// LateUpdate for the actual looping animation). Reusable so both a
+        /// fresh BuildPage0 build and EditorUpgradeSpinnerToRadialFill
+        /// (upgrading an already hand-placed spinner in place) configure it
+        /// identically.
+        /// </summary>
+        private static void SetUpAsLoadingRing(Image image)
+        {
+            image.type = Image.Type.Filled;
+            image.fillMethod = Image.FillMethod.Radial360;
+            image.fillOrigin = (int)Image.Origin360.Top;
+            image.fillClockwise = true;
+            image.fillAmount = 0f;
         }
 
         /// <summary>

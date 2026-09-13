@@ -38,7 +38,6 @@ namespace ARRevealEditor
             Undo.RegisterFullObjectHierarchyUndo(controller.gameObject, "Build Share UI");
 
             AssignIfMissing(ref controller.LogoSprite, "Logo.png");
-            AssignIfMissing(ref controller.Page1TextSprite, "Page_01_Text.png");
             AssignIfMissing(ref controller.Page2TextTopSprite, "Page_02_Text_Top.png");
             AssignIfMissing(ref controller.Page2TextBottomSprite, "Page_02_Text_Bottom.png");
             AssignIfMissing(ref controller.Page3TextSprite, "Page_03_Text.png");

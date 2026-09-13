@@ -14,7 +14,7 @@ namespace ARReveal
     /// exactly per convention, just constructed at runtime instead of hand-placed
     /// in the Editor.
     ///
-    /// Three screens, all built from the final design's own PNGs (every screen's
+    /// Two screens, both built from the final design's own PNGs (every screen's
     /// text is pre-rendered INTO its image asset - no font/TextMeshPro needed at
     /// all, just positioned Image components):
     ///
@@ -26,12 +26,10 @@ namespace ARReveal
     ///  - SHARE PROMPT (shown after tapping FOTO): "share your photo, win
     ///    tickets" text + a record button (retakes the photo) + TEILEN (share)
     ///    button.
-    ///  - DISTANCE ALERT: overrides whichever of the above is showing, any time
-    ///    the viewer is within actual tentacle-attack range - see the "too
-    ///    close" check in Update()'s own doc comment for why this keys off
-    ///    TentacleController.IsCameraWithinAttackRange (per-tentacle, tip-
-    ///    based Snap Distance) rather than a flat radius around some single
-    ///    content origin point.
+    ///
+    /// A third "Distance Alert" screen (warning the viewer to step back) was
+    /// tried and then removed entirely per direct request - see git history
+    /// around "Distance Alert" if it's ever wanted back.
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
@@ -75,7 +73,6 @@ namespace ARReveal
 
         [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each")]
         public Sprite LogoSprite;
-        public Sprite Page1TextSprite;
         public Sprite Page2TextTopSprite;
         public Sprite Page2TextBottomSprite;
         public Sprite Page3TextSprite;
@@ -86,7 +83,6 @@ namespace ARReveal
         public Sprite RecordButtonSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
-        public GameObject Page1GroupOverride;
         public GameObject Page2GroupOverride;
         public GameObject Page3GroupOverride;
         public Button RestartButtonOverride;
@@ -104,14 +100,10 @@ namespace ARReveal
         private enum UiScreen { None, CallToAction, SharePrompt }
         private UiScreen _screen = UiScreen.None;
 
-        private GameObject _page1Group;
         private GameObject _page2Group;
         private GameObject _page3Group;
 
         private float _handoffStartTime = -1f;
-
-        /// <summary>Cached once handoff completes - see EnsureTentacleCache. ContentWrapper's hierarchy is authored/fixed, never rebuilt at runtime, so a one-time GetComponentsInChildren is enough; avoids re-scanning the whole hierarchy every single frame just to check proximity.</summary>
-        private TentacleController[] _tentacles;
 
         private Image _flashImage;
         private Coroutine _flashRoutine;
@@ -149,7 +141,6 @@ namespace ARReveal
         /// </summary>
         private void AttachToExistingUI(Transform canvasRoot)
         {
-            _page1Group = Page1GroupOverride != null ? Page1GroupOverride : FindChild(canvasRoot, "Page1_DistanceAlert");
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
 
@@ -158,7 +149,6 @@ namespace ARReveal
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
 
-            SetActiveIfNotNull(_page1Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
 
@@ -189,7 +179,6 @@ namespace ARReveal
         {
             if (Handoff == null || !Handoff.HasHandedOff)
             {
-                SetActiveIfNotNull(_page1Group, false);
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
                 _handoffStartTime = -1f;
@@ -199,62 +188,11 @@ namespace ARReveal
 
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
-            // DISTANCE ALERT overrides whichever screen would otherwise be
-            // showing, any time the viewer is within actual tentacle-attack
-            // range - the SAME per-tentacle Snap Distance check that drives
-            // ReachByDistance's own attacks (TentacleController.
-            // IsCameraWithinAttackRange), not a single flat radius around
-            // ContentRoot/ContentWrapper's origin like before. That origin-
-            // distance check was wrong for this project's actual layout: a
-            // rooftop tentacle's own base can sit metres away from
-            // ContentWrapper's origin, so "close to the origin" and "close
-            // enough to actually get attacked" were two different things -
-            // this now warns exactly when, and only when, the viewer is
-            // close enough for some tentacle to actually reach them.
-            EnsureTentacleCache();
-            bool tooClose = false;
-            if (_tentacles != null)
-            {
-                foreach (var tentacle in _tentacles)
-                {
-                    if (tentacle != null && tentacle.IsCameraWithinAttackRange) { tooClose = true; break; }
-                }
-            }
-
-            if (tooClose)
-            {
-                SetActiveIfNotNull(_page1Group, true);
-                SetActiveIfNotNull(_page2Group, false);
-                SetActiveIfNotNull(_page3Group, false);
-                return;
-            }
-
-            SetActiveIfNotNull(_page1Group, false);
-
             if (_screen == UiScreen.None && Time.time - _handoffStartTime >= Page2DelaySeconds)
                 _screen = UiScreen.CallToAction;
 
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
-        }
-
-        /// <summary>
-        /// Lazily caches every TentacleController under ContentWrapper the
-        /// first time it's needed (Handoff.HasHandedOff is already
-        /// guaranteed true by the time Update() calls this) - the hierarchy
-        /// is fixed/authored, never rebuilt at runtime, so one scan is
-        /// enough; re-caches automatically if ContentWrapper is ever
-        /// reassigned to a different Transform (defensive, not expected to
-        /// happen in practice).
-        /// </summary>
-        private Transform _tentacleCacheSource;
-        private void EnsureTentacleCache()
-        {
-            Transform wrapper = Handoff.ContentWrapper;
-            if (wrapper == null) { _tentacles = null; _tentacleCacheSource = null; return; }
-            if (_tentacles != null && _tentacleCacheSource == wrapper) return;
-            _tentacles = wrapper.GetComponentsInChildren<TentacleController>(true);
-            _tentacleCacheSource = wrapper;
         }
 
         private static void SetActiveIfNotNull(GameObject go, bool active)
@@ -278,11 +216,9 @@ namespace ARReveal
 
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            _page1Group = BuildPage1(canvasGo.transform);
             _page2Group = BuildPage2(canvasGo.transform);
             _page3Group = BuildPage3(canvasGo.transform);
 
-            _page1Group.SetActive(false);
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
 
@@ -368,20 +304,6 @@ namespace ARReveal
             BuildUI();
         }
 #endif
-
-        // --- DISTANCE ALERT ---------------------------------------------------
-        private GameObject BuildPage1(Transform parent)
-        {
-            var group = new GameObject("Page1_DistanceAlert");
-            group.transform.SetParent(parent, false);
-
-            // Positioned lower-middle, matching the design mockup's own layout
-            // for this screen (no buttons on this one - it's purely a "step
-            // back" instruction that clears itself once the viewer does).
-            AddImage(group.transform, Page1TextSprite, new Vector2(0f, -150f), new Vector2(760f, 380f));
-
-            return group;
-        }
 
         // --- CALL TO ACTION ----------------------------------------------------
         private GameObject BuildPage2(Transform parent)
@@ -502,7 +424,6 @@ namespace ARReveal
 
             _screen = UiScreen.None;
             _handoffStartTime = Time.time;
-            SetActiveIfNotNull(_page1Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
         }

@@ -170,6 +170,32 @@ namespace ARReveal.EditorTools
 
             WireRevealAndBurst(target, instance, pairIndices);
 
+            // Belt-and-suspenders against a real bug hit once: cross-references
+            // into a freshly PrefabUtility.InstantiatePrefab'd hierarchy can drop
+            // silently on scene save if the new instance isn't fully "settled"
+            // with the serialization system first (Name/Delay, being plain value
+            // fields, persisted fine while the Tentacle/Hole Component references
+            // came back null - see RepairUCIREBurstWiring.cs, which fixes this
+            // after the fact by name if it ever happens again). Forcing an asset
+            // database save/refresh here, then re-verifying every point actually
+            // has both references before the FINAL scene save, means this run
+            // either produces fully-correct wiring or loudly says so - never a
+            // silent null.
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+
+            var burstCheck = target.gameObject.GetComponent<BurstSequencer>();
+            if (burstCheck != null && burstCheck.Points != null)
+            {
+                int broken = 0;
+                foreach (var point in burstCheck.Points)
+                    if (point.Tentacle == null || point.Hole == null) broken++;
+                if (broken > 0)
+                    Debug.LogError("[UCIREContentPort] " + broken + "/" + burstCheck.Points.Length +
+                        " BurstSequencer.Points still have a null Tentacle/Hole after wiring - run " +
+                        "ARReveal/UCI-RE/Repair BurstSequencer Wiring (Safety Backup) to fix by name.");
+            }
+
             var scene = EditorSceneManager.GetActiveScene();
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);

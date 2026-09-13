@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.UI;
 using Zappar;
@@ -43,6 +42,29 @@ namespace ARReveal
     /// Instagram/Messages/etc as destinations - a web page has no way to post
     /// directly into a specific platform's own feed/API, this native-share-sheet
     /// approach is the only way any website can "share to Instagram".
+    ///
+    /// RESTART, per direct request, means replay the tentacle/hole/FX burst in
+    /// place - NOT reload the browser page (an earlier version did exactly
+    /// that via a same-tab jslib reload; superseded, see Restart()'s own doc
+    /// comment and HandoffToInstantTracking.RestartRevealSequence()).
+    ///
+    /// CAPTURE FEEDBACK: a website cannot silently write an image into the
+    /// device's photo gallery - no permission grants that, it's a hard
+    /// browser security boundary, not a Zappar/Unity limitation. The only
+    /// way to get a captured photo into Photos/gallery is the native OS
+    /// save/share sheet ZSaveNShare.OpenSNSSnapPrompt() opens (the user taps
+    /// "Save" in THAT sheet - one tap, no separate permission dialog). Both
+    /// Foto and the round record button now open that sheet immediately
+    /// after capturing (previously only Teilen did, so tapping the record
+    /// button silently captured nothing anyone could see or save - the
+    /// reported bug this fixes) - plus a brief white flash (PlayCaptureFlash)
+    /// fires the instant either is tapped, giving immediate "yes, that
+    /// registered" feedback regardless of how long the capture/dialog takes
+    /// to actually appear. Whether that native sheet offers "Share" as well
+    /// as "Save" depends on the browser's own Web Share API support (not
+    /// something this code controls) - notably, an in-app browser (e.g.
+    /// Instagram/TikTok's own webview, plausible for a QR-driven promo) may
+    /// only offer a save/download fallback with no share option at all.
     /// </summary>
     public class ARShareController : MonoBehaviour
     {
@@ -88,6 +110,9 @@ namespace ARReveal
 
         private Transform _camTransform;
         private float _handoffStartTime = -1f;
+
+        private Image _flashImage;
+        private Coroutine _flashRoutine;
 
         private void Awake()
         {
@@ -136,6 +161,8 @@ namespace ARReveal
             SetActiveIfNotNull(_page1Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
+
+            EnsureFlashOverlay(canvasRoot);
         }
 
         private static GameObject FindChild(Transform root, string path)
@@ -230,6 +257,69 @@ namespace ARReveal
             _page1Group.SetActive(false);
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
+
+            EnsureFlashOverlay(canvasGo.transform);
+        }
+
+        /// <summary>
+        /// A full-screen white Image, always kept as the last sibling (so it
+        /// renders above whichever page is currently showing) - see
+        /// PlayCaptureFlash for why this exists. raycastTarget is false so it
+        /// never blocks taps on the buttons underneath it even while fading.
+        /// Safe to call repeatedly (e.g. every AttachToExistingUI/BuildUI) -
+        /// reuses the existing "CaptureFlash" child instead of duplicating it.
+        /// </summary>
+        private void EnsureFlashOverlay(Transform canvasRoot)
+        {
+            var existing = canvasRoot.Find("CaptureFlash");
+            GameObject go;
+            if (existing != null)
+            {
+                go = existing.gameObject;
+            }
+            else
+            {
+                go = new GameObject("CaptureFlash");
+                go.transform.SetParent(canvasRoot, false);
+                var rt = go.AddComponent<RectTransform>();
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                var img = go.AddComponent<Image>();
+                img.color = new Color(1f, 1f, 1f, 0f);
+                img.raycastTarget = false;
+            }
+            go.transform.SetAsLastSibling();
+            _flashImage = go.GetComponent<Image>();
+        }
+
+        /// <summary>
+        /// Brief white flash - the only "yes, a photo was just taken"
+        /// feedback a web page can give INSTANTLY, independent of how long
+        /// TakeSnapshot's WaitForEndOfFrame + native save/share dialog take
+        /// to actually complete/appear. Fixes the reported "press the record
+        /// button and nothing seems to happen" gap.
+        /// </summary>
+        private void PlayCaptureFlash()
+        {
+            if (_flashImage == null) return;
+            if (_flashRoutine != null) StopCoroutine(_flashRoutine);
+            _flashRoutine = StartCoroutine(CaptureFlashRoutine());
+        }
+
+        private IEnumerator CaptureFlashRoutine()
+        {
+            const float fadeSeconds = 0.35f;
+            _flashImage.color = new Color(1f, 1f, 1f, 0.85f);
+            float t = 0f;
+            while (t < fadeSeconds)
+            {
+                t += Time.deltaTime;
+                _flashImage.color = new Color(1f, 1f, 1f, Mathf.Lerp(0.85f, 0f, t / fadeSeconds));
+                yield return null;
+            }
+            _flashImage.color = new Color(1f, 1f, 1f, 0f);
         }
 
 #if UNITY_EDITOR
@@ -366,45 +456,33 @@ namespace ARReveal
             return Sprite.Create(tex, new Rect(0f, 0f, diameter, diameter), new Vector2(0.5f, 0.5f), 100f);
         }
 
-#if UNITY_WEBGL && !UNITY_EDITOR
-        [DllImport("__Internal")]
-        private static extern void ARReveal_ReloadPage();
-#endif
-
         /// <summary>
-        /// Reloads the page - the simplest, most reliable "restart everything"
-        /// for a WebGL AR experience (re-running the tracking/reveal state
-        /// machine in place would need resetting a lot of independent state -
-        /// HandoffToInstantTracking, every TentacleController/WallHoleEffect/
-        /// DebrisRing, this controller's own screen state - a full reload
-        /// guarantees a genuinely clean slate).
-        ///
-        /// Deliberately NOT Application.OpenURL(Application.absoluteURL) - on
-        /// WebGL that can call window.open(url, "_blank") depending on the
-        /// template, opening a SECOND tab and leaving the original (with its
-        /// live camera feed) still running behind it. Instead this calls a
-        /// tiny native plugin (Plugins/WebGL/ARReveal_Reload.jslib) that does
-        /// window.location.reload() directly - guaranteed same-tab, in-place.
-        ///
-        /// Because the reload stays on the same origin, the browser does NOT
-        /// re-prompt for camera/microphone permission - permissions are
-        /// granted per-origin, not per page-load, so whatever the user
-        /// already granted carries straight over automatically. No-ops
-        /// outside a WebGL build (nothing to reload in the Editor/other
-        /// platforms).
+        /// Replays the tentacle/hole/FX burst in place - per direct request,
+        /// NOT a page reload (an earlier version did that via a same-tab
+        /// jslib call; superseded now that HandoffToInstantTracking exposes a
+        /// proper in-place reset - see RestartRevealSequence's own doc
+        /// comment). Tracking/SLAM is untouched, so this is instant and needs
+        /// no QR rescan. Also resets THIS controller's own screen timing, so
+        /// the Call To Action screen reappears Page2DelaySeconds after this
+        /// restart (not the original handoff), and immediately hides
+        /// whichever page was showing rather than leaving it stuck up while
+        /// the burst replays.
         /// </summary>
         public void Restart()
         {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            ARReveal_ReloadPage();
-#else
-            Debug.Log("[ARShareController] Restart requested - only reloads the page in an actual WebGL build.");
-#endif
+            if (Handoff != null) Handoff.RestartRevealSequence();
+
+            _screen = UiScreen.None;
+            _handoffStartTime = Time.time;
+            SetActiveIfNotNull(_page1Group, false);
+            SetActiveIfNotNull(_page2Group, false);
+            SetActiveIfNotNull(_page3Group, false);
         }
 
-        /// <summary>Takes the snapshot that will later be shared, then advances from the Call To Action screen to the Share Prompt screen.</summary>
+        /// <summary>Takes the snapshot that will later be shared, then advances from the Call To Action screen to the Share Prompt screen. See this class's own "CAPTURE FEEDBACK" doc comment for the flash + why the save/share dialog opens immediately.</summary>
         public void Foto()
         {
+            PlayCaptureFlash();
             StartCoroutine(TakePhotoThenShowSharePrompt());
         }
 
@@ -412,20 +490,23 @@ namespace ARReveal
         {
             yield return ZSaveNShare.TakeSnapshot();
             _screen = UiScreen.SharePrompt;
+            ZSaveNShare.OpenSNSSnapPrompt();
         }
 
-        /// <summary>The round record button on the Share Prompt screen - retakes the photo without changing screens, in case the first one didn't land right.</summary>
+        /// <summary>The round record button on the Share Prompt screen - retakes the photo without changing screens, in case the first one didn't land right. See this class's own "CAPTURE FEEDBACK" doc comment - previously this only captured silently with no way to ever save/see it, which is the reported "nothing gets added to my gallery" bug; now it flashes immediately and opens the same native save/share dialog Teilen does.</summary>
         public void RetakePhoto()
         {
+            PlayCaptureFlash();
             StartCoroutine(RetakePhotoRoutine());
         }
 
         private IEnumerator RetakePhotoRoutine()
         {
             yield return ZSaveNShare.TakeSnapshot();
+            ZSaveNShare.OpenSNSSnapPrompt();
         }
 
-        /// <summary>Opens the device's native share sheet for whichever photo was most recently captured (Foto or the record button) - no fresh capture here, sharing is a separate step from taking the photo now.</summary>
+        /// <summary>Re-opens the native save/share dialog for whichever photo was most recently captured, without taking a new one - useful if the dialog from Foto/RetakePhoto was dismissed by mistake.</summary>
         public void Teilen()
         {
             ZSaveNShare.OpenSNSSnapPrompt();

@@ -1033,7 +1033,40 @@ namespace ARReveal
         {
             if (ContentWrapper == null) return;
             ContentWrapper.gameObject.SetActive(true);
+            TriggerAllBurstPoints();
+        }
 
+        /// <summary>
+        /// "Restart" per direct request means replay the tentacle/hole/FX burst
+        /// in place - NOT reload the browser page (that was the previous
+        /// implementation; superseded, see ARShareController.Restart()'s own
+        /// doc comment). Tracking/SLAM itself is completely untouched here -
+        /// only the visual burst sequence resets - so this works instantly,
+        /// with no QR rescan needed. Every TentacleController/WallHoleEffect/
+        /// DebrisRing/SmokePuff/FallingRubble under ContentWrapper already
+        /// supports exactly this (Hide() returns it to its pre-burst rest
+        /// state - curled/closed/invisible - and Open()/Grow() restarts from
+        /// there since forceRestart isn't even needed once already Hidden),
+        /// so this just calls Hide() on everything, then re-runs the same
+        /// triggering logic RevealContent() uses (TriggerAllBurstPoints) -
+        /// staggered Pairs batch, everything else immediate, a fresh random
+        /// delay draw each time this runs.
+        /// </summary>
+        public void RestartRevealSequence()
+        {
+            if (ContentWrapper == null || !_handedOff) return;
+
+            foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true)) tentacle.Hide();
+            foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true)) hole.Hide();
+            foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true)) debris.Hide();
+            foreach (var smoke in ContentWrapper.GetComponentsInChildren<SmokePuff>(true)) smoke.Hide();
+            foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true)) rubble.Hide();
+
+            TriggerAllBurstPoints();
+        }
+
+        private void TriggerAllBurstPoints()
+        {
             var pairedTentacles = new HashSet<TentacleController>();
             var pairedHoles = new HashSet<WallHoleEffect>();
             var pairedDebris = new HashSet<DebrisRing>();

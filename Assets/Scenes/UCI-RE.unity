@@ -3489,12 +3489,12 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1394794540}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 33496e5c07b4bc442bab9fc3d2003a63, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TrackingDebugOverlay
-  ShowOverlay: 1
+  ShowOverlay: 0
   Handoff: {fileID: 0}
 --- !u!114 &1394794542
 MonoBehaviour:
@@ -3559,7 +3559,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.RevealOnTrackingFound
   ContentRoots:
-  - {fileID: 0}
+  - {fileID: 358579975}
   BurstSequencer: {fileID: 1394794545}
   RevealOnlyOnce: 1
   DebugAutoReveal: 0

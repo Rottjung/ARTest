@@ -1,7 +1,6 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-using Zappar;
 using Zappar.Additional.SNS;
 
 namespace ARReveal
@@ -28,8 +27,11 @@ namespace ARReveal
     ///    tickets" text + a record button (retakes the photo) + TEILEN (share)
     ///    button.
     ///  - DISTANCE ALERT: overrides whichever of the above is showing, any time
-    ///    the viewer gets too close to the content itself (not the QR) - see
-    ///    TooCloseDistanceMeters's own doc comment.
+    ///    the viewer is within actual tentacle-attack range - see the "too
+    ///    close" check in Update()'s own doc comment for why this keys off
+    ///    TentacleController.IsCameraWithinAttackRange (per-tentacle, tip-
+    ///    based Snap Distance) rather than a flat radius around some single
+    ///    content origin point.
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
@@ -95,8 +97,6 @@ namespace ARReveal
         [Header("Timing / thresholds")]
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
         public float Page2DelaySeconds = 30f;
-        [Tooltip("How close (meters) the viewer can get to the content before the Distance Alert screen takes over. UNTESTED - no client spec given for this number, chosen as a reasonable starting guess; tune on-site.")]
-        public float TooCloseDistanceMeters = 3f;
 
         [Tooltip("Above CameraSlimeOverlay's 500, so this UI always draws on top of the slime splat.")]
         public int SortingOrder = 600;
@@ -108,8 +108,10 @@ namespace ARReveal
         private GameObject _page2Group;
         private GameObject _page3Group;
 
-        private Transform _camTransform;
         private float _handoffStartTime = -1f;
+
+        /// <summary>Cached once handoff completes - see EnsureTentacleCache. ContentWrapper's hierarchy is authored/fixed, never rebuilt at runtime, so a one-time GetComponentsInChildren is enough; avoids re-scanning the whole hierarchy every single frame just to check proximity.</summary>
+        private TentacleController[] _tentacles;
 
         private Image _flashImage;
         private Coroutine _flashRoutine;
@@ -117,8 +119,6 @@ namespace ARReveal
         private void Awake()
         {
             if (Handoff == null) Handoff = FindFirstObjectByType<HandoffToInstantTracking>();
-            var zCam = ZapparCamera.Instance != null ? ZapparCamera.Instance : FindFirstObjectByType<ZapparCamera>();
-            if (zCam != null) _camTransform = zCam.transform;
 
             // If a hand-tuned "ARShareCanvas" hierarchy already exists as a
             // child (built via the ARReveal/Build Share UI In Scene menu
@@ -200,16 +200,25 @@ namespace ARReveal
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
             // DISTANCE ALERT overrides whichever screen would otherwise be
-            // showing, any time the viewer is too close to the CONTENT itself
-            // (ContentRoot if assigned, else ContentWrapper) - not the QR, since
-            // being close to the QR on the ground is normal/expected, being
-            // close to the virtual building/tentacles is what this warns about.
-            Transform contentTransform = Handoff.ContentRoot != null ? Handoff.ContentRoot : Handoff.ContentWrapper;
+            // showing, any time the viewer is within actual tentacle-attack
+            // range - the SAME per-tentacle Snap Distance check that drives
+            // ReachByDistance's own attacks (TentacleController.
+            // IsCameraWithinAttackRange), not a single flat radius around
+            // ContentRoot/ContentWrapper's origin like before. That origin-
+            // distance check was wrong for this project's actual layout: a
+            // rooftop tentacle's own base can sit metres away from
+            // ContentWrapper's origin, so "close to the origin" and "close
+            // enough to actually get attacked" were two different things -
+            // this now warns exactly when, and only when, the viewer is
+            // close enough for some tentacle to actually reach them.
+            EnsureTentacleCache();
             bool tooClose = false;
-            if (_camTransform != null && contentTransform != null)
+            if (_tentacles != null)
             {
-                float dist = Vector3.Distance(_camTransform.position, contentTransform.position);
-                tooClose = dist < TooCloseDistanceMeters;
+                foreach (var tentacle in _tentacles)
+                {
+                    if (tentacle != null && tentacle.IsCameraWithinAttackRange) { tooClose = true; break; }
+                }
             }
 
             if (tooClose)
@@ -227,6 +236,25 @@ namespace ARReveal
 
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
+        }
+
+        /// <summary>
+        /// Lazily caches every TentacleController under ContentWrapper the
+        /// first time it's needed (Handoff.HasHandedOff is already
+        /// guaranteed true by the time Update() calls this) - the hierarchy
+        /// is fixed/authored, never rebuilt at runtime, so one scan is
+        /// enough; re-caches automatically if ContentWrapper is ever
+        /// reassigned to a different Transform (defensive, not expected to
+        /// happen in practice).
+        /// </summary>
+        private Transform _tentacleCacheSource;
+        private void EnsureTentacleCache()
+        {
+            Transform wrapper = Handoff.ContentWrapper;
+            if (wrapper == null) { _tentacles = null; _tentacleCacheSource = null; return; }
+            if (_tentacles != null && _tentacleCacheSource == wrapper) return;
+            _tentacles = wrapper.GetComponentsInChildren<TentacleController>(true);
+            _tentacleCacheSource = wrapper;
         }
 
         private static void SetActiveIfNotNull(GameObject go, bool active)

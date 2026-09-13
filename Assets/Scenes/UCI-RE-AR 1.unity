@@ -2418,9 +2418,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7b94ad59d980e5b4ca3a438b583248a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
-  Camera: {fileID: 0}
-  ButtonColor: {r: 1, g: 1, b: 1, a: 0.85}
-  ButtonTextColor: {r: 0, g: 0, b: 0, a: 1}
+  Handoff: {fileID: 0}
+  LogoSprite: {fileID: 0}
+  Page1TextSprite: {fileID: 0}
+  Page2TextTopSprite: {fileID: 0}
+  Page2TextBottomSprite: {fileID: 0}
+  Page3TextSprite: {fileID: 0}
+  RestartButtonSprite: {fileID: 0}
+  FotoButtonSprite: {fileID: 0}
+  TeilenButtonSprite: {fileID: 0}
+  RecordButtonSprite: {fileID: 0}
+  Page1GroupOverride: {fileID: 0}
+  Page2GroupOverride: {fileID: 0}
+  Page3GroupOverride: {fileID: 0}
+  RestartButtonOverride: {fileID: 0}
+  FotoButtonOverride: {fileID: 0}
+  RecordButtonOverride: {fileID: 0}
+  TeilenButtonOverride: {fileID: 0}
+  Page2DelaySeconds: 30
+  TooCloseDistanceMeters: 3
   SortingOrder: 600
 --- !u!1 &777038240
 GameObject:
@@ -2890,10 +2906,6 @@ MonoBehaviour:
   ImageTarget: {fileID: 1090348472}
   InstantTarget: {fileID: 542577147}
   ContentWrapper: {fileID: 1106795034}
-  AdditionalReanchorSources:
-  - Name: Building Facade (UCI LUXE + Bowling World signage)
-    Target: {fileID: 510838788}
-    WorldPositionRelativeToQR: {x: 5.5, y: 11, z: 20.4}
   MinStartDelay: 1
   MaxStartDelay: 10
   MinDelayBetweenBursts: 0.5
@@ -2955,6 +2967,7 @@ MonoBehaviour:
     Rubble: {fileID: 0}
   DebugAutoReveal: 1
   DebugAutoRevealDelay: 4
+  ContentRoot: {fileID: 0}
 --- !u!1 &1106795033
 GameObject:
   m_ObjectHideFlags: 0
@@ -5256,31 +5269,31 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 38.07
+      value: 1.1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -2.2399993
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 48.019997
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
-      propertyPath: m_LocalRotation.w
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
+      propertyPath: m_LocalPosition.z
+      value: 20.4
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
-      propertyPath: m_LocalRotation.y
+      propertyPath: m_LocalRotation.w
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
       propertyPath: m_LocalRotation.z
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -5288,7 +5301,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 180
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 8ae4e42ccf57eed4d90718bc00c7ba40, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z

@@ -47,11 +47,11 @@ MonoBehaviour:
   ChunkCount: 20
   ChunkSize: 0.1
   Irregularity: 0.45
-  SizeRange: {x: 0.5, y: 1.4}
+  SizeRange: {x: 0.75, y: 2}
   DepthScaleRange: {x: 0.3, y: 0.6}
   StartRadius: 0.5
-  FallDistance: 2
-  FallDuration: 3
+  FallDistance: 3.5
+  FallDuration: 5
   FallCurve:
     serializedVersion: 2
     m_Curve:
@@ -81,6 +81,6 @@ MonoBehaviour:
   TumbleSpeedRange: {x: 90, y: 260}
   FadeOutFraction: 0.25
   ChunkMaterial: {fileID: 2100000, guid: 177874b8afb89604b80409104c57d32c, type: 2}
-  ColorJitter: 0.12
+  ColorJitter: 0.25
   OpenOnStart: 0
   OpenOnStartDelay: 0.5

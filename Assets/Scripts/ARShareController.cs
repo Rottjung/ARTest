@@ -109,6 +109,9 @@ namespace ARReveal
         private GameObject _page2Group;
         private GameObject _page3Group;
 
+        /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
+        private Canvas _canvas;
+
         private float _handoffStartTime = -1f;
 
         private Image _flashImage;
@@ -147,6 +150,7 @@ namespace ARReveal
         /// </summary>
         private void AttachToExistingUI(Transform canvasRoot)
         {
+            _canvas = canvasRoot.GetComponent<Canvas>();
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
 
@@ -213,6 +217,7 @@ namespace ARReveal
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = SortingOrder;
+            _canvas = canvas;
 
             var scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -456,11 +461,16 @@ namespace ARReveal
         /// sheet (ZSaveNShare.OpenSNSSnapPrompt) - from that point on it's
         /// entirely the OS's own UI, nothing further for this code to do.
         ///
-        /// The flash fires AFTER capture completes, not before/during -
-        /// firing it first (an earlier version's bug) meant TakeSnapshot's
-        /// ReadPixels captured the flash overlay ITSELF, coming out an
-        /// almost-all-white photo. Capturing first, then flashing, guarantees
-        /// the flash can never contaminate what actually gets saved/shared.
+        /// The whole Canvas is switched off for the capture itself (see
+        /// RetakePhotoRoutine) so none of our own buttons/text end up baked
+        /// into the photo - per direct request, the saved image should be a
+        /// clean AR view only. The flash then fires AFTER capture completes
+        /// (and after the UI is back on), not before/during - firing it
+        /// first (an earlier version's bug) meant TakeSnapshot's ReadPixels
+        /// captured the flash overlay ITSELF, coming out an almost-all-white
+        /// photo. Capturing on a clean, UI-free frame first, then restoring
+        /// the UI and flashing, guarantees neither can ever contaminate what
+        /// actually gets saved/shared.
         /// </summary>
         public void RetakePhoto()
         {
@@ -469,7 +479,15 @@ namespace ARReveal
 
         private IEnumerator RetakePhotoRoutine()
         {
+            if (_canvas != null) _canvas.enabled = false;
+            // Let a fully rendered, UI-free frame actually happen before
+            // TakeSnapshot does its own WaitForEndOfFrame + ReadPixels -
+            // Canvas.enabled takes effect immediately, but without waiting a
+            // frame here, TakeSnapshot could still read back whatever the
+            // GPU had already queued up from the moment the button was tapped.
+            yield return new WaitForEndOfFrame();
             yield return ZSaveNShare.TakeSnapshot();
+            if (_canvas != null) _canvas.enabled = true;
             PlayCaptureFlash();
             ZSaveNShare.OpenSNSSnapPrompt();
         }

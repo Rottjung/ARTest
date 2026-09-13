@@ -39,6 +39,16 @@ namespace ARReveal
 
         private bool _revealed;
 
+        /// <summary>
+        /// True once Reveal() has actually run at least once - the
+        /// direct-image-tracking equivalent of
+        /// HandoffToInstantTracking.HasHandedOff, so ARShareController can
+        /// gate its own UI (the calibration screen, Call To Action timing)
+        /// the same way regardless of which of the two reveal mechanisms a
+        /// given scene actually uses.
+        /// </summary>
+        public bool HasRevealed => _revealed;
+
         private void Awake()
         {
             SetContentActive(false);
@@ -57,6 +67,22 @@ namespace ARReveal
 
             SetContentActive(true);
             if (BurstSequencer != null) BurstSequencer.PlaySequence();
+        }
+
+        /// <summary>
+        /// The direct-image-tracking equivalent of
+        /// HandoffToInstantTracking.RestartRevealSequence() - replays the
+        /// burst in place via BurstSequencer's own Hide-everything-then-
+        /// replay (ResetAll + PlaySequence), for ARShareController's Restart
+        /// button to call in a scene that uses this simpler reveal mechanism
+        /// instead of the QR/SLAM handoff. No-ops if nothing has been
+        /// revealed yet, or if no BurstSequencer is wired.
+        /// </summary>
+        public void RestartRevealSequence()
+        {
+            if (!_revealed || BurstSequencer == null) return;
+            BurstSequencer.ResetAll();
+            BurstSequencer.PlaySequence();
         }
 
         /// <summary>Wire this to the tracker's OnNotSeenEvent only if you want it to hide again when tracking is lost.</summary>

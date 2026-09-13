@@ -42,20 +42,24 @@ namespace ARReveal
     ///
     /// CALIBRATION SCREEN (Page0_Calibration - see BuildCalibrationScreen):
     /// shown as soon as the Zappar camera feed is actually live
-    /// (ZapparCamera.CameraSourceInitialized), for as long as tracking hasn't
-    /// handed off yet (!Handoff.HasHandedOff) - a rounded-square viewfinder
-    /// frame to place the QR in, "scan the QR to calibrate" instructional
-    /// text, and a round loading ring (a "loading bar that fills in a loop"
-    /// per direct request - see SetUpAsLoadingRing/LateUpdate) +
-    /// "CALIBRATING..." label at the bottom. Shown EXACTLY ONCE per
-    /// session, never again after the first successful lock - this falls
-    /// straight out of HasHandedOff's own existing semantics (set true on
-    /// the very first handoff and never reset back to false by anything,
-    /// including a later re-scan/re-lock - see HandoffToInstantTracking's
-    /// own doc), so a re-scan after that first lock silently just
-    /// re-corrects the anchor as it always did, with no UI interruption at
-    /// all - "if we scan the AR again just keep what we have now" per
-    /// direct request. The frame and loading ring are generated at runtime
+    /// (ZapparCamera.CameraSourceInitialized), for as long as content hasn't
+    /// been revealed yet (!HasRevealedContent - see that property's own doc
+    /// for why this works identically whether the scene uses
+    /// HandoffToInstantTracking's QR+SLAM handoff or
+    /// RevealOnTrackingFound's simpler direct-image-tracking reveal) - a
+    /// rounded-square viewfinder frame to place the QR in, "scan the QR to
+    /// calibrate" instructional text, and a round loading ring (a "loading
+    /// bar that fills in a loop" per direct request - see
+    /// SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
+    /// bottom. Shown EXACTLY ONCE per session, never again after the first
+    /// successful lock - this falls straight out of
+    /// HasHandedOff/HasRevealed's own existing semantics on either
+    /// underlying component (set true on the very first reveal and never
+    /// reset back to false by anything, including a later re-scan/re-lock),
+    /// so a re-scan after that first lock silently just re-corrects the
+    /// anchor as it always did, with no UI interruption at all - "if we
+    /// scan the AR again just keep what we have now" per direct request.
+    /// The frame and loading ring are generated at runtime
     /// (CreateRoundedFrameSprite/CreateRingSprite, same procedural-texture
     /// approach as CreateCircleSprite below) since no design asset exists
     /// for this screen yet; the two text labels use a
@@ -105,8 +109,11 @@ namespace ARReveal
     /// </summary>
     public class ARShareController : MonoBehaviour
     {
-        [Tooltip("Auto-found in the scene if left blank.")]
+        [Tooltip("QR+SLAM scenes (UCI-RE-AR) - auto-found in the scene if left blank.")]
         public HandoffToInstantTracking Handoff;
+
+        [Tooltip("Direct image-tracking scenes with no QR/SLAM at all (UCI-RE, the safety backup) - auto-found in the scene if left blank. Only ever consulted when Handoff above is null, so this has zero effect on a scene where Handoff is assigned.")]
+        public RevealOnTrackingFound DirectTrackingReveal;
 
         [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each")]
         public Sprite LogoSprite;
@@ -161,6 +168,7 @@ namespace ARReveal
         private void Awake()
         {
             if (Handoff == null) Handoff = FindFirstObjectByType<HandoffToInstantTracking>();
+            if (DirectTrackingReveal == null) DirectTrackingReveal = FindFirstObjectByType<RevealOnTrackingFound>();
             _zapparCamera = ZapparCamera.Instance != null ? ZapparCamera.Instance : FindFirstObjectByType<ZapparCamera>();
 
             // If a hand-tuned "ARShareCanvas" hierarchy already exists as a
@@ -229,9 +237,24 @@ namespace ARReveal
                 Debug.LogWarning("[ARShareController] Could not find button at '" + path + "' under " + root.name + " - either drag it into the matching *ButtonOverride field, or make sure it wasn't renamed/deleted while adjusting the layout.");
         }
 
+        /// <summary>
+        /// True once content has actually been revealed, regardless of
+        /// which of the two reveal mechanisms this scene uses -
+        /// HandoffToInstantTracking.HasHandedOff (QR+SLAM scenes) if
+        /// Handoff is assigned, else RevealOnTrackingFound.HasRevealed
+        /// (direct image-tracking scenes) as a fallback. Handoff always
+        /// wins when assigned, so this is byte-for-byte identical to the
+        /// old `Handoff == null || !Handoff.HasHandedOff` check on any
+        /// scene where Handoff is set (UCI-RE-AR) - the fallback only ever
+        /// activates on a scene where Handoff was already null.
+        /// </summary>
+        private bool HasRevealedContent =>
+            Handoff != null ? Handoff.HasHandedOff
+            : DirectTrackingReveal != null && DirectTrackingReveal.HasRevealed;
+
         private void Update()
         {
-            if (Handoff == null || !Handoff.HasHandedOff)
+            if (!HasRevealedContent)
             {
                 // Shown once camera access is actually live, until the FIRST
                 // successful lock - see this class's own "CALIBRATION SCREEN"
@@ -701,18 +724,22 @@ namespace ARReveal
         /// <summary>
         /// Replays the tentacle/hole/FX burst in place - per direct request,
         /// NOT a page reload (an earlier version did that via a same-tab
-        /// jslib call; superseded now that HandoffToInstantTracking exposes a
-        /// proper in-place reset - see RestartRevealSequence's own doc
-        /// comment). Tracking/SLAM is untouched, so this is instant and needs
-        /// no QR rescan. Also resets THIS controller's own screen timing, so
-        /// the Call To Action screen reappears Page2DelaySeconds after this
-        /// restart (not the original handoff), and immediately hides
-        /// whichever page was showing rather than leaving it stuck up while
-        /// the burst replays.
+        /// jslib call; superseded now that both reveal mechanisms expose
+        /// their own proper in-place reset: HandoffToInstantTracking.
+        /// RestartRevealSequence() for QR+SLAM scenes, or
+        /// RevealOnTrackingFound.RestartRevealSequence() for direct
+        /// image-tracking scenes - Handoff always wins if assigned, same as
+        /// HasRevealedContent). Tracking/SLAM (if any) is untouched, so this
+        /// is instant and needs no rescan. Also resets THIS controller's own
+        /// screen timing, so the Call To Action screen reappears
+        /// Page2DelaySeconds after this restart (not the original handoff),
+        /// and immediately hides whichever page was showing rather than
+        /// leaving it stuck up while the burst replays.
         /// </summary>
         public void Restart()
         {
             if (Handoff != null) Handoff.RestartRevealSequence();
+            else if (DirectTrackingReveal != null) DirectTrackingReveal.RestartRevealSequence();
 
             _screen = UiScreen.None;
             _handoffStartTime = Time.time;

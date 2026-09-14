@@ -56,17 +56,30 @@ namespace ARReveal
     /// that fills in a loop" per direct request - see
     /// SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
     /// bottom. Once content actually spawns, the ring freezes full and the
-    /// label switches to "READY!" for ReadyDisplaySeconds (per direct
-    /// request - a viewer staring at their phone could otherwise miss the
-    /// reveal entirely with nothing telling them to look), THEN the whole
-    /// screen hides. Shown EXACTLY ONCE per session after that - this falls
-    /// straight out of HasContentSpawned/HasRevealed's own existing
-    /// semantics on either underlying component (set true on the very first
-    /// reveal and never reset back to false by anything, including a later
-    /// re-scan/re-lock), so a re-scan after that first lock silently just
-    /// re-corrects the anchor as it always did, with no UI interruption at
-    /// all - "if we scan the AR again just keep what we have now" per
-    /// direct request. The frame and loading ring are generated at runtime
+    /// label switches to "READY!" - held for ReadyDisplaySeconds, then EASED
+    /// OUT over ReadyFadeOutSeconds (a CanvasGroup fade, not an instant
+    /// SetActive(false)) rather than just vanishing - both per direct
+    /// on-site feedback that the READY confirmation was disappearing too
+    /// fast for a viewer to actually register it (a viewer staring at their
+    /// phone could otherwise miss the reveal entirely with nothing telling
+    /// them to look). Normally shown exactly once per session after that -
+    /// this falls straight out of HasContentSpawned/HasRevealed's own
+    /// existing semantics on either underlying component (set true on the
+    /// very first reveal and never reset back to false on their own,
+    /// including a later passive re-scan/re-lock), so a passive re-scan
+    /// after that first lock (the QR happening to be glimpsed again)
+    /// silently just re-corrects the anchor as it always did, with no UI
+    /// interruption at all - "if we scan the AR again just keep what we
+    /// have now" per direct request. A DELIBERATE full recalibration is
+    /// still available via the bottom-center Rescan button (see
+    /// BuildRescanButton/Rescan) - shown once this screen has fully hidden
+    /// and neither other page is up, it forces HasContentSpawned/HasRevealed
+    /// back to false (HandoffToInstantTracking.RequestRescan()/
+    /// RevealOnTrackingFound.RequestRescan()), which puts this exact screen
+    /// straight back up and waits for a fresh QR scan through the same
+    /// settle/lock pipeline as the very first time - per direct request,
+    /// "put the calibrate UI back on and we can rescan and reset with the
+    /// same flow as the first time." The frame and loading ring are generated at runtime
     /// (CreateRoundedFrameSprite/CreateRingSprite, same procedural-texture
     /// approach as CreateCircleSprite below) since no design asset exists
     /// for this screen yet; the two text labels use a
@@ -144,6 +157,8 @@ namespace ARReveal
         public Button FotoButtonOverride;
         public Button RecordButtonOverride;
         public Button TeilenButtonOverride;
+        [Tooltip("The bottom-center Rescan button (see BuildRescanButton/Rescan) - drag it in directly if hand-tuning its position/sprite, or leave blank to find it by name (RescanButton) under the canvas root.")]
+        public Button RescanButtonOverride;
         [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
         public Image SpinnerImageOverride;
         [Tooltip("Drag the calibration screen's instructional Text component here directly - overrides the by-name lookup (Page0_Calibration/InstructionText).")]
@@ -158,8 +173,11 @@ namespace ARReveal
         [Tooltip("How many times per second the calibration loading ring fills up before looping back to empty and starting over.")]
         public float SpinnerLoopsPerSecond = 0.8f;
 
-        [Tooltip("Seconds to hold a 'READY!' confirmation on the calibration screen once content has actually spawned, before hiding it - per direct request: without this, a viewer staring at their phone could miss the reveal entirely and look up at the real building instead. Runs in parallel with (doesn't delay) Page2DelaySeconds' own countdown.")]
-        public float ReadyDisplaySeconds = 1.5f;
+        [Tooltip("Seconds to hold a 'READY!' confirmation on the calibration screen once content has actually spawned, before starting to fade it out (see ReadyFadeOutSeconds) - per direct request: without a generous hold here, a viewer staring at their phone could miss the reveal entirely and look up at the real building instead. Bumped up from an original 1.5s after on-site feedback that it was disappearing before most viewers actually registered it. Runs in parallel with (doesn't delay) Page2DelaySeconds' own countdown.")]
+        public float ReadyDisplaySeconds = 3f;
+
+        [Tooltip("Seconds to fade the calibration screen out (CanvasGroup alpha 1->0) once ReadyDisplaySeconds has elapsed, instead of an instant SetActive(false) - a smoother, more noticeable 'ok, it's done now' transition per the same on-site feedback that prompted raising ReadyDisplaySeconds.")]
+        public float ReadyFadeOutSeconds = 0.6f;
 
         [Tooltip("Above CameraSlimeOverlay's 500, so this UI always draws on top of the slime splat.")]
         public int SortingOrder = 600;
@@ -170,6 +188,10 @@ namespace ARReveal
         private GameObject _page0Group;
         private GameObject _page2Group;
         private GameObject _page3Group;
+        private GameObject _rescanButton;
+
+        /// <summary>Drives the calibration screen's fade-out (see ReadyFadeOutSeconds) - added to _page0Group whether it was built fresh (BuildPage0) or picked up from a hand-tuned prefab (AttachToExistingUI), so the same Update() logic works either way.</summary>
+        private CanvasGroup _page0CanvasGroup;
 
         private Image _spinnerImage;
         private Text _instructionText;
@@ -233,15 +255,21 @@ namespace ARReveal
             var calibratingTransform = canvasRoot.Find("Page0_Calibration/CalibratingText");
             _calibratingText = CalibratingTextOverride != null ? CalibratingTextOverride
                 : calibratingTransform != null ? calibratingTransform.GetComponent<Text>() : null;
+            _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
+
+            var rescanTransform = RescanButtonOverride != null ? RescanButtonOverride.transform : canvasRoot.Find("RescanButton");
+            _rescanButton = rescanTransform != null ? rescanTransform.gameObject : null;
 
             WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
+            WireButton(RescanButtonOverride, canvasRoot, "RescanButton", Rescan);
 
             SetActiveIfNotNull(_page0Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
+            SetActiveIfNotNull(_rescanButton, false);
 
             EnsureFlashOverlay(canvasRoot);
         }
@@ -293,9 +321,18 @@ namespace ARReveal
                 // Shown once camera access is actually live, until content
                 // has ACTUALLY spawned - see HasRevealedContent's own doc
                 // comment for why that's a different (later) moment than
-                // "tracking merely locked on".
+                // "tracking merely locked on". Also the state a Rescan()
+                // returns to - HasRevealedContent reads false again the
+                // instant Handoff/DirectTrackingReveal's own RequestRescan()
+                // runs, so this exact branch is what puts the calibration
+                // screen back up for a genuine second scan, no separate
+                // rescan-specific logic needed here at all.
                 bool cameraReady = _zapparCamera != null && _zapparCamera.CameraSourceInitialized;
                 SetActiveIfNotNull(_page0Group, cameraReady);
+                // Always reset to fully opaque here - undoes any fade-out
+                // left over from a previous reveal cycle (see the revealed
+                // branch below) now that this screen is showing again.
+                if (_page0CanvasGroup != null) _page0CanvasGroup.alpha = 1f;
 
                 // "Preparing..." instead of "Scan the QR" while the .zpt
                 // itself is still preloading - see TargetPreloader's own
@@ -307,6 +344,7 @@ namespace ARReveal
 
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
+                SetActiveIfNotNull(_rescanButton, false);
                 _handoffStartTime = -1f;
                 _screen = UiScreen.None;
                 _contentSpawnedAt = -1f;
@@ -314,19 +352,40 @@ namespace ARReveal
             }
 
             // Content has just spawned - hold a "READY!" confirmation on the
-            // calibration screen for ReadyDisplaySeconds before hiding it,
-            // so a viewer looking at their phone gets a clear "yes, look
-            // here now" cue instead of the screen just vanishing with
-            // nothing yet visible behind it (per direct request). Runs in
-            // PARALLEL with, not instead of, the Page2DelaySeconds countdown
-            // below - both start from this same moment.
+            // calibration screen for ReadyDisplaySeconds, then fade it out
+            // over ReadyFadeOutSeconds (rather than an instant
+            // SetActive(false)), so a viewer looking at their phone gets a
+            // clear "yes, look here now" cue instead of the screen just
+            // vanishing with nothing yet visible behind it (per direct
+            // request - both the hold length and the fade were increased/
+            // added after on-site feedback that the original version
+            // disappeared too fast for most viewers to actually see).
+            // Runs in PARALLEL with, not instead of, the Page2DelaySeconds
+            // countdown below - both start from this same moment.
             if (_contentSpawnedAt < 0f)
             {
                 _contentSpawnedAt = Time.time;
                 SetCalibrationMessage(null, "READY!");
             }
-            bool showingReady = Time.time - _contentSpawnedAt < ReadyDisplaySeconds;
-            SetActiveIfNotNull(_page0Group, showingReady);
+
+            float readyElapsed = Time.time - _contentSpawnedAt;
+            bool page0Visible;
+            if (readyElapsed < ReadyDisplaySeconds)
+            {
+                page0Visible = true;
+                if (_page0CanvasGroup != null) _page0CanvasGroup.alpha = 1f;
+            }
+            else if (readyElapsed < ReadyDisplaySeconds + ReadyFadeOutSeconds)
+            {
+                page0Visible = true;
+                if (_page0CanvasGroup != null)
+                    _page0CanvasGroup.alpha = Mathf.Lerp(1f, 0f, (readyElapsed - ReadyDisplaySeconds) / ReadyFadeOutSeconds);
+            }
+            else
+            {
+                page0Visible = false;
+            }
+            SetActiveIfNotNull(_page0Group, page0Visible);
 
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
@@ -335,6 +394,13 @@ namespace ARReveal
 
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
+
+            // Rescan button (per direct request): "bottom mid, that is there
+            // after the calibrate and only while no other ui page is
+            // active" - i.e. once the calibration screen has fully finished
+            // (including its own fade-out above) AND neither Page2 nor
+            // Page3 is currently showing.
+            SetActiveIfNotNull(_rescanButton, !page0Visible && _screen == UiScreen.None);
         }
 
         /// <summary>Sets the calibration screen's two placeholder text labels - pass null for either to leave it as-is (e.g. the instruction line doesn't need to change for the READY state).</summary>
@@ -390,10 +456,12 @@ namespace ARReveal
             _page0Group = BuildPage0(canvasGo.transform);
             _page2Group = BuildPage2(canvasGo.transform);
             _page3Group = BuildPage3(canvasGo.transform);
+            _rescanButton = BuildRescanButton(canvasGo.transform);
 
             _page0Group.SetActive(false);
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
+            _rescanButton.SetActive(false);
 
             EnsureFlashOverlay(canvasGo.transform);
         }
@@ -550,6 +618,40 @@ namespace ARReveal
 
             Debug.Log("[ARShareController] Spinner upgraded to a radial-fill loading ring - its position/size were left untouched.");
         }
+
+        /// <summary>
+        /// Surgical companion to EditorRebuildUI(), same spirit as
+        /// EditorAddCalibrationScreenIfMissing() above - adds JUST the
+        /// bottom-center Rescan button to an already-hand-tuned
+        /// "ARShareCanvas" if it's missing, without touching or rebuilding
+        /// anything else already placed/tuned. For a canvas built/saved
+        /// before the Rescan button existed. Safe to call repeatedly -
+        /// no-ops if a "RescanButton" already exists directly under the
+        /// canvas root. See Assets/Editor/AddRescanButtonToSharePrefab.cs
+        /// for the menu command that calls this on a prefab asset directly.
+        /// </summary>
+        public void EditorAddRescanButtonIfMissing()
+        {
+            var canvasRoot = transform.Find("ARShareCanvas");
+            if (canvasRoot == null)
+            {
+                Debug.LogError("[ARShareController] No 'ARShareCanvas' child found - build the UI first (ARReveal/UI/Build Share UI In Scene).");
+                return;
+            }
+            if (canvasRoot.Find("RescanButton") != null)
+            {
+                Debug.Log("[ARShareController] RescanButton already exists under " + canvasRoot.name + " - nothing to add.");
+                return;
+            }
+
+            _rescanButton = BuildRescanButton(canvasRoot);
+            _rescanButton.SetActive(false);
+
+            // Keep the flash overlay on top of the newly-added button too.
+            EnsureFlashOverlay(canvasRoot);
+
+            Debug.Log("[ARShareController] Added RescanButton under " + canvasRoot.name + ".");
+        }
 #endif
 
         // --- CALIBRATION ---------------------------------------------------------
@@ -575,7 +677,18 @@ namespace ARReveal
             _calibratingText = AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
                 36, new Vector2(0f, -820f), new Vector2(500f, 80f));
 
+            _page0CanvasGroup = EnsureCanvasGroup(group);
+
             return group;
+        }
+
+        /// <summary>Gets or adds a CanvasGroup - used to fade the calibration screen out (see ReadyFadeOutSeconds) whether it was just built fresh here or picked up from a hand-tuned prefab that predates this fade (AttachToExistingUI).</summary>
+        private static CanvasGroup EnsureCanvasGroup(GameObject go)
+        {
+            if (go == null) return null;
+            var cg = go.GetComponent<CanvasGroup>();
+            if (cg == null) cg = go.AddComponent<CanvasGroup>();
+            return cg;
         }
 
         /// <summary>
@@ -648,6 +761,37 @@ namespace ARReveal
                 new Vector2(0f, -500f), new Vector2(280f, 140f), Teilen);
 
             return group;
+        }
+
+        // --- RESCAN --------------------------------------------------------
+        /// <summary>
+        /// Bottom-center "Rescan" button, per direct request - added directly
+        /// on the root canvas (a sibling of Page0/Page2/Page3, not nested
+        /// inside any of them), since its own visibility is gated
+        /// independently of all three (see Update(): HasRevealedContent AND
+        /// the calibration screen has fully hidden/faded AND neither Page2
+        /// nor Page3 is up) rather than being tied to any single page.
+        /// Tapping it calls Rescan(), which does nothing more than forward to
+        /// Handoff/DirectTrackingReveal's own RequestRescan() - see that
+        /// method's own doc comment for why that alone is enough to put the
+        /// exact same calibration screen back up and run a genuine fresh
+        /// settle/lock, with zero extra state to manage here. No design
+        /// asset exists for this yet (added ad hoc, per direct request) - a
+        /// generated rounded pill background (see CreateRoundedFillSprite)
+        /// plus plain placeholder text, same "swap for a real asset later"
+        /// caveat as the calibration screen's own two text labels.
+        /// </summary>
+        private GameObject BuildRescanButton(Transform parent)
+        {
+            var buttonSprite = CreateRoundedFillSprite(new Color(0f, 0f, 0f, 0.55f), 320, 110, 28);
+            var button = BuildImageButton(parent, "RescanButton", buttonSprite,
+                new Vector2(0f, -880f), new Vector2(320f, 110f), Rescan);
+            button.GetComponent<Image>().preserveAspect = false;
+
+            var label = AddPlaceholderText(button.transform, "Label", "RESCAN", 36, Vector2.zero, new Vector2(320f, 110f));
+            label.raycastTarget = false;
+
+            return button.gameObject;
         }
 
         private static Image AddImage(Transform parent, Sprite sprite, Vector2 anchoredPos, Vector2 size)
@@ -744,6 +888,37 @@ namespace ARReveal
         }
 
         /// <summary>
+        /// Generates a SOLID filled rounded-rect (a "pill" background) at
+        /// exactly width x height pixels - unlike CreateRoundedFrameSprite
+        /// (an outline) or the square-only RoundedBoxSDF/CreateRingSprite
+        /// above, this supports a genuinely rectangular (non-square) shape
+        /// at its own real aspect ratio, generated at the exact pixel size
+        /// the button will actually display at so it can be shown with
+        /// preserveAspect OFF with no stretching - see BuildRescanButton.
+        /// </summary>
+        private static Sprite CreateRoundedFillSprite(Color color, int width, int height, int cornerRadius)
+        {
+            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            var pixels = new Color[width * height];
+            Vector2 halfExtents = new Vector2(width / 2f - 1f, height / 2f - 1f);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f - width / 2f, y + 0.5f - height / 2f);
+                    Vector2 q = new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - (halfExtents - new Vector2(cornerRadius, cornerRadius));
+                    float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
+                    float inside = Mathf.Min(Mathf.Max(q.x, q.y), 0f);
+                    float dist = outside + inside - cornerRadius;
+                    pixels[y * width + x] = dist <= 0f ? color : new Color(0f, 0f, 0f, 0f);
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>
         /// Generates a plain, fully-closed ring (donut) - the base shape for
         /// the calibration loading ring. No design asset exists for this yet
         /// - see this class's own "CALIBRATION SCREEN" doc comment. The
@@ -817,6 +992,28 @@ namespace ARReveal
             _handoffStartTime = Time.time;
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
+        }
+
+        /// <summary>
+        /// The bottom-center Rescan button's own action, per direct request:
+        /// "it put the calibrate UI back on and we can rescan and reset with
+        /// the same flow as the first time." Unlike Restart() above (an
+        /// instant in-place FX replay that leaves tracking completely
+        /// untouched), this is a genuine full recalibration - it forwards to
+        /// Handoff.RequestRescan()/DirectTrackingReveal.RequestRescan(),
+        /// which hides the content again and forces HasContentSpawned/
+        /// HasRevealed back to false. That alone is enough: the moment
+        /// HasRevealedContent reads false again, Update()'s own existing
+        /// "!HasRevealedContent" branch takes over on its own and puts the
+        /// calibration screen ("Scan the QR to calibrate") straight back up,
+        /// resets _screen/_handoffStartTime/_contentSpawnedAt, and hides
+        /// Page2/Page3/this button - exactly the same state the very first
+        /// launch starts in, with no separate reset logic needed here.
+        /// </summary>
+        public void Rescan()
+        {
+            if (Handoff != null) Handoff.RequestRescan();
+            else if (DirectTrackingReveal != null) DirectTrackingReveal.RequestRescan();
         }
 
         /// <summary>

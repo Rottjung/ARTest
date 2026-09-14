@@ -198,6 +198,15 @@ namespace ARReveal
         private bool _contentSpawned;
 
         /// <summary>
+        /// Set by RequestRescan() to make the NEXT completed lock call
+        /// RevealContent()/set _contentSpawned again, even though _handedOff
+        /// is already true (so firstTime alone would read false and skip
+        /// both, per HandoffRoutine's original firstTime-only gate) - see
+        /// RequestRescan()'s own doc comment.
+        /// </summary>
+        private bool _pendingReveal;
+
+        /// <summary>
         /// The building's real-world rotation, as last established by a
         /// settled QR reading (see SettleAndSample) - the only source ever
         /// trusted for rotation. Re-applied to ContentWrapper EVERY FRAME in
@@ -668,10 +677,17 @@ namespace ARReveal
             float upAngle = Vector3.Angle(settledRot * Vector3.up, Vector3.up);
             Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - world position {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames, up-vector {upAngle:F0} degrees from world-up).");
 
-            if (firstTime)
+            // firstTime covers the genuine very-first lock; _pendingReveal
+            // covers a DELIBERATE Rescan() (RequestRescan() below) - both
+            // mean "content needs to actually (re)appear now", as opposed to
+            // every other re-lock (an ordinary passive re-scan after the QR
+            // was merely glimpsed again), which should just quietly re-
+            // correct the anchor in place with no UI/content change at all.
+            if (firstTime || _pendingReveal)
             {
                 RevealContent();
                 _contentSpawned = true;
+                _pendingReveal = false;
             }
         }
 
@@ -1087,6 +1103,57 @@ namespace ARReveal
             foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true)) rubble.Hide();
 
             TriggerAllBurstPoints();
+        }
+
+        /// <summary>
+        /// A DELIBERATE full recalibration - the "Rescan" button's own
+        /// action (ARShareController.Rescan()), per direct request: "we need
+        /// a rescan button... it put the calibrate UI back on and we can
+        /// rescan and reset with the same flow as the first time." Unlike
+        /// RestartRevealSequence() above (an instant in-place FX replay that
+        /// never touches tracking at all), this genuinely re-arms the whole
+        /// handoff: hides content immediately, flips HasContentSpawned back
+        /// to false (which is ALL ARShareController needs to put its
+        /// calibration screen straight back up - see HasRevealedContent's
+        /// own doc comment), and arranges for the very next QR detection to
+        /// run a full fresh settle-and-lock through the exact same
+        /// HandoffRoutine/SettleAndSample pipeline the first-ever scan used
+        /// - "the same flow as the first time," literally the same code
+        /// path, just without the FirstLockExtraSettleFrames hedge (that
+        /// hedge exists only for the very first moment after page load
+        /// specifically, not for a deliberate manual re-scan later - see its
+        /// own doc comment).
+        ///
+        /// No-ops if nothing has ever been handed off yet, or a rescan is
+        /// already pending (button should already be hidden in that state,
+        /// but this guards it regardless).
+        ///
+        /// _hasLeftSinceLastLock is forced true here rather than waiting for
+        /// a real "QR genuinely left view" edge - HandoffOnce()'s own gate
+        /// otherwise requires that before allowing ANY re-lock (see its own
+        /// doc), which would silently ignore this deliberate request if the
+        /// QR happened to still be in frame at the exact moment Rescan was
+        /// tapped. In practice this is moot anyway: the calibration screen
+        /// coming back up ("Scan the QR to calibrate") is itself the
+        /// instruction to move the camera down to the QR again, which
+        /// naturally produces a real not-seen/seen edge.
+        /// </summary>
+        public void RequestRescan()
+        {
+            if (ContentWrapper == null || !_handedOff || _pendingReveal) return;
+
+            foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true)) tentacle.Hide();
+            foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true)) hole.Hide();
+            foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true)) debris.Hide();
+            foreach (var smoke in ContentWrapper.GetComponentsInChildren<SmokePuff>(true)) smoke.Hide();
+            foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true)) rubble.Hide();
+
+            ContentWrapper.gameObject.SetActive(false);
+            if (ContentRoot != null) ContentRoot.gameObject.SetActive(false);
+
+            _contentSpawned = false;
+            _pendingReveal = true;
+            _hasLeftSinceLastLock = true;
         }
 
         private void TriggerAllBurstPoints()

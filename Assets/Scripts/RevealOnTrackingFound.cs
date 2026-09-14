@@ -93,6 +93,29 @@ namespace ARReveal
             SetContentActive(false);
         }
 
+        /// <summary>
+        /// The direct-image-tracking equivalent of
+        /// HandoffToInstantTracking.RequestRescan() - the "Rescan" button's
+        /// own action (ARShareController.Rescan()) for a scene using this
+        /// simpler reveal mechanism instead of the QR/SLAM handoff, per
+        /// direct request ("we need a rescan button... reset with the same
+        /// flow as the first time"). Unlike Hide() above (a no-op whenever
+        /// RevealOnlyOnce is set, which it normally is - the burst is meant
+        /// to be a one-time event, not something ordinary tracking loss
+        /// should undo), this unconditionally hides content and clears
+        /// _revealed regardless of RevealOnlyOnce, so the very next
+        /// OnSeenEvent runs Reveal() completely fresh - the exact same code
+        /// path the first-ever detection used, since Reveal()'s own
+        /// early-out only ever checks RevealOnlyOnce && _revealed, and
+        /// _revealed is now false.
+        /// </summary>
+        public void RequestRescan()
+        {
+            _revealed = false;
+            SetContentActive(false);
+            if (BurstSequencer != null) BurstSequencer.ResetAll();
+        }
+
         private void SetContentActive(bool active)
         {
             if (ContentRoots == null) return;

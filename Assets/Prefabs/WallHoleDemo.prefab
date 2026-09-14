@@ -276,6 +276,14 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7144803938671606600, guid: c06eaec410a48834b98efc164b986647, type: 3}
+      propertyPath: SizeRange.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7144803938671606600, guid: c06eaec410a48834b98efc164b986647, type: 3}
+      propertyPath: SizeRange.y
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7144803938671606600, guid: c06eaec410a48834b98efc164b986647, type: 3}
       propertyPath: StartRadius
       value: 0.5
       objectReference: {fileID: 0}
@@ -286,6 +294,14 @@ PrefabInstance:
     - target: {fileID: 7144803938671606600, guid: c06eaec410a48834b98efc164b986647, type: 3}
       propertyPath: SidewaysDrift
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7144803938671606600, guid: c06eaec410a48834b98efc164b986647, type: 3}
+      propertyPath: DepthScaleRange.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7144803938671606600, guid: c06eaec410a48834b98efc164b986647, type: 3}
+      propertyPath: DepthScaleRange.y
+      value: 2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

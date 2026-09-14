@@ -27,7 +27,7 @@ Material:
     m_Floats:
     - _Active: 1
     - _CrackWidth: 0.01
-    - _EdgeFadeEnd: 1.25
+    - _EdgeFadeEnd: 1.06
     - _EdgeFadeStart: 0.75
     - _EmissionStrength: 0
     - _GlowIntensity: 0

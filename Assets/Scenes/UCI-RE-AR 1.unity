@@ -2419,6 +2419,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
   Handoff: {fileID: 0}
+  DirectTrackingReveal: {fileID: 0}
   LogoSprite: {fileID: 0}
   Page2TextTopSprite: {fileID: 0}
   Page2TextBottomSprite: {fileID: 0}
@@ -2427,13 +2428,16 @@ MonoBehaviour:
   FotoButtonSprite: {fileID: 0}
   TeilenButtonSprite: {fileID: 0}
   RecordButtonSprite: {fileID: 0}
+  Page0GroupOverride: {fileID: 0}
   Page2GroupOverride: {fileID: 0}
   Page3GroupOverride: {fileID: 0}
   RestartButtonOverride: {fileID: 0}
   FotoButtonOverride: {fileID: 0}
   RecordButtonOverride: {fileID: 0}
   TeilenButtonOverride: {fileID: 0}
+  SpinnerImageOverride: {fileID: 0}
   Page2DelaySeconds: 30
+  SpinnerLoopsPerSecond: 0.8
   SortingOrder: 600
 --- !u!1 &777038240
 GameObject:
@@ -4613,7 +4617,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6109786624428484672, guid: a643e58ef652a474587d359e9882ea45, type: 3}
       propertyPath: NoiseSpeed
-      value: 1
+      value: 6.94
       objectReference: {fileID: 0}
     - target: {fileID: 6109786624428484672, guid: a643e58ef652a474587d359e9882ea45, type: 3}
       propertyPath: JabDistance
@@ -4693,7 +4697,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6109786624428484672, guid: a643e58ef652a474587d359e9882ea45, type: 3}
       propertyPath: NoiseAmplitudeDegrees
-      value: 7
+      value: 14.88
       objectReference: {fileID: 0}
     - target: {fileID: 6109786624428484672, guid: a643e58ef652a474587d359e9882ea45, type: 3}
       propertyPath: PunchIdleDuringWindup

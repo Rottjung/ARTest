@@ -1,0 +1,213 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &4468818820939631215
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 71.28
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 18.29
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 33.29
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.6279633
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.778243
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.0000011846423
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.0000008493662
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -77.8
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -179.999
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 179.999
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      propertyPath: m_Name
+      value: T9
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4316197083518543973}
+  m_SourcePrefab: {fileID: 100100000, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+--- !u!1 &3658337812520040254 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+  m_PrefabInstance: {fileID: 4468818820939631215}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &4316197083518543973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3658337812520040254}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
+  RootBone: {fileID: 6446706372566739651}
+  IsHero: 0
+  Style: 1
+  ExtendAxis: 0
+  GrowDuration: 1.2
+  GrowCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  CurledAngle: 70
+  PerBoneGrowDelay: 1
+  CurlAxisRandomness: 25
+  RiseDistance: 0
+  RiseStartScale: 1
+  JabDuration: 0.1
+  JabDistance: 0.105
+  RetractDuration: 0.1
+  RetractDistance: 0.117
+  BurstDuration: 0.5
+  PunchOvershoot: 1
+  SettleDuration: 3
+  PunchIdleDuringWindup: 0
+  IdleActiveThroughoutPunch: 1
+  PunchStraightenTip: 0.4
+  NoiseAmplitudeDegrees: 7
+  NoiseSpeed: 1
+  SineAmplitudeDegrees: 45
+  SineFrequency: 1.4
+  SineSpeed: 0.4
+  JitterAmplitudeDegrees: 12
+  JitterSpeed: 1.5
+  ReachStrength: 0.3
+  ReachSmoothing: 5
+  ReachAimDistance: -0.3
+  MinStrikeDistance: -0.3
+  AimBelowCameraOffset: 3
+  CameraOverride: {fileID: 0}
+  SlimeOverlay: {fileID: 0}
+  ReachByDistance: 1
+  SnapDistance: 5
+  SnapFadeDistance: 3
+  SnapFadeGraceDuration: 0.4
+  AttackRepeatInterval: 7.5
+  AttackTarget: {fileID: 0}
+  UseAttackTarget: 1
+  AttackTargetChance: 0.542
+  AttackTargetRollIntervalMin: 3
+  AttackTargetRollIntervalMax: 6
+  LashDuration: 1
+  LashCoilFraction: 0.6
+  LashStrikeFraction: 0.25
+  LashCoilStrength: 0.5
+  LashOvershoot: 0
+  LashBaseAnchorFraction: 0.25
+  LashBendCurve: 1
+  IdleBlendInDuration: 0.5
+  EngagedIdleDamping: 1
+  SweepDuration: 1.2
+  SweepHookAngleDegrees: 200
+  SweepStartSide: 2
+  SweepSpeedCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  SweepBendStrength: 0.4
+  SweepVerticalLift: 20
+  SweepExtendAmount: 0.5
+  SweepExtendGirthFraction: 0.2
+  SnapAtCameraOnSettle: 0
+  SnapAtCameraOnSettleShape: 0
+  SnapPeakStrength: 1
+  SnapStretchTipFraction: 0.5
+  SnapMaxStretchMultiplier: 2
+--- !u!4 &6446706372566739651 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 7454339468107554988, guid: 4f9170453f74de849bf75906e6822aae, type: 3}
+  m_PrefabInstance: {fileID: 4468818820939631215}
+  m_PrefabAsset: {fileID: 0}

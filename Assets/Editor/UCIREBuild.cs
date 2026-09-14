@@ -10,6 +10,8 @@ namespace ARReveal.EditorTools
         private const string PagesMarkerOutputDir = "docs/uci-re-marker";
         private const string PagesArOutputDir = "docs/uci-re-ar";
         private const string ArVersion1OutputDir = "Builds/UCI-RE-AR_Version1";
+        private const string ArQROnlyOutputDir = "Builds/UCI-RE-AR_QROnly";
+        private const string PagesArQROnlyOutputDir = "docs/uci-re-ar-qronly";
 
         [MenuItem("ARReveal/UCI-RE/Build WebGL (Brotli)")]
         public static void Run()
@@ -147,6 +149,53 @@ namespace ARReveal.EditorTools
             {
                 scenes = new[] { "Assets/Scenes/UCI-RE-AR.unity" },
                 locationPathName = PagesArOutputDir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
+
+            PlayerSettings.WebGL.compressionFormat = previousCompression;
+
+            Log(report);
+        }
+
+        /// <summary>
+        /// Builds UCI-RE-AR_QROnly.unity (the bare-QR-crop test variant, no
+        /// A3/full-poster page around it - see its own Target field for the
+        /// exact trained size in use) at default/Brotli compression, same
+        /// pattern as RunArVersion1() for the main UCI-RE-AR.unity. Zip
+        /// Builds/UCI-RE-AR_QROnly (index.html at the zip root) and upload
+        /// under the project's Experience tab for a real Zappar-hosted test.
+        /// </summary>
+        [MenuItem("ARReveal/UCI-RE-AR/Build QROnly WebGL for Zappar (Brotli)")]
+        public static void RunArQROnly()
+        {
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/UCI-RE-AR_QROnly.unity" },
+                locationPathName = ArQROnlyOutputDir,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            });
+
+            Log(report);
+        }
+
+        /// <summary>
+        /// Same UCI-RE-AR_QROnly.unity scene as above, but uncompressed into
+        /// docs/uci-re-ar-qronly/ for a fast self-serve GitHub Pages test -
+        /// same reasoning as RunForPagesAr() for the main scene. Requires a
+        /// `git push` after this to actually go live.
+        /// </summary>
+        [MenuItem("ARReveal/UCI-RE-AR/Build QROnly WebGL for GitHub Pages (uncompressed, testing only)")]
+        public static void RunForPagesArQROnly()
+        {
+            var previousCompression = PlayerSettings.WebGL.compressionFormat;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/Scenes/UCI-RE-AR_QROnly.unity" },
+                locationPathName = PagesArQROnlyOutputDir,
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None
             });

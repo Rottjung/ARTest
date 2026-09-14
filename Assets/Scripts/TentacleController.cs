@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace ARReveal
 {
@@ -107,6 +108,9 @@ namespace ARReveal
         public Transform RootBone;
         [Tooltip("Marks this as THE hero tentacle - purely a marker read by HandoffToInstantTracking, which delays this one's spawn until after every other burst point has started (see its HeroExtraDelay), and by this component's own SnapAtCameraOnSettle handling, which stretches to guarantee this one actually reaches the camera (see SnapStretchTipFraction/SnapMaxStretchMultiplier) - the repeating Reach By Distance lashes never stretch, hero or not. Mark at most one tentacle this way.")]
         public bool IsHero = false;
+
+        [Tooltip("Fires the instant THIS tentacle actually starts growing (see Grow()), but ONLY if IsHero is checked - wire an AudioSource's Play() directly here in the Inspector (no extra script needed) to sync a sound/music cue to the hero's own start moment, regardless of which burst-orchestration system (HandoffToInstantTracking's Pairs, or BurstSequencer) actually triggered it.")]
+        public UnityEvent OnHeroGrowStart;
 
         [Header("Grow style")]
         [Tooltip("Unfold = slow uncurl (rooftop). Punch = fast scale-out burst, tip leads (wall breakthrough).")]
@@ -438,6 +442,7 @@ namespace ARReveal
             CurrentState = State.Growing;
             _growStartTime = Time.time;
             if (Style == GrowStyle.Punch) transform.localScale = Vector3.zero;
+            if (IsHero) OnHeroGrowStart?.Invoke();
         }
 
         public void Hide()

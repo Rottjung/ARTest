@@ -195,6 +195,7 @@ namespace ARReveal
         public float DebugAutoRevealDelay = 1f;
 
         private bool _handedOff;
+        private bool _contentSpawned;
 
         /// <summary>
         /// The building's real-world rotation, as last established by a
@@ -207,11 +208,30 @@ namespace ARReveal
         private Quaternion _lockedWorldRotation = Quaternion.identity;
 
         /// <summary>
-        /// True once the FIRST handoff has completed (content revealed).
-        /// Exposed for TrackingDebugOverlay - "waiting for the QR" and "tracking
-        /// active" are genuinely different states worth telling apart on screen.
+        /// True the instant the FIRST handoff attempt is ACCEPTED (the QR was
+        /// just glimpsed for the first time) - NOT once content has actually
+        /// appeared. Despite this property's name, that's ALL it ever meant:
+        /// set true at the very top of HandoffOnce(), well before
+        /// SettleAndSample even starts (which alone can take ~1.5s+) and
+        /// before RevealContent()'s own staggered burst delays (several more
+        /// seconds for non-hero tentacles). Exposed for TrackingDebugOverlay -
+        /// "waiting for the QR" vs "an attempt is in flight" is still a
+        /// meaningful distinction to show. For "has the reveal actually
+        /// happened" (e.g. gating a UI's own "tracking found" screen), use
+        /// HasContentSpawned instead - conflating the two was a real bug,
+        /// found when a client on-site test showed the calibration screen
+        /// disappearing well before anything was actually visible, leaving a
+        /// silent gap where a viewer could easily miss the reveal.
         /// </summary>
         public bool HasHandedOff => _handedOff;
+
+        /// <summary>
+        /// True once RevealContent() has actually been called (the real
+        /// "content has spawned" moment) - as opposed to HasHandedOff, which
+        /// fires the instant a handoff attempt merely STARTS. See
+        /// HasHandedOff's own doc comment for why the distinction matters.
+        /// </summary>
+        public bool HasContentSpawned => _contentSpawned;
 
         /// <summary>
         /// How many times the instant-tracker anchor has been RE-seeded from a
@@ -648,7 +668,11 @@ namespace ARReveal
             float upAngle = Vector3.Angle(settledRot * Vector3.up, Vector3.up);
             Debug.Log($"[HandoffToInstantTracking] {(firstTime ? "Initial lock" : "Re-seeded")} - world position {settledPos.Value}, rotation {settledRot.eulerAngles} (settled after {SettleProgress}/{requiredFrames} agreeing frames, up-vector {upAngle:F0} degrees from world-up).");
 
-            if (firstTime) RevealContent();
+            if (firstTime)
+            {
+                RevealContent();
+                _contentSpawned = true;
+            }
         }
 
         /// <summary>

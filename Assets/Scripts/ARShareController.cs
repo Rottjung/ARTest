@@ -43,23 +43,30 @@ namespace ARReveal
     /// CALIBRATION SCREEN (Page0_Calibration - see BuildCalibrationScreen):
     /// shown as soon as the Zappar camera feed is actually live
     /// (ZapparCamera.CameraSourceInitialized), for as long as content hasn't
-    /// been revealed yet (!HasRevealedContent - see that property's own doc
-    /// for why this works identically whether the scene uses
-    /// HandoffToInstantTracking's QR+SLAM handoff or
-    /// RevealOnTrackingFound's simpler direct-image-tracking reveal) - a
-    /// rounded-square viewfinder frame to place the QR in, "scan the QR to
-    /// calibrate" instructional text, and a round loading ring (a "loading
-    /// bar that fills in a loop" per direct request - see
+    /// ACTUALLY spawned yet (!HasRevealedContent - see that property's own
+    /// doc for why HasContentSpawned, not HasHandedOff, is the right signal
+    /// to gate on, and for why this works identically whether the scene
+    /// uses HandoffToInstantTracking's QR+SLAM handoff or
+    /// RevealOnTrackingFound's simpler direct-image-tracking reveal). Shows
+    /// a rounded-square viewfinder frame to place the QR in, an
+    /// instructional text line ("Preparing..." while TargetPreloader hasn't
+    /// finished warming the browser's cache yet, else "Scan the QR to
+    /// calibrate" - see TargetPreloader's own doc comment for the real
+    /// cold-cache bug this avoids), and a round loading ring (a "loading bar
+    /// that fills in a loop" per direct request - see
     /// SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
-    /// bottom. Shown EXACTLY ONCE per session, never again after the first
-    /// successful lock - this falls straight out of
-    /// HasHandedOff/HasRevealed's own existing semantics on either
-    /// underlying component (set true on the very first reveal and never
-    /// reset back to false by anything, including a later re-scan/re-lock),
-    /// so a re-scan after that first lock silently just re-corrects the
-    /// anchor as it always did, with no UI interruption at all - "if we
-    /// scan the AR again just keep what we have now" per direct request.
-    /// The frame and loading ring are generated at runtime
+    /// bottom. Once content actually spawns, the ring freezes full and the
+    /// label switches to "READY!" for ReadyDisplaySeconds (per direct
+    /// request - a viewer staring at their phone could otherwise miss the
+    /// reveal entirely with nothing telling them to look), THEN the whole
+    /// screen hides. Shown EXACTLY ONCE per session after that - this falls
+    /// straight out of HasContentSpawned/HasRevealed's own existing
+    /// semantics on either underlying component (set true on the very first
+    /// reveal and never reset back to false by anything, including a later
+    /// re-scan/re-lock), so a re-scan after that first lock silently just
+    /// re-corrects the anchor as it always did, with no UI interruption at
+    /// all - "if we scan the AR again just keep what we have now" per
+    /// direct request. The frame and loading ring are generated at runtime
     /// (CreateRoundedFrameSprite/CreateRingSprite, same procedural-texture
     /// approach as CreateCircleSprite below) since no design asset exists
     /// for this screen yet; the two text labels use a
@@ -115,6 +122,9 @@ namespace ARReveal
         [Tooltip("Direct image-tracking scenes with no QR/SLAM at all (UCI-RE, the safety backup) - auto-found in the scene if left blank. Only ever consulted when Handoff above is null, so this has zero effect on a scene where Handoff is assigned.")]
         public RevealOnTrackingFound DirectTrackingReveal;
 
+        [Tooltip("Optional - auto-found in the scene if left blank. While this hasn't finished preloading the .zpt yet, the calibration screen shows a 'Preparing...' message instead of 'Scan the QR' - see TargetPreloader's own doc comment for the real bug this addresses (a cold browser cache losing the race against the QR actually being scanned).")]
+        public TargetPreloader Preloader;
+
         [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each")]
         public Sprite LogoSprite;
         public Sprite Page2TextTopSprite;
@@ -136,6 +146,10 @@ namespace ARReveal
         public Button TeilenButtonOverride;
         [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
         public Image SpinnerImageOverride;
+        [Tooltip("Drag the calibration screen's instructional Text component here directly - overrides the by-name lookup (Page0_Calibration/InstructionText).")]
+        public Text InstructionTextOverride;
+        [Tooltip("Drag the calibration screen's 'CALIBRATING...'/'READY!' Text component here directly - overrides the by-name lookup (Page0_Calibration/CalibratingText).")]
+        public Text CalibratingTextOverride;
 
         [Header("Timing / thresholds")]
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
@@ -143,6 +157,9 @@ namespace ARReveal
 
         [Tooltip("How many times per second the calibration loading ring fills up before looping back to empty and starting over.")]
         public float SpinnerLoopsPerSecond = 0.8f;
+
+        [Tooltip("Seconds to hold a 'READY!' confirmation on the calibration screen once content has actually spawned, before hiding it - per direct request: without this, a viewer staring at their phone could miss the reveal entirely and look up at the real building instead. Runs in parallel with (doesn't delay) Page2DelaySeconds' own countdown.")]
+        public float ReadyDisplaySeconds = 1.5f;
 
         [Tooltip("Above CameraSlimeOverlay's 500, so this UI always draws on top of the slime splat.")]
         public int SortingOrder = 600;
@@ -155,12 +172,17 @@ namespace ARReveal
         private GameObject _page3Group;
 
         private Image _spinnerImage;
+        private Text _instructionText;
+        private Text _calibratingText;
         private ZapparCamera _zapparCamera;
 
         /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
         private Canvas _canvas;
 
         private float _handoffStartTime = -1f;
+
+        /// <summary>Time.time when content first actually spawned (HasRevealedContent flipped true) - drives the "READY!" hold on the calibration screen (see ReadyDisplaySeconds). -1 while not yet spawned.</summary>
+        private float _contentSpawnedAt = -1f;
 
         private Image _flashImage;
         private Coroutine _flashRoutine;
@@ -169,6 +191,7 @@ namespace ARReveal
         {
             if (Handoff == null) Handoff = FindFirstObjectByType<HandoffToInstantTracking>();
             if (DirectTrackingReveal == null) DirectTrackingReveal = FindFirstObjectByType<RevealOnTrackingFound>();
+            if (Preloader == null) Preloader = FindFirstObjectByType<TargetPreloader>();
             _zapparCamera = ZapparCamera.Instance != null ? ZapparCamera.Instance : FindFirstObjectByType<ZapparCamera>();
 
             // If a hand-tuned "ARShareCanvas" hierarchy already exists as a
@@ -204,6 +227,12 @@ namespace ARReveal
             var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
             _spinnerImage = SpinnerImageOverride != null ? SpinnerImageOverride
                 : spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
+            var instructionTransform = canvasRoot.Find("Page0_Calibration/InstructionText");
+            _instructionText = InstructionTextOverride != null ? InstructionTextOverride
+                : instructionTransform != null ? instructionTransform.GetComponent<Text>() : null;
+            var calibratingTransform = canvasRoot.Find("Page0_Calibration/CalibratingText");
+            _calibratingText = CalibratingTextOverride != null ? CalibratingTextOverride
+                : calibratingTransform != null ? calibratingTransform.GetComponent<Text>() : null;
 
             WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
@@ -238,40 +267,66 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// True once content has actually been revealed, regardless of
-        /// which of the two reveal mechanisms this scene uses -
-        /// HandoffToInstantTracking.HasHandedOff (QR+SLAM scenes) if
-        /// Handoff is assigned, else RevealOnTrackingFound.HasRevealed
-        /// (direct image-tracking scenes) as a fallback. Handoff always
-        /// wins when assigned, so this is byte-for-byte identical to the
-        /// old `Handoff == null || !Handoff.HasHandedOff` check on any
-        /// scene where Handoff is set (UCI-RE-AR) - the fallback only ever
-        /// activates on a scene where Handoff was already null.
+        /// True once content has ACTUALLY been revealed (the real "content
+        /// has spawned" moment - see HandoffToInstantTracking.
+        /// HasContentSpawned's own doc comment for why HasHandedOff was the
+        /// wrong signal for this: it fires the instant a handoff attempt
+        /// merely STARTS, well before anything is actually visible, found
+        /// from an on-site report of the calibration screen disappearing
+        /// with nothing yet on screen). Works identically whether the scene
+        /// uses HandoffToInstantTracking's QR+SLAM handoff (HasContentSpawned)
+        /// if Handoff is assigned, or RevealOnTrackingFound's simpler
+        /// direct-image-tracking reveal (HasRevealed - already accurate for
+        /// that simpler system, no separate settling delay exists there) as
+        /// a fallback. Handoff always wins when assigned, so this has zero
+        /// effect on a scene where Handoff is set (UCI-RE-AR) beyond fixing
+        /// which of Handoff's own properties gets read.
         /// </summary>
         private bool HasRevealedContent =>
-            Handoff != null ? Handoff.HasHandedOff
+            Handoff != null ? Handoff.HasContentSpawned
             : DirectTrackingReveal != null && DirectTrackingReveal.HasRevealed;
 
         private void Update()
         {
             if (!HasRevealedContent)
             {
-                // Shown once camera access is actually live, until the FIRST
-                // successful lock - see this class's own "CALIBRATION SCREEN"
-                // doc comment for why HasHandedOff alone is exactly the right
-                // gate (never shows again after that first lock, including on
-                // a later re-scan).
+                // Shown once camera access is actually live, until content
+                // has ACTUALLY spawned - see HasRevealedContent's own doc
+                // comment for why that's a different (later) moment than
+                // "tracking merely locked on".
                 bool cameraReady = _zapparCamera != null && _zapparCamera.CameraSourceInitialized;
                 SetActiveIfNotNull(_page0Group, cameraReady);
+
+                // "Preparing..." instead of "Scan the QR" while the .zpt
+                // itself is still preloading - see TargetPreloader's own
+                // doc comment for the real bug this avoids (scanning before
+                // the target data has actually loaded can never be detected,
+                // no matter how well the QR is framed).
+                bool targetReady = Preloader == null || Preloader.IsReady;
+                SetCalibrationMessage(cameraReady && !targetReady ? "Preparing..." : "Scan the QR to calibrate", "CALIBRATING...");
 
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
                 _handoffStartTime = -1f;
                 _screen = UiScreen.None;
+                _contentSpawnedAt = -1f;
                 return;
             }
 
-            SetActiveIfNotNull(_page0Group, false);
+            // Content has just spawned - hold a "READY!" confirmation on the
+            // calibration screen for ReadyDisplaySeconds before hiding it,
+            // so a viewer looking at their phone gets a clear "yes, look
+            // here now" cue instead of the screen just vanishing with
+            // nothing yet visible behind it (per direct request). Runs in
+            // PARALLEL with, not instead of, the Page2DelaySeconds countdown
+            // below - both start from this same moment.
+            if (_contentSpawnedAt < 0f)
+            {
+                _contentSpawnedAt = Time.time;
+                SetCalibrationMessage(null, "READY!");
+            }
+            bool showingReady = Time.time - _contentSpawnedAt < ReadyDisplaySeconds;
+            SetActiveIfNotNull(_page0Group, showingReady);
 
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
@@ -282,15 +337,32 @@ namespace ARReveal
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
         }
 
+        /// <summary>Sets the calibration screen's two placeholder text labels - pass null for either to leave it as-is (e.g. the instruction line doesn't need to change for the READY state).</summary>
+        private void SetCalibrationMessage(string instruction, string calibrating)
+        {
+            if (instruction != null && _instructionText != null) _instructionText.text = instruction;
+            if (calibrating != null && _calibratingText != null) _calibratingText.text = calibrating;
+        }
+
         private void LateUpdate()
         {
+            if (_spinnerImage == null || _page0Group == null || !_page0Group.activeInHierarchy) return;
+
+            if (_contentSpawnedAt >= 0f)
+            {
+                // READY state - freeze the ring as a complete, filled circle
+                // (reads as "done") instead of continuing to loop, for the
+                // brief window this screen stays up after content spawns.
+                _spinnerImage.fillAmount = 1f;
+                return;
+            }
+
             // A radial-fill loading ring (Image.Type.Filled/Radial360), not a
             // rotated shape - fillAmount sweeps 0 -> 1 on a repeating sawtooth
             // (Mathf.Repeat), so it fills up, snaps back to empty, and fills
             // again in an endless loop, exactly "a round loading bar that
             // fills in a loop" per direct request.
-            if (_spinnerImage != null && _page0Group != null && _page0Group.activeInHierarchy)
-                _spinnerImage.fillAmount = Mathf.Repeat(Time.time * SpinnerLoopsPerSecond, 1f);
+            _spinnerImage.fillAmount = Mathf.Repeat(Time.time * SpinnerLoopsPerSecond, 1f);
         }
 
         private static void SetActiveIfNotNull(GameObject go, bool active)
@@ -492,7 +564,7 @@ namespace ARReveal
             var frameSprite = CreateRoundedFrameSprite(new Color(1f, 1f, 1f, 0.9f), 512, 64, 10);
             AddImage(group.transform, frameSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
 
-            AddPlaceholderText(group.transform, "InstructionText", "Scan the QR to calibrate",
+            _instructionText = AddPlaceholderText(group.transform, "InstructionText", "Scan the QR to calibrate",
                 48, new Vector2(0f, 620f), new Vector2(800f, 160f));
 
             var spinnerImage = AddImage(group.transform, CreateRingSprite(Color.white, 128, 0.16f), new Vector2(0f, -700f), new Vector2(100f, 100f));
@@ -500,7 +572,7 @@ namespace ARReveal
             SetUpAsLoadingRing(spinnerImage);
             _spinnerImage = spinnerImage;
 
-            AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
+            _calibratingText = AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
                 36, new Vector2(0f, -820f), new Vector2(500f, 80f));
 
             return group;

@@ -32,8 +32,8 @@ namespace ARReveal
         /// distinct colors (not just a version number bump) since the whole point
         /// is to be readable as "different" at a glance, from across a room.
         /// </summary>
-        private const string BuildTag = "build-40";
-        private const string BuildTagColorHex = "#4682B4"; // steel blue - change alongside BuildTag above
+        private const string BuildTag = "build-41";
+        private const string BuildTagColorHex = "#DAA520"; // goldenrod - change alongside BuildTag above
 
         [Tooltip("Off hides the on-screen label entirely - still tracks everything underneath, just doesn't draw. Flip this off for the real build/client demo.")]
         public bool ShowOverlay = true;

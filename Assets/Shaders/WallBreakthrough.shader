@@ -13,7 +13,11 @@ Shader "ARReveal/WallBreakthrough"
     // own quad edge, so there's never a visible rectangle - it blends into the real
     // wall. Where the hole is fully open (alpha 0), whatever was drawn before this
     // decal - typically the tentacle mesh - shows through, since this renders in the
-    // Transparent queue after opaque geometry.
+    // Transparent queue after opaque geometry. That outer fade boundary is itself
+    // noise-distorted too (_OuterNoiseScale/_OuterNoiseStrength), same technique as
+    // the hole's own jagged edge but with its own decorrelated noise sample (a
+    // different UV offset into the same noise function) so the two edges don't
+    // wobble in obvious lockstep with each other.
     Properties
     {
         _BaseColor("Crack/Debris Color", Color) = (0.35, 0.32, 0.29, 1)
@@ -28,6 +32,8 @@ Shader "ARReveal/WallBreakthrough"
         _NoiseStrength("Edge Noise Strength", Range(0,0.4)) = 0.15
         _EdgeFadeStart("Outer Fade Start", Range(0,1)) = 0.72
         _EdgeFadeEnd("Outer Fade End", Range(0,1.5)) = 1.0
+        _OuterNoiseScale("Outer Fade Noise Scale", Range(1,20)) = 5
+        _OuterNoiseStrength("Outer Fade Noise Strength", Range(0,0.4)) = 0.12
 
         [Header(Pre Crack Spiderweb Flash)]
         _PreCrackColor("Pre-Crack Line Color", Color) = (0.9, 0.95, 1.0, 1)
@@ -78,6 +84,8 @@ Shader "ARReveal/WallBreakthrough"
                 float _NoiseStrength;
                 float _EdgeFadeStart;
                 float _EdgeFadeEnd;
+                float _OuterNoiseScale;
+                float _OuterNoiseStrength;
                 float4 _PreCrackColor;
                 float _PreCrackIntensity;
                 float _PreCrackScale;
@@ -146,8 +154,14 @@ Shader "ARReveal/WallBreakthrough"
                 float2 centered = (IN.uv - 0.5) * 2.0; // -1..1
                 float d = length(centered);
 
-                // Fades the whole decal to nothing before it reaches the quad's hard edge.
-                float outerFade = 1.0 - smoothstep(_EdgeFadeStart, _EdgeFadeEnd, d);
+                // Fades the whole decal to nothing before it reaches the quad's hard
+                // edge - noise-distorted the same way the hole's own edge is (see
+                // below), just with a decorrelated noise sample (a different UV
+                // offset into the same noise function) so it doesn't wobble in
+                // obvious lockstep with the hole's edge.
+                float nOuter = valueNoise(IN.uv * _OuterNoiseScale + 31.0) - 0.5;
+                float dOuterJagged = d + nOuter * _OuterNoiseStrength;
+                float outerFade = 1.0 - smoothstep(_EdgeFadeStart, _EdgeFadeEnd, dOuterJagged);
 
                 // Jagged, organic edge instead of a perfect circle.
                 float n = valueNoise(IN.uv * _NoiseScale) - 0.5;

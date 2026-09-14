@@ -31,9 +31,9 @@ Material:
     - _EdgeFadeStart: 0.75
     - _EmissionStrength: 0
     - _GlowIntensity: 0
-    - _MaxHoleRadius: 0.557
+    - _MaxHoleRadius: 0.7
     - _NoiseScale: 20
-    - _NoiseStrength: 0.166
+    - _NoiseStrength: 0.4
     - _PreCrackIntensity: 0.883
     - _PreCrackLineWidth: 0.2
     - _PreCrackScale: 8.1

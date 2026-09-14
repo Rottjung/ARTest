@@ -2420,6 +2420,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ARShareController
   Handoff: {fileID: 0}
   DirectTrackingReveal: {fileID: 0}
+  Preloader: {fileID: 0}
   LogoSprite: {fileID: 0}
   Page2TextTopSprite: {fileID: 0}
   Page2TextBottomSprite: {fileID: 0}
@@ -2436,8 +2437,11 @@ MonoBehaviour:
   RecordButtonOverride: {fileID: 0}
   TeilenButtonOverride: {fileID: 0}
   SpinnerImageOverride: {fileID: 0}
+  InstructionTextOverride: {fileID: 0}
+  CalibratingTextOverride: {fileID: 0}
   Page2DelaySeconds: 30
   SpinnerLoopsPerSecond: 0.8
+  ReadyDisplaySeconds: 1.5
   SortingOrder: 600
 --- !u!1 &777038240
 GameObject:
@@ -3915,28 +3919,32 @@ PrefabInstance:
       value: H3
       objectReference: {fileID: 0}
     - target: {fileID: 3149189093015573704, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: InnerRadius
+      value: 0.1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3149189093015573704, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: OpenOnStart
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 6178885141760728109, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.8
+    - target: {fileID: 3149189093015573704, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: OuterRadius
+      value: 0.2
       objectReference: {fileID: 0}
-    - target: {fileID: 6178885141760728109, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 10.56
+    - target: {fileID: 3149189093015573704, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: LargeChunkChance
+      value: 0.33
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 12.390001
+      objectReference: {fileID: 0}
+    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.y
-      value: 10.56
+      value: 12.390001
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1.1733334
+      value: 12.39
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.x
@@ -3980,7 +3988,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_ConstrainProportionsScale
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: OpenOnStart
@@ -4025,15 +4033,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.x
-      value: 8
+      value: 9.73
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.y
-      value: 8
+      value: 9.73
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.z
-      value: 8
+      value: 9.73
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4074,6 +4082,10 @@ PrefabInstance:
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: OpenOnStart
@@ -5159,23 +5171,23 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 357f81543b4365d4fbd105fbf550e82d, type: 2}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.x
-      value: 5
+      value: 6.88
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.y
-      value: 5
+      value: 6.88
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalScale.z
-      value: 5
+      value: 6.88
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 5.7
+      value: 5.04
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 10.9
+      value: 11.13
       objectReference: {fileID: 0}
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalPosition.z
@@ -5208,6 +5220,10 @@ PrefabInstance:
     - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 8164016893962466130, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8772758931219612477, guid: bf7186130b8bd2d40b521031ff582f47, type: 3}
       propertyPath: OpenOnStart

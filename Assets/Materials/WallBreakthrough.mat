@@ -27,13 +27,15 @@ Material:
     m_Floats:
     - _Active: 1
     - _CrackWidth: 0.01
-    - _EdgeFadeEnd: 1.1
-    - _EdgeFadeStart: 0.75
+    - _EdgeFadeEnd: 1.03
+    - _EdgeFadeStart: 0.64
     - _EmissionStrength: 0
     - _GlowIntensity: 0
-    - _MaxHoleRadius: 0.5
+    - _MaxHoleRadius: 0.307
     - _NoiseScale: 20
     - _NoiseStrength: 0.166
+    - _OuterNoiseScale: 20
+    - _OuterNoiseStrength: 0.229
     - _PreCrackIntensity: 0.883
     - _PreCrackLineWidth: 0.2
     - _PreCrackScale: 8.1

@@ -190,7 +190,7 @@ MonoBehaviour:
   SmallSizeRange: {x: 0.9, y: 1.4}
   LargeSizeRange: {x: 1.5, y: 2}
   Irregularity: 0
-  DepthScaleRange: {x: 0.2, y: 0.3}
+  DepthScaleRange: {x: 0.01, y: 0.5}
   MaxTiltDegrees: 55
   ChunkMaterial: {fileID: 2100000, guid: 177874b8afb89604b80409104c57d32c, type: 2}
   ColorJitter: 0.12

@@ -34,6 +34,8 @@ Material:
     - _MaxHoleRadius: 0.7
     - _NoiseScale: 20
     - _NoiseStrength: 0.4
+    - _OuterNoiseScale: 20
+    - _OuterNoiseStrength: 0.4
     - _PreCrackIntensity: 0.883
     - _PreCrackLineWidth: 0.2
     - _PreCrackScale: 8.1

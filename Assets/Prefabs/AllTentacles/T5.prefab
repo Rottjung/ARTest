@@ -1,0 +1,213 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &7845372650950257451
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 1.3717937
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 6.9100003
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 31.360678
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.100359224
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.045087248
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.9939188
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0.0045526056
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -1.037
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 168.514
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: -5.09
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      propertyPath: m_Name
+      value: T5
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5668026365491967860}
+  m_SourcePrefab: {fileID: 100100000, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+--- !u!4 &4518296367177505238 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5932483464039887613, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+  m_PrefabInstance: {fileID: 7845372650950257451}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &6926876035622983290 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 0b08d8fe5f71f354ab5bb260ef676a27, type: 3}
+  m_PrefabInstance: {fileID: 7845372650950257451}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5668026365491967860
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6926876035622983290}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
+  RootBone: {fileID: 4518296367177505238}
+  IsHero: 0
+  Style: 1
+  ExtendAxis: 0
+  GrowDuration: 1.2
+  GrowCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  CurledAngle: 70
+  PerBoneGrowDelay: 1
+  CurlAxisRandomness: 25
+  RiseDistance: 0
+  RiseStartScale: 1
+  JabDuration: 0.1
+  JabDistance: 0.105
+  RetractDuration: 0.1
+  RetractDistance: 0.117
+  BurstDuration: 0.5
+  PunchOvershoot: 1
+  SettleDuration: 3
+  PunchIdleDuringWindup: 0.15
+  IdleActiveThroughoutPunch: 1
+  PunchStraightenTip: 0.4
+  NoiseAmplitudeDegrees: 7
+  NoiseSpeed: 1
+  SineAmplitudeDegrees: 25
+  SineFrequency: 0.5
+  SineSpeed: 0.25
+  JitterAmplitudeDegrees: 12
+  JitterSpeed: 1.5
+  ReachStrength: 0.26
+  ReachSmoothing: 5
+  ReachAimDistance: -0.3
+  MinStrikeDistance: -0.3
+  AimBelowCameraOffset: 3
+  CameraOverride: {fileID: 0}
+  SlimeOverlay: {fileID: 0}
+  ReachByDistance: 1
+  SnapDistance: 5
+  SnapFadeDistance: 3
+  SnapFadeGraceDuration: 0.4
+  AttackRepeatInterval: 2.9
+  AttackTarget: {fileID: 0}
+  UseAttackTarget: 0
+  AttackTargetChance: 0.3
+  AttackTargetRollIntervalMin: 3
+  AttackTargetRollIntervalMax: 6
+  LashDuration: 1
+  LashCoilFraction: 0.281
+  LashStrikeFraction: 0.25
+  LashCoilStrength: 0.326
+  LashOvershoot: 0
+  LashBaseAnchorFraction: 0.25
+  LashBendCurve: 2.45
+  IdleBlendInDuration: 0.5
+  EngagedIdleDamping: 1
+  SweepDuration: 1.2
+  SweepHookAngleDegrees: 200
+  SweepStartSide: 2
+  SweepSpeedCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  SweepBendStrength: 0.4
+  SweepVerticalLift: 20
+  SweepExtendAmount: 0.5
+  SweepExtendGirthFraction: 0.2
+  SnapAtCameraOnSettle: 0
+  SnapAtCameraOnSettleShape: 0
+  SnapPeakStrength: 1
+  SnapStretchTipFraction: 0.5
+  SnapMaxStretchMultiplier: 2

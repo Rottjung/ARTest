@@ -46,9 +46,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.FallingRubble
   ChunkCount: 20
   ChunkSize: 0.1
-  Irregularity: 0.45
-  SizeRange: {x: 0.75, y: 2}
-  DepthScaleRange: {x: 0.3, y: 0.6}
+  Irregularity: 0.25
+  SizeRange: {x: 0.25, y: 0.5}
+  DepthScaleRange: {x: 1, y: 2}
   StartRadius: 0.5
   FallDistance: 3.5
   FallDuration: 5
@@ -76,7 +76,7 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  SidewaysDrift: 0.5
+  SidewaysDrift: 1
   PerChunkDelayJitter: 1
   TumbleSpeedRange: {x: 90, y: 260}
   FadeOutFraction: 0.25

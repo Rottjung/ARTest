@@ -258,17 +258,18 @@ namespace ARReveal
         /// <summary>Live progress (consecutive agreeing frames so far) toward CurrentSettleFramesRequired during the current settle attempt (see SettleAndSample) - for on-screen feedback while locking.</summary>
         public int SettleProgress { get; private set; }
 
-        /// <summary>The ACTUAL required-frames target for whichever settle attempt is currently running (SettleFramesRequired normally, or +FirstLockExtraSettleFrames for the very first lock) - overlay should show progress against this, not the bare SettleFramesRequired constant, since the first lock's real target is larger.</summary>
-        public int CurrentSettleFramesRequired { get; private set; } = SettleFramesRequired;
+        /// <summary>The ACTUAL required-frames target for whichever settle attempt is currently running (SettleFramesRequired normally, or +FirstLockExtraSettleFrames for the very first lock) - overlay should show progress against this, not the bare SettleFramesRequired constant, since the first lock's real target is larger. Set in Awake() (not a field initializer - see Awake's own comment for why) since SettleFramesRequired below is no longer a compile-time const.</summary>
+        public int CurrentSettleFramesRequired { get; private set; }
 
-        /// <summary>Required consecutive agreeing frames (both position AND rotation within tolerance of the previous sample) before a reading is trusted enough to seed from - see SettleAndSample. Untested constant - tune from an actual device if locking feels too slow or too twitchy.</summary>
-        public const int SettleFramesRequired = 10;
+        [Header("Settle precision - directly Inspector-tunable per direct request (used to be hardcoded const, needed a code change every time)")]
+        [Tooltip("Required consecutive agreeing frames (both position AND rotation within tolerance of the previous sample) before a reading is trusted enough to seed from - see SettleAndSample. Higher = more precise/stable lock, but takes longer to converge (and times out to a looser last-sample more often - see SettleTimeoutFrames, still a const below). Untested-on-device default - tune directly here.")]
+        public int SettleFramesRequired = 10;
 
-        /// <summary>Position tolerance (meters) between consecutive samples to count as "agreeing" - see SettleAndSample. Same untested-constant caveat as SettleFramesRequired.</summary>
-        public const float SettlePositionTolerance = 0.12f;
+        [Tooltip("Position tolerance (meters) between consecutive samples to count as 'agreeing' - see SettleAndSample. Tighter (smaller) = a more precise starting anchor (everything downstream, including tracking through a big tilt, inherits this lock's own error), at the cost of needing steadier hands / more time to converge.")]
+        public float SettlePositionTolerance = 0.12f;
 
-        /// <summary>Rotation tolerance (degrees) between consecutive samples to count as "agreeing" - see SettleAndSample. Same untested-constant caveat as SettleFramesRequired.</summary>
-        public const float SettleRotationToleranceDegrees = 3f;
+        [Tooltip("Rotation tolerance (degrees) between consecutive samples to count as 'agreeing' - see SettleAndSample. Same precision/convergence-time tradeoff as SettlePositionTolerance above.")]
+        public float SettleRotationToleranceDegrees = 3f;
 
         /// <summary>Closest plausible camera-to-QR distance (meters) for a settle sample to be trusted at all - see SettleAndSample's own "DISTANCE SANITY CHECK" comment. Generous on purpose (a few centimeters would mean the QR is essentially against the lens) - this exists to catch a genuinely degenerate reading, not to enforce a specific scanning distance.</summary>
         public const float MinPlausibleDistanceMeters = 0.05f;
@@ -365,6 +366,18 @@ namespace ARReveal
 
         private void Awake()
         {
+            // Was a field initializer (`= SettleFramesRequired`) back when
+            // SettleFramesRequired was a compile-time const - now that it's
+            // an ordinary Inspector-tunable field (see its own doc comment),
+            // a field/property initializer referencing it would run BEFORE
+            // SettleFramesRequired's own initializer in declaration order,
+            // reading its default value (0) instead of whatever's actually
+            // set in the Inspector. Setting it explicitly here instead, at
+            // the top of Awake() - after every field has its real
+            // (Inspector-overridden or default) value - sidesteps that
+            // entirely, regardless of declaration order.
+            CurrentSettleFramesRequired = SettleFramesRequired;
+
             if (ContentWrapper == null) return;
             ContentWrapper.gameObject.SetActive(false);
             // Explicit, not just relied on via ContentWrapper's own cascading

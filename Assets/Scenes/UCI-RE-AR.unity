@@ -436,7 +436,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6772653853974744061, guid: 416ef06f1d9cb984e856ce41e6fb7573, type: 3}
       propertyPath: SettleDuration
-      value: 26
+      value: 24
       objectReference: {fileID: 0}
     - target: {fileID: 6772653853974744061, guid: 416ef06f1d9cb984e856ce41e6fb7573, type: 3}
       propertyPath: OnHeroGrowStart.m_PersistentCalls.m_Calls.Array.size

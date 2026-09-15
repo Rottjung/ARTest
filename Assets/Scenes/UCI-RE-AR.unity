@@ -364,6 +364,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &317438935 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3863022231102473612, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &320823049
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -564,6 +569,11 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 6097855134772589512, guid: 416ef06f1d9cb984e856ce41e6fb7573, type: 3}
   m_PrefabInstance: {fileID: 433030931}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &456318880 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6045698916838234989, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
   m_PrefabAsset: {fileID: 0}
 --- !u!1 &468690108
 GameObject:
@@ -1055,6 +1065,11 @@ Transform:
   - {fileID: 1106795034}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &634744561 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5155438216814641411, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &777038240
 GameObject:
   m_ObjectHideFlags: 0
@@ -2003,10 +2018,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 3863022231102473612, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4597595391347692509, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 11.49497
@@ -2055,6 +2066,22 @@ PrefabInstance:
       propertyPath: Preloader
       value: 
       objectReference: {fileID: 404304985}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: QrFrameOverride
+      value: 
+      objectReference: {fileID: 634744561}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: ReadyImageSprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 4d200fd8bbc1b620134551535e0b89fc, type: 3}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: Page1GroupOverride
+      value: 
+      objectReference: {fileID: 317438935}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: ReadyImageOverride
+      value: 
+      objectReference: {fileID: 456318880}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

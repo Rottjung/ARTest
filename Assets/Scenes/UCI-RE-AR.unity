@@ -1866,7 +1866,7 @@ PrefabInstance:
       objectReference: {fileID: 404304985}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: Page2DelaySeconds
-      value: 30
+      value: 34
       objectReference: {fileID: 0}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: RescanButtonOverride

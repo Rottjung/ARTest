@@ -431,7 +431,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6772653853974744061, guid: 416ef06f1d9cb984e856ce41e6fb7573, type: 3}
       propertyPath: SettleDuration
-      value: 24
+      value: 22.5
       objectReference: {fileID: 0}
     - target: {fileID: 6772653853974744061, guid: 416ef06f1d9cb984e856ce41e6fb7573, type: 3}
       propertyPath: OnHeroGrowStart.m_PersistentCalls.m_Calls.Array.size
@@ -1700,6 +1700,10 @@ PrefabInstance:
       propertyPath: Preloader
       value: 
       objectReference: {fileID: 404304985}
+    - target: {fileID: 7601960049389696683, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 59.56006
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

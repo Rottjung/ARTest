@@ -87,6 +87,13 @@ namespace ARReveal
     /// for the same reason - EVERY OTHER screen's text in this class is a
     /// pre-rendered PNG per this project's own convention, swap these two
     /// Text components for Image components once real assets exist.
+    /// SetCalibrationMessage only ever auto-writes hardcoded wording
+    /// ("CALIBRATING...", "Scan the QR to calibrate", "READY!", etc.) to
+    /// whichever of InstructionText/CalibratingText has its OWN
+    /// InstructionTextOverride/CalibratingTextOverride field left empty -
+    /// per direct request, dragging a specific Text object into either
+    /// override field means "hand off control of this label's wording
+    /// entirely," so it's never touched/overwritten after that.
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
@@ -403,11 +410,23 @@ namespace ARReveal
             SetActiveIfNotNull(_rescanButton, !page0Visible && _screen == UiScreen.None);
         }
 
-        /// <summary>Sets the calibration screen's two placeholder text labels - pass null for either to leave it as-is (e.g. the instruction line doesn't need to change for the READY state).</summary>
+        /// <summary>
+        /// Sets the calibration screen's two placeholder text labels - pass
+        /// null for either to leave it as-is (e.g. the instruction line
+        /// doesn't need to change for the READY state). ONLY writes to a
+        /// label whose own *TextOverride field was left empty - per direct
+        /// request, dragging a specific Text object into
+        /// InstructionTextOverride/CalibratingTextOverride means "I'm
+        /// hand-authoring this label myself" (custom wording, a real
+        /// translation, different styling split across runs, etc.), so this
+        /// must never overwrite it. Auto-writing the hardcoded default
+        /// strings only happens for the plain procedurally-built/by-name-found
+        /// case (no override given), same as before.
+        /// </summary>
         private void SetCalibrationMessage(string instruction, string calibrating)
         {
-            if (instruction != null && _instructionText != null) _instructionText.text = instruction;
-            if (calibrating != null && _calibratingText != null) _calibratingText.text = calibrating;
+            if (instruction != null && _instructionText != null && InstructionTextOverride == null) _instructionText.text = instruction;
+            if (calibrating != null && _calibratingText != null && CalibratingTextOverride == null) _calibratingText.text = calibrating;
         }
 
         private void LateUpdate()

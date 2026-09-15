@@ -35,14 +35,29 @@ namespace ARReveal
     ///    both lines in one image) + RESTART and FOTO buttons.
     ///  - SHARE PROMPT / "the selfie screen" (shown after tapping FOTO -
     ///    Foto() is PURE NAVIGATION, it does not capture anything itself):
-    ///    "share your photo, win tickets" text + the round record button,
-    ///    the ONE real "take the photo" action (RetakePhoto - can be tapped
-    ///    more than once to retake) + TEILEN (share) button. An earlier
-    ///    version had FOTO itself capture + immediately open the save/share
-    ///    dialog, skipping this screen entirely - corrected per direct
-    ///    feedback ("that not the design... foto button make you go to the
-    ///    selfie screen... clicking the red button should make a native
+    ///    "share your photo, win tickets" text + FotoMode/VideoMode buttons
+    ///    (SelectPhotoMode/SelectVideoMode - decide what the round record
+    ///    button captures) + the round record button, the ONE real "take
+    ///    the photo" action (RetakePhoto - can be tapped more than once to
+    ///    retake/recapture) + TEILEN (share) button. An earlier version had
+    ///    FOTO itself capture + immediately open the save/share dialog,
+    ///    skipping this screen entirely - corrected per direct feedback
+    ///    ("that not the design... foto button make you go to the selfie
+    ///    screen... clicking the red button should make a native
     ///    screenshot").
+    ///
+    ///    RetakePhoto no longer shares immediately either, per a LATER
+    ///    direct request ("client wants the video or foto shown first, and
+    ///    if we click teilen we go to the native share") - it captures and
+    ///    shows a full-screen PREVIEW instead (ShowPhotoPreview/
+    ///    PhotoPreview), leaving Teilen as the actual "share this now"
+    ///    trigger - Teilen already called ShareLastPhoto before (as a
+    ///    secondary "re-share if the dialog was dismissed" convenience),
+    ///    now promoted to the primary one. VIDEO capture itself is a
+    ///    placeholder for now (see RetakePhoto's own doc comment) - Unity
+    ///    WebGL has no built-in video encoder, so it needs new
+    ///    MediaRecorder/canvas.captureStream()-based .jslib work, a
+    ///    separate, larger piece of work than the mode-picker UI itself.
     ///
     /// A third "Distance Alert" screen (warning the viewer to step back) was
     /// tried and then removed entirely per direct request - see git history
@@ -165,6 +180,9 @@ namespace ARReveal
         public Sprite RecordButtonSprite;
         [Tooltip("Shown on the calibration screen once content is ready (see Update()) - only used by the procedural BuildPage0() path (a fresh build with no existing hand-tuned canvas); the hand-tuned Share.prefab has its own 'Ready' image placed directly, found by name (see AttachToExistingUI). Left blank here just means nothing shows in the Ready image's place for a freshly-built UI - CalibratingText's own 'READY!' wording still works regardless.")]
         public Sprite ReadyImageSprite;
+        [Tooltip("The Foto/Video mode-select buttons on the Share Prompt screen (see SelectPhotoMode/SelectVideoMode) - only used by the procedural BuildPage3() path; the hand-tuned Share.prefab has its own FotoMode/VideoMode buttons placed directly, found by name.")]
+        public Sprite FotoModeSprite;
+        public Sprite VideoModeSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
@@ -176,6 +194,9 @@ namespace ARReveal
         public Button FotoButtonOverride;
         public Button RecordButtonOverride;
         public Button TeilenButtonOverride;
+        [Tooltip("The Foto/Video mode-select buttons on the Share Prompt screen (see SelectPhotoMode/SelectVideoMode) - override the by-name lookups (Page3_SharePrompt/FotoMode and .../VideoMode).")]
+        public Button FotoModeButtonOverride;
+        public Button VideoModeButtonOverride;
         [Tooltip("The bottom-center Rescan button (see BuildRescanButton/Rescan) - drag it in directly if hand-tuning its position/sprite, or leave blank to find it by name (RescanButton) under the canvas root.")]
         public Button RescanButtonOverride;
         [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
@@ -222,7 +243,13 @@ namespace ARReveal
         private Text _calibratingText;
         private GameObject _qrFrame;
         private GameObject _readyImage;
+        private Image _fotoModeImage;
+        private Image _videoModeImage;
+        private Image _photoPreviewImage;
         private ZapparCamera _zapparCamera;
+
+        private enum CaptureMode { Photo, Video }
+        private CaptureMode _captureMode = CaptureMode.Photo;
 
         /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
         private Canvas _canvas;
@@ -288,6 +315,12 @@ namespace ARReveal
             _readyImage = ReadyImageOverride != null ? ReadyImageOverride : (readyImageTransform != null ? readyImageTransform.gameObject : null);
             _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
 
+            var fotoModeTransform = FotoModeButtonOverride != null ? FotoModeButtonOverride.transform : canvasRoot.Find("Page3_SharePrompt/FotoMode");
+            _fotoModeImage = fotoModeTransform != null ? fotoModeTransform.GetComponent<Image>() : null;
+            var videoModeTransform = VideoModeButtonOverride != null ? VideoModeButtonOverride.transform : canvasRoot.Find("Page3_SharePrompt/VideoMode");
+            _videoModeImage = videoModeTransform != null ? videoModeTransform.GetComponent<Image>() : null;
+            if (_page3Group != null) EnsurePhotoPreview(_page3Group.transform);
+
             // Checks Page1_Experience first - the button's own natural home
             // now that Page1 shares its exact visibility window (see
             // Update()'s own doc comment) - falling back to the old
@@ -302,6 +335,8 @@ namespace ARReveal
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
+            WireButton(FotoModeButtonOverride, canvasRoot, "Page3_SharePrompt/FotoMode", SelectPhotoMode);
+            WireButton(VideoModeButtonOverride, canvasRoot, "Page3_SharePrompt/VideoMode", SelectVideoMode);
             // rescanButtonComponent is already fully resolved above (override,
             // or found under either possible location) - passed straight
             // through as WireButton's own explicitButton so its internal
@@ -314,6 +349,7 @@ namespace ARReveal
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
             SetActiveIfNotNull(_rescanButton, false);
+            UpdateModeButtonHighlights();
 
             EnsureFlashOverlay(canvasRoot);
         }
@@ -551,6 +587,7 @@ namespace ARReveal
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
             _rescanButton.SetActive(false);
+            UpdateModeButtonHighlights();
 
             EnsureFlashOverlay(canvasGo.transform);
         }
@@ -614,6 +651,46 @@ namespace ARReveal
                 yield return null;
             }
             _flashImage.color = new Color(1f, 1f, 1f, 0f);
+        }
+
+        /// <summary>
+        /// A full-screen Image showing the most recently captured photo -
+        /// per direct request: "the client wants the video or foto to be
+        /// shown first, and if we click teilen we go to the native share."
+        /// Kept as the FIRST sibling under Page3_SharePrompt (opposite of
+        /// CaptureFlash's LAST-sibling convention above) so it renders
+        /// BEHIND the mode buttons/record button/Teilen/text - it's meant
+        /// to visually replace the live camera view once something's been
+        /// captured, not cover up the controls needed to retake or share it.
+        /// Starts hidden (nothing captured yet); ShowPhotoPreview() is what
+        /// actually populates and reveals it after a capture. Safe to call
+        /// repeatedly (e.g. every AttachToExistingUI/BuildPage3) - reuses an
+        /// existing "PhotoPreview" child instead of duplicating it.
+        /// </summary>
+        private void EnsurePhotoPreview(Transform page3Root)
+        {
+            var existing = page3Root.Find("PhotoPreview");
+            GameObject go;
+            if (existing != null)
+            {
+                go = existing.gameObject;
+            }
+            else
+            {
+                go = new GameObject("PhotoPreview");
+                go.transform.SetParent(page3Root, false);
+                var rt = go.AddComponent<RectTransform>();
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                var img = go.AddComponent<Image>();
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+            }
+            go.transform.SetAsFirstSibling();
+            go.SetActive(false);
+            _photoPreviewImage = go.GetComponent<Image>();
         }
 
 #if UNITY_EDITOR
@@ -850,12 +927,33 @@ namespace ARReveal
             var group = new GameObject("Page3_SharePrompt");
             group.transform.SetParent(parent, false);
 
+            // First sibling - see EnsurePhotoPreview's own doc comment for
+            // why it needs to render BEHIND every button/text added below.
+            EnsurePhotoPreview(group.transform);
+
             AddImage(group.transform, Page3TextSprite, new Vector2(0f, 400f), new Vector2(760f, 260f));
+
+            // Foto/Video mode-select buttons - per direct request, choosing
+            // between them decides what the round record button below
+            // actually captures (see SelectPhotoMode/SelectVideoMode/
+            // RetakePhoto). Falls back to a plain generated pill if no
+            // design asset is assigned, same "never breaks, just plainer"
+            // convention as RecordButtonSprite below.
+            var fotoModeSprite = FotoModeSprite != null ? FotoModeSprite : CreateRoundedFillSprite(new Color(1f, 1f, 1f, 0.85f), 220, 90, 20);
+            var fotoModeButton = BuildImageButton(group.transform, "FotoMode", fotoModeSprite,
+                new Vector2(-130f, -250f), new Vector2(220f, 90f), SelectPhotoMode);
+            _fotoModeImage = fotoModeButton.GetComponent<Image>();
+
+            var videoModeSprite = VideoModeSprite != null ? VideoModeSprite : CreateRoundedFillSprite(new Color(1f, 1f, 1f, 0.85f), 220, 90, 20);
+            var videoModeButton = BuildImageButton(group.transform, "VideoMode", videoModeSprite,
+                new Vector2(130f, -250f), new Vector2(220f, 90f), SelectVideoMode);
+            _videoModeImage = videoModeButton.GetComponent<Image>();
 
             // Uses RecordButtonSprite (RecButton.png) if assigned; falls back
             // to a plain generated red circle otherwise so this never breaks
-            // if that field is left blank. Tapping it retakes the photo
-            // without leaving this screen.
+            // if that field is left blank. Tapping it captures per whichever
+            // mode is currently selected above (can be tapped more than once
+            // to retake/recapture - see RetakePhoto's own doc comment).
             var recordSprite = RecordButtonSprite != null ? RecordButtonSprite : CreateCircleSprite(new Color(0.85f, 0.1f, 0.1f, 1f), 128);
             BuildImageButton(group.transform, "RecordButton", recordSprite,
                 new Vector2(0f, 0f), new Vector2(140f, 140f), RetakePhoto);
@@ -1127,38 +1225,92 @@ namespace ARReveal
         /// here, skipping that screen entirely - wrong per the actual design,
         /// where FOTO is purely a navigation step and the round record
         /// button (RetakePhoto) is the one real "take the photo" action.
+        /// Resets to Photo mode and hides any stale preview from a previous
+        /// visit, per direct request - a fresh visit to this screen should
+        /// always start from the same predictable state (mode picker up,
+        /// nothing captured yet), not wherever the LAST visit left off.
         /// </summary>
         public void Foto()
         {
             _screen = UiScreen.SharePrompt;
+            SetCaptureMode(CaptureMode.Photo);
+            SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
+        }
+
+        /// <summary>Wired to the FotoMode/VideoMode buttons on the Share Prompt screen - see RetakePhoto/UpdateModeButtonHighlights.</summary>
+        public void SelectPhotoMode() => SetCaptureMode(CaptureMode.Photo);
+        public void SelectVideoMode() => SetCaptureMode(CaptureMode.Video);
+
+        private void SetCaptureMode(CaptureMode mode)
+        {
+            _captureMode = mode;
+            UpdateModeButtonHighlights();
+        }
+
+        /// <summary>Dims whichever of FotoMode/VideoMode ISN'T currently selected, so it's visually obvious which one the round record button below will act on - a plain alpha tint rather than needing two separate "selected/unselected" sprite assets per button.</summary>
+        private void UpdateModeButtonHighlights()
+        {
+            const float selectedAlpha = 1f;
+            const float unselectedAlpha = 0.45f;
+            if (_fotoModeImage != null) SetImageAlpha(_fotoModeImage, _captureMode == CaptureMode.Photo ? selectedAlpha : unselectedAlpha);
+            if (_videoModeImage != null) SetImageAlpha(_videoModeImage, _captureMode == CaptureMode.Video ? selectedAlpha : unselectedAlpha);
+        }
+
+        private static void SetImageAlpha(Image image, float alpha)
+        {
+            var c = image.color;
+            c.a = alpha;
+            image.color = c;
         }
 
         /// <summary>
         /// The round record button on the Share Prompt screen - THE actual
-        /// "take the photo" action (can be tapped more than once to retake,
-        /// in case the first one didn't land right). Captures the composited
-        /// AR view (our own code - see CapturePhotoBytes, NOT Zappar's
-        /// ZSaveNShare package), then calls straight into the phone's real
-        /// native OS share sheet (see ShareLastPhoto/ARReveal_ShareImage) -
-        /// no custom Save/Share/Close overlay of Zappar's own in between at
-        /// all, per direct request ("skip zappars ui and go native os").
+        /// "take the photo" action, for whichever of Photo/Video mode is
+        /// currently selected (see SelectPhotoMode/SelectVideoMode above).
+        /// Can be tapped more than once to retake/recapture, in case the
+        /// first one didn't land right - just re-runs the same routine,
+        /// overwriting whatever was captured before.
         ///
-        /// The whole Canvas is switched off for the capture itself (see
-        /// RetakePhotoRoutine) so none of our own buttons/text end up baked
-        /// into the photo - per direct request, the saved image should be a
-        /// clean AR view only. The flash then fires AFTER capture completes
-        /// (and after the UI is back on), not before/during - firing it
-        /// first (an earlier version's bug) meant a captured screenshot
-        /// included the flash overlay ITSELF, coming out an almost-all-white
-        /// photo. Capturing on a clean, UI-free frame first, then restoring
-        /// the UI and flashing, guarantees neither can ever contaminate what
-        /// actually gets shared.
+        /// Per direct request, this no longer jumps straight to the native
+        /// share sheet - it just captures and shows a PREVIEW (see
+        /// ShowPhotoPreview), leaving Teilen as the actual "now share this"
+        /// action (see Teilen's own doc comment for why that's a clean,
+        /// small change rather than a restructure - ShareLastPhoto/
+        /// ARReveal_ShareImage, the actual native-share plumbing, is
+        /// completely unchanged).
+        ///
+        /// VIDEO capture is NOT implemented yet - a real feature on its own
+        /// (Unity WebGL has no built-in video encoder; capturing a video
+        /// means bridging to the browser's own MediaRecorder/
+        /// canvas.captureStream() APIs via new custom .jslib code, which
+        /// doesn't exist in this project yet). Selecting Video mode and
+        /// tapping record currently just logs a warning and does nothing -
+        /// intentional placeholder, not a bug, until that's built.
         /// </summary>
         public void RetakePhoto()
         {
+            if (_captureMode == CaptureMode.Video)
+            {
+                Debug.LogWarning("[ARShareController] Video capture isn't implemented yet - see RetakePhoto's own doc comment. Switch to Foto mode to actually capture something.");
+                return;
+            }
             StartCoroutine(RetakePhotoRoutine());
         }
 
+        /// <summary>
+        /// The whole Canvas is switched off for the capture itself so none
+        /// of our own buttons/text end up baked into the photo - per direct
+        /// request, the saved/shared image should be a clean AR view only.
+        /// The flash then fires AFTER capture completes (and after the UI
+        /// is back on), not before/during - firing it first (an earlier
+        /// version's bug) meant a captured screenshot included the flash
+        /// overlay ITSELF, coming out an almost-all-white photo. Capturing
+        /// on a clean, UI-free frame first, then restoring the UI and
+        /// flashing, guarantees neither can ever contaminate what actually
+        /// gets shown/shared. Ends by showing the preview (ShowPhotoPreview)
+        /// rather than sharing immediately - see RetakePhoto's own doc
+        /// comment for why.
+        /// </summary>
         private IEnumerator RetakePhotoRoutine()
         {
             if (_canvas != null) _canvas.enabled = false;
@@ -1171,14 +1323,40 @@ namespace ARReveal
             CapturePhotoBytes();
             if (_canvas != null) _canvas.enabled = true;
             PlayCaptureFlash();
-            ShareLastPhoto();
+            ShowPhotoPreview();
         }
 
         /// <summary>
         /// The most recently captured photo's raw JPEG bytes - kept around
-        /// so Teilen can re-share the same photo without recapturing.
+        /// so Teilen can share (or re-share) the same photo without
+        /// recapturing.
         /// </summary>
         private byte[] _lastPhotoBytes;
+
+        /// <summary>Whatever Sprite/Texture2D ShowPhotoPreview last created - torn down before making a new one so retaking repeatedly doesn't leak a fresh Texture2D/Sprite pair on every tap.</summary>
+        private Texture2D _previewTexture;
+
+        /// <summary>
+        /// Populates PhotoPreview (see EnsurePhotoPreview) with the just-
+        /// captured JPEG and reveals it - per direct request, the client
+        /// wants the photo shown first, with Teilen as the actual "share
+        /// this" action (RetakePhoto can still be tapped again to retake,
+        /// which simply calls this again and replaces what's shown).
+        /// </summary>
+        private void ShowPhotoPreview()
+        {
+            if (_photoPreviewImage == null || _lastPhotoBytes == null) return;
+
+            if (_previewTexture != null) Destroy(_previewTexture);
+            _previewTexture = new Texture2D(2, 2);
+            _previewTexture.LoadImage(_lastPhotoBytes);
+
+            if (_photoPreviewImage.sprite != null) Destroy(_photoPreviewImage.sprite);
+            _photoPreviewImage.sprite = Sprite.Create(_previewTexture,
+                new Rect(0f, 0f, _previewTexture.width, _previewTexture.height), new Vector2(0.5f, 0.5f));
+
+            _photoPreviewImage.gameObject.SetActive(true);
+        }
 
         /// <summary>
         /// Reads the current frame straight off the screen and encodes it to
@@ -1221,7 +1399,18 @@ namespace ARReveal
 #endif
         }
 
-        /// <summary>Re-shares whichever photo was most recently captured, without taking a new one - useful if the native share sheet from Foto/RetakePhoto was dismissed by mistake.</summary>
+        /// <summary>
+        /// THE "share this now" action, per direct request: RetakePhoto no
+        /// longer shares automatically (it just captures and shows a
+        /// preview - see ShowPhotoPreview), so this is what actually opens
+        /// the native OS share sheet for whatever's currently shown in that
+        /// preview. Nothing about ShareLastPhoto/ARReveal_ShareImage
+        /// themselves changed - Teilen already called this exact method
+        /// before, just as a secondary "re-share if the dialog was
+        /// dismissed by mistake" convenience; it's simply promoted to the
+        /// primary trigger now that capture and share are two separate
+        /// steps instead of one.
+        /// </summary>
         public void Teilen()
         {
             ShareLastPhoto();

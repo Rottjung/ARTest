@@ -1286,7 +1286,10 @@ namespace ARReveal
             if (pair.Tentacle != null) { pair.Tentacle.enabled = true; pair.Tentacle.Grow(); }
             // Smoke and falling rubble read as the moment of impact, so they fire
             // alongside the hole/tentacle rather than waiting like the static debris
-            // ring below.
+            // ring below. (A per-pair post-delay was tried here and reverted per
+            // direct feedback - the actual reported lag was a genuine bug, not a
+            // timing/choreography choice - see SmokePuff.Configure()'s own
+            // main.startDelay fix.)
             if (smoke != null) { smoke.enabled = true; smoke.Open(); }
             if (rubble != null) { rubble.enabled = true; rubble.Open(); }
 

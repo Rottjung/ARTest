@@ -20,6 +20,18 @@ namespace ARReveal.EditorTools
             DrawDefaultInspector();
 
             EditorGUILayout.Space();
+            if (GUILayout.Button("Reconfigure Now", GUILayout.Height(24)))
+            {
+                var smoke = (SmokePuff)target;
+                Undo.RecordObject(smoke.GetComponent<ParticleSystem>(), "Reconfigure Now");
+                smoke.ForceReconfigure();
+                EditorUtility.SetDirty(smoke.GetComponent<ParticleSystem>());
+            }
+            EditorGUILayout.HelpBox(
+                "Applies the fields above to the ParticleSystem right now, in Edit Mode - no need to enter Play mode to preview a field change (this is exactly what Awake() runs automatically when AutoConfigure is on, just callable on demand). Use the ParticleSystem's own Play button below to preview after clicking this.",
+                MessageType.None);
+
+            EditorGUILayout.Space();
             if (GUILayout.Button("Copy From Particle", GUILayout.Height(28)))
             {
                 var smoke = (SmokePuff)target;

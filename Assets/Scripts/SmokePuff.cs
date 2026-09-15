@@ -21,26 +21,29 @@ namespace ARReveal
     public class SmokePuff : MonoBehaviour
     {
         [Header("Burst")]
-        public int ParticleCount = 18;
-        public float EmitDuration = 0.4f;
+        [Tooltip("Denser than the original soft-puff defaults, per direct request for a punchier 'the hole spits out debris dust' look rather than a gentle billow.")]
+        public int ParticleCount = 26;
+        public float EmitDuration = 0.25f;
 
         [Header("Look")]
         public Material ParticleMaterial;
         public Color StartColor = new Color(0.55f, 0.53f, 0.5f, 0.55f);
         [Range(0f, 0.5f)] public float ColorJitter = 0.1f;
-        public Vector2 StartSizeRange = new Vector2(0.15f, 0.35f);
-        public Vector2 LifetimeRange = new Vector2(1.2f, 2f);
+        public Vector2 StartSizeRange = new Vector2(0.18f, 0.4f);
+        [Tooltip("Shortened from the original soft-puff defaults (1.2-2s) - a sharp burst that's mostly gone within a second or so reads as an ejection, not a lingering drift.")]
+        public Vector2 LifetimeRange = new Vector2(0.7f, 1.3f);
 
         [Header("Motion")]
-        [Tooltip("Initial outward speed range, along the emission cone.")]
-        public Vector2 StartSpeedRange = new Vector2(0.2f, 0.6f);
-        [Tooltip("Half-angle (degrees) of the emission cone - wider reads as more of a puff, narrower as more of a jet.")]
-        [Range(0f, 90f)] public float ConeAngle = 35f;
+        [Tooltip("Initial outward speed range, along the emission cone - raised sharply from the original soft-puff defaults (0.2-0.6, which read as a gentle drift) per direct request: 'an ejaculation of smoke bursting in the direction the tentacle breaks through, like the hole spits out debris dust.'")]
+        public Vector2 StartSpeedRange = new Vector2(2.5f, 4.5f);
+        [Tooltip("Half-angle (degrees) of the emission cone - wider reads as more of a puff, narrower as more of a jet. Narrowed from the original 35 degrees so the burst reads as shooting out in ONE direction (the tentacle's own breach direction, along this object's local +Z - orient the GameObject itself if that's wrong) rather than dispersing outward as a wide dome.")]
+        [Range(0f, 90f)] public float ConeAngle = 14f;
         [Tooltip("Radius of the cone's base - how spread out across the breach the puffs start from, not how far they travel.")]
-        public float ConeRadius = 0.05f;
-        public float RiseSpeed = 0.3f;
-        [Tooltip("Higher slows particles down faster as they age, reading as smoke losing momentum and dispersing rather than flying off in a straight line.")]
-        public float Drag = 1.2f;
+        public float ConeRadius = 0.04f;
+        [Tooltip("Lowered from the original soft-puff default (0.3) - a fast directional ejection shouldn't also lazily float upward like campfire smoke; it should read as debris dust that was shot out and is now falling/scattering under its own drag.")]
+        public float RiseSpeed = 0.05f;
+        [Tooltip("Higher slows particles down faster as they age, reading as smoke losing momentum and dispersing rather than flying off in a straight line. Raised from the original 1.2 to sell the 'burst' - the high StartSpeedRange above needs strong drag right after to read as a sharp ejection that quickly loses momentum, rather than dust flying an unrealistically long distance at that speed.")]
+        public float Drag = 3.5f;
 
         [Header("Overall size")]
         [Tooltip("Uniform scale of this GameObject - sizes the whole effect up or down (particle sizes/speeds/distances all scale with it, since the Particle System's Scaling Mode is Local). Source of truth for the Transform's scale - Configure() applies this every Awake(), so scaling the object by hand only sticks if it's copied back in here (Copy From Particle does this too).")]
@@ -83,6 +86,15 @@ namespace ARReveal
 
             if (!AutoConfigure && _ps.main.playOnAwake)
                 Debug.LogWarning("[SmokePuff] '" + name + "' has AutoConfigure off AND Play On Awake still checked on its ParticleSystem - the Stop() safety net above prevents it bursting early, but consider unchecking Play On Awake directly on the ParticleSystem too, since it serves no purpose here (Open() always drives playback).", this);
+
+            // Same reasoning as the Play On Awake check above - with
+            // AutoConfigure off, Configure()'s own main.startDelay = 0f fix
+            // never runs, so a nonzero Start Delay left on the Main module
+            // (from hand-tuning, or just easy to miss) silently makes Open()
+            // visually do nothing until it elapses - the exact "smoke starts
+            // a second late" bug reported on-site.
+            if (!AutoConfigure && _ps.main.startDelay.constantMax > 0f)
+                Debug.LogWarning("[SmokePuff] '" + name + "' has AutoConfigure off AND a nonzero Start Delay on its ParticleSystem's Main module - Open() fires on time, but nothing will actually appear until that delay elapses. Set Start Delay to 0 directly on the ParticleSystem (Open() should be the only thing controlling when this puff starts).", this);
         }
 
         private void Start()
@@ -109,6 +121,16 @@ namespace ARReveal
             var main = _ps.main;
             main.loop = false;
             main.playOnAwake = false;
+            // Explicitly zeroed - Configure() never used to touch this at all,
+            // so whatever Start Delay was already sitting on the Main module
+            // (left over from hand-tuning, or just never noticed since it's
+            // easy to miss/scroll past) silently persisted and made Open()'s
+            // _ps.Play() call visually do nothing for however long that delay
+            // was - reading exactly as "the smoke starts a second late," per
+            // direct report, even though Open() itself fires at the correct
+            // instant. Open() is the only thing that should ever decide when
+            // this puff actually starts.
+            main.startDelay = 0f;
             main.scalingMode = ParticleSystemScalingMode.Local;
             main.duration = Mathf.Max(0.1f, EmitDuration);
             main.startLifetime = new ParticleSystem.MinMaxCurve(LifetimeRange.x, LifetimeRange.y);
@@ -153,6 +175,18 @@ namespace ARReveal
 
             var renderer = GetComponent<ParticleSystemRenderer>();
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            // Render Mode alone ("Billboard" vs Mesh/Stretched/etc.) does NOT
+            // guarantee particles actually face the camera - that's a SEPARATE
+            // setting, Render Alignment (View/World/Local/Facing/Velocity),
+            // which Configure() never used to touch at all. Left at whatever
+            // the ParticleSystemRenderer happened to default/carry over to
+            // (World or Local, if this component was ever copy-pasted from
+            // another particle system, or just Unity's own factory default),
+            // Billboard mode still orients the quad relative to THAT space
+            // instead of the camera - reading as "doesn't billboard" even
+            // though Render Mode itself is correctly set to Billboard. View is
+            // the one alignment that means "always face the camera."
+            renderer.alignment = ParticleSystemRenderSpace.View;
             renderer.sharedMaterial = ParticleMaterial != null ? ParticleMaterial : GetOrBuildDefaultMaterial();
         }
 
@@ -228,6 +262,21 @@ namespace ARReveal
         {
             _fired = false;
             _ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+
+        /// <summary>
+        /// Runs Configure() directly, regardless of AutoConfigure or whether
+        /// Awake() has ever run - lets SmokePuffEditor's "Reconfigure Now"
+        /// button preview field changes live in EDIT MODE, without needing to
+        /// enter Play mode (which is when Configure() normally runs, via
+        /// Awake()) for every single tuning iteration. Editor-preview
+        /// convenience only - nothing at runtime calls this directly (Awake()
+        /// still owns the real AutoConfigure gate).
+        /// </summary>
+        public void ForceReconfigure()
+        {
+            if (_ps == null) _ps = GetComponent<ParticleSystem>();
+            Configure();
         }
     }
 }

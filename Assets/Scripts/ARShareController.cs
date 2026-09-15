@@ -20,6 +20,14 @@ namespace ARReveal
     /// needed at all, just positioned Image components); the calibration screen
     /// below is the one exception, see its own doc paragraph for why:
     ///
+    ///  - EXPERIENCE (Page1_Experience, per direct request): active for the
+    ///    whole stretch between the calibration screen's fade-out finishing
+    ///    and the Call To Action screen appearing (Page2DelaySeconds later) -
+    ///    see Update()'s own "Page1_Experience" comment for the exact window.
+    ///    Content/layout is whatever's placed directly in the prefab; this
+    ///    class only owns its show/hide timing. The Rescan button typically
+    ///    lives as a child of this page (see AttachToExistingUI/Rescan()'s
+    ///    own doc comments) since they share the identical visibility window.
     ///  - CALL TO ACTION (shown Page2DelaySeconds after tracking locks): logo +
     ///    "Heute: dieses Kino... die ganze Welt" two-line text (split into
     ///    Page_02_Text_Top.png/Page_02_Text_Bottom.png so the logo can sit
@@ -160,6 +168,8 @@ namespace ARReveal
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
+        [Tooltip("Shown once the calibration screen (Page0) has fully finished its fade-out, and hidden again the instant the Call To Action screen (Page2) appears - see Update(). Overrides the by-name lookup (Page1_Experience).")]
+        public GameObject Page1GroupOverride;
         public GameObject Page2GroupOverride;
         public GameObject Page3GroupOverride;
         public Button RestartButtonOverride;
@@ -199,6 +209,7 @@ namespace ARReveal
         private UiScreen _screen = UiScreen.None;
 
         private GameObject _page0Group;
+        private GameObject _page1Group;
         private GameObject _page2Group;
         private GameObject _page3Group;
         private GameObject _rescanButton;
@@ -259,6 +270,7 @@ namespace ARReveal
         {
             _canvas = canvasRoot.GetComponent<Canvas>();
             _page0Group = Page0GroupOverride != null ? Page0GroupOverride : FindChild(canvasRoot, "Page0_Calibration");
+            _page1Group = Page1GroupOverride != null ? Page1GroupOverride : FindChild(canvasRoot, "Page1_Experience");
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
             var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
@@ -276,16 +288,29 @@ namespace ARReveal
             _readyImage = ReadyImageOverride != null ? ReadyImageOverride : (readyImageTransform != null ? readyImageTransform.gameObject : null);
             _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
 
-            var rescanTransform = RescanButtonOverride != null ? RescanButtonOverride.transform : canvasRoot.Find("RescanButton");
+            // Checks Page1_Experience first - the button's own natural home
+            // now that Page1 shares its exact visibility window (see
+            // Update()'s own doc comment) - falling back to the old
+            // root-level spot for a canvas that hasn't had it moved yet.
+            var rescanTransform = RescanButtonOverride != null ? RescanButtonOverride.transform
+                : (canvasRoot.Find("Page1_Experience/RescanButton") ?? canvasRoot.Find("RescanButton"));
             _rescanButton = rescanTransform != null ? rescanTransform.gameObject : null;
+            var rescanButtonComponent = RescanButtonOverride != null ? RescanButtonOverride
+                : (rescanTransform != null ? rescanTransform.GetComponent<Button>() : null);
 
             WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
-            WireButton(RescanButtonOverride, canvasRoot, "RescanButton", Rescan);
+            // rescanButtonComponent is already fully resolved above (override,
+            // or found under either possible location) - passed straight
+            // through as WireButton's own explicitButton so its internal
+            // by-name fallback (which only knows the OLD root-level path)
+            // never gets a chance to miss it.
+            WireButton(rescanButtonComponent, canvasRoot, "RescanButton", Rescan);
 
             SetActiveIfNotNull(_page0Group, false);
+            SetActiveIfNotNull(_page1Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
             SetActiveIfNotNull(_rescanButton, false);
@@ -372,6 +397,7 @@ namespace ARReveal
                 bool targetReady = Preloader == null || Preloader.IsReady;
                 SetCalibrationMessage(cameraReady && !targetReady ? "Preparing..." : "Scan the QR to calibrate", "CALIBRATING...");
 
+                SetActiveIfNotNull(_page1Group, false);
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
                 SetActiveIfNotNull(_rescanButton, false);
@@ -439,12 +465,19 @@ namespace ARReveal
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
 
-            // Rescan button (per direct request): "bottom mid, that is there
-            // after the calibrate and only while no other ui page is
-            // active" - i.e. once the calibration screen has fully finished
-            // (including its own fade-out above) AND neither Page2 nor
-            // Page3 is currently showing.
-            SetActiveIfNotNull(_rescanButton, !page0Visible && _screen == UiScreen.None);
+            // Page1_Experience (per direct request) shares this EXACT same
+            // window - active once the calibration screen has fully finished
+            // (including its own fade-out above) and hidden again the
+            // instant Page2 (Call To Action) appears. The Rescan button now
+            // typically lives AS A CHILD of Page1_Experience (per direct
+            // request - "I can add rescan to this page"), so toggling Page1
+            // here already hides/shows it for free; _rescanButton is set
+            // explicitly too regardless, harmless if it's already covered by
+            // Page1's own active state, and still correct on its own if it
+            // ever ends up back at the canvas root instead.
+            bool experienceActive = !page0Visible && _screen == UiScreen.None;
+            SetActiveIfNotNull(_page1Group, experienceActive);
+            SetActiveIfNotNull(_rescanButton, experienceActive);
         }
 
         /// <summary>

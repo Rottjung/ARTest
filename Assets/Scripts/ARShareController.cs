@@ -155,6 +155,8 @@ namespace ARReveal
         public Sprite TeilenButtonSprite;
         [Tooltip("The round record/retake button on the Share Prompt screen. Falls back to a plain generated red circle if left blank.")]
         public Sprite RecordButtonSprite;
+        [Tooltip("Shown on the calibration screen once content is ready (see Update()) - only used by the procedural BuildPage0() path (a fresh build with no existing hand-tuned canvas); the hand-tuned Share.prefab has its own 'Ready' image placed directly, found by name (see AttachToExistingUI). Left blank here just means nothing shows in the Ready image's place for a freshly-built UI - CalibratingText's own 'READY!' wording still works regardless.")]
+        public Sprite ReadyImageSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
@@ -172,6 +174,10 @@ namespace ARReveal
         public Text InstructionTextOverride;
         [Tooltip("Drag the calibration screen's 'CALIBRATING...'/'READY!' Text component here directly - overrides the by-name lookup (Page0_Calibration/CalibratingText).")]
         public Text CalibratingTextOverride;
+        [Tooltip("The QR viewfinder frame on the calibration screen - hidden the instant content is ready (see Update()), alongside InstructionText and the spinner. Overrides the by-name lookup (Page0_Calibration/QRFrame).")]
+        public GameObject QrFrameOverride;
+        [Tooltip("Shown the instant content is ready, replacing the QR frame/instruction text/spinner (see Update()) - CalibratingText stays visible throughout (just its wording changes to READY!). Overrides the by-name lookup (Page0_Calibration/Ready).")]
+        public GameObject ReadyImageOverride;
 
         [Header("Timing / thresholds")]
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
@@ -203,6 +209,8 @@ namespace ARReveal
         private Image _spinnerImage;
         private Text _instructionText;
         private Text _calibratingText;
+        private GameObject _qrFrame;
+        private GameObject _readyImage;
         private ZapparCamera _zapparCamera;
 
         /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
@@ -262,6 +270,10 @@ namespace ARReveal
             var calibratingTransform = canvasRoot.Find("Page0_Calibration/CalibratingText");
             _calibratingText = CalibratingTextOverride != null ? CalibratingTextOverride
                 : calibratingTransform != null ? calibratingTransform.GetComponent<Text>() : null;
+            var qrFrameTransform = canvasRoot.Find("Page0_Calibration/QRFrame");
+            _qrFrame = QrFrameOverride != null ? QrFrameOverride : (qrFrameTransform != null ? qrFrameTransform.gameObject : null);
+            var readyImageTransform = canvasRoot.Find("Page0_Calibration/Ready");
+            _readyImage = ReadyImageOverride != null ? ReadyImageOverride : (readyImageTransform != null ? readyImageTransform.gameObject : null);
             _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
 
             var rescanTransform = RescanButtonOverride != null ? RescanButtonOverride.transform : canvasRoot.Find("RescanButton");
@@ -341,6 +353,17 @@ namespace ARReveal
                 // branch below) now that this screen is showing again.
                 if (_page0CanvasGroup != null) _page0CanvasGroup.alpha = 1f;
 
+                // Always reset back to the CALIBRATING visual state here too -
+                // undoes the READY swap below (frame/instruction/spinner off,
+                // Ready image on) left over from a previous reveal cycle, so
+                // a Rescan() puts back exactly the same screen a first-time
+                // viewer sees, not whatever it looked like at the moment it
+                // last faded out.
+                SetActiveIfNotNull(_qrFrame, true);
+                SetActiveIfNotNull(_instructionText != null ? _instructionText.gameObject : null, true);
+                SetActiveIfNotNull(_spinnerImage != null ? _spinnerImage.gameObject : null, true);
+                SetActiveIfNotNull(_readyImage, false);
+
                 // "Preparing..." instead of "Scan the QR" while the .zpt
                 // itself is still preloading - see TargetPreloader's own
                 // doc comment for the real bug this avoids (scanning before
@@ -373,6 +396,20 @@ namespace ARReveal
             {
                 _contentSpawnedAt = Time.time;
                 SetCalibrationMessage(null, "READY!");
+
+                // Swap the calibrating visuals for the ready ones, per direct
+                // request: instruction text/QR frame/spinner turn off
+                // immediately, the new Ready image turns on immediately -
+                // CalibratingText is the ONE thing that stays up throughout,
+                // just with its wording changed above. All four then hold
+                // together (or fade together, once past ReadyDisplaySeconds
+                // below) as a single readable "you're set, look up" moment,
+                // rather than the QR frame/spinner lingering pointlessly
+                // alongside it.
+                SetActiveIfNotNull(_qrFrame, false);
+                SetActiveIfNotNull(_instructionText != null ? _instructionText.gameObject : null, false);
+                SetActiveIfNotNull(_spinnerImage != null ? _spinnerImage.gameObject : null, false);
+                SetActiveIfNotNull(_readyImage, true);
             }
 
             float readyElapsed = Time.time - _contentSpawnedAt;
@@ -681,9 +718,15 @@ namespace ARReveal
 
             // Rounded-square viewfinder frame - where the QR should be placed.
             // Generated at runtime (see CreateRoundedFrameSprite) - no design
-            // asset for this exists yet.
+            // asset for this exists yet. Named "QRFrame" (not left as the
+            // AddImage default "Image") so the by-name lookup in
+            // AttachToExistingUI/EditorAddCalibrationScreenIfMissing still
+            // finds it consistently, matching the hand-tuned Share.prefab's
+            // own naming.
             var frameSprite = CreateRoundedFrameSprite(new Color(1f, 1f, 1f, 0.9f), 512, 64, 10);
-            AddImage(group.transform, frameSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
+            var frameImage = AddImage(group.transform, frameSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
+            frameImage.gameObject.name = "QRFrame";
+            _qrFrame = frameImage.gameObject;
 
             _instructionText = AddPlaceholderText(group.transform, "InstructionText", "Scan the QR to calibrate",
                 48, new Vector2(0f, 620f), new Vector2(800f, 160f));
@@ -695,6 +738,14 @@ namespace ARReveal
 
             _calibratingText = AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
                 36, new Vector2(0f, -820f), new Vector2(500f, 80f));
+
+            // Shown in place of the three above once content is ready (see
+            // Update()) - starts hidden, matching the "calibrating" baseline
+            // state every other element of this page starts in.
+            var readyImage = AddImage(group.transform, ReadyImageSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
+            readyImage.gameObject.name = "Ready";
+            readyImage.gameObject.SetActive(false);
+            _readyImage = readyImage.gameObject;
 
             _page0CanvasGroup = EnsureCanvasGroup(group);
 

@@ -1073,7 +1073,37 @@ namespace ARReveal
         {
             if (ContentWrapper == null) return;
             ContentWrapper.gameObject.SetActive(true);
+
+            // Safety net for a real-device-observed race: SetActive(true) just
+            // above can, on some frames, let a child's native ParticleSystem
+            // "Play On Awake" (SmokePuff) - or any other Start()/enable-driven
+            // self-trigger - fire the instant it first becomes active, well
+            // before its own pair's staggered delay elapses below (see
+            // TriggerAllBurstPoints/TriggerPairAfterDelay) - exactly the
+            // "smoke puffs from every hole all together at the very start"
+            // symptom seen on-site. Unity calls Awake()/OnEnable() for the
+            // whole newly-activated subtree SYNCHRONOUSLY within the
+            // SetActive(true) call above, before returning control here, so
+            // by this point every child's own Awake() (which sets up _ps
+            // etc.) has already run - explicitly hiding everything again
+            // right here, the exact same call RestartRevealSequence()/
+            // RequestRescan() already rely on, guarantees a clean slate
+            // regardless of what a stray auto-play did in that instant: the
+            // only things a viewer ever actually sees come from this
+            // method's own explicit TriggerAllBurstPoints() below.
+            HideAllEffects();
+
             TriggerAllBurstPoints();
+        }
+
+        /// <summary>Hides every tentacle/hole/debris/smoke/rubble under ContentWrapper - shared by RevealContent() (see its own doc comment for why this runs even on the very first reveal, not just replays), RestartRevealSequence(), and RequestRescan().</summary>
+        private void HideAllEffects()
+        {
+            foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true)) tentacle.Hide();
+            foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true)) hole.Hide();
+            foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true)) debris.Hide();
+            foreach (var smoke in ContentWrapper.GetComponentsInChildren<SmokePuff>(true)) smoke.Hide();
+            foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true)) rubble.Hide();
         }
 
         /// <summary>
@@ -1096,12 +1126,7 @@ namespace ARReveal
         {
             if (ContentWrapper == null || !_handedOff) return;
 
-            foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true)) tentacle.Hide();
-            foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true)) hole.Hide();
-            foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true)) debris.Hide();
-            foreach (var smoke in ContentWrapper.GetComponentsInChildren<SmokePuff>(true)) smoke.Hide();
-            foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true)) rubble.Hide();
-
+            HideAllEffects();
             TriggerAllBurstPoints();
         }
 
@@ -1142,11 +1167,7 @@ namespace ARReveal
         {
             if (ContentWrapper == null || !_handedOff || _pendingReveal) return;
 
-            foreach (var tentacle in ContentWrapper.GetComponentsInChildren<TentacleController>(true)) tentacle.Hide();
-            foreach (var hole in ContentWrapper.GetComponentsInChildren<WallHoleEffect>(true)) hole.Hide();
-            foreach (var debris in ContentWrapper.GetComponentsInChildren<DebrisRing>(true)) debris.Hide();
-            foreach (var smoke in ContentWrapper.GetComponentsInChildren<SmokePuff>(true)) smoke.Hide();
-            foreach (var rubble in ContentWrapper.GetComponentsInChildren<FallingRubble>(true)) rubble.Hide();
+            HideAllEffects();
 
             ContentWrapper.gameObject.SetActive(false);
             if (ContentRoot != null) ContentRoot.gameObject.SetActive(false);

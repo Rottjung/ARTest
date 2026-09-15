@@ -25,10 +25,21 @@ namespace ARReveal.EditorTools
                 var smoke = (SmokePuff)target;
                 Undo.RecordObject(smoke, "Copy From Particle");
                 CopyFromParticle(smoke);
+                // Also turns AutoConfigure off - per direct request: this
+                // button can only round-trip the specific properties it
+                // reads below (see CopyFromParticle), NOT the Color/Size-
+                // Over-Lifetime curves or Velocity-Over-Lifetime X/Z, which
+                // Configure() would otherwise still silently rebuild from
+                // its own fixed logic on the next Awake() even after this
+                // copy. Turning AutoConfigure off guarantees the ParticleSystem
+                // is never touched again, so it stays EXACTLY as tuned -
+                // toggle it back on by hand if this instance should go back
+                // to being auto-configured from the fields instead.
+                smoke.AutoConfigure = false;
                 EditorUtility.SetDirty(smoke);
             }
             EditorGUILayout.HelpBox(
-                "Tune the Particle System component below directly (or live in Play mode), then click this to pull those values back into the fields above.",
+                "Tune the Particle System component below directly (or live in Play mode), then click this to pull the properties it understands back into the fields above, AND turn Auto Configure off - guaranteeing nothing (including properties this button can't read, like the Color/Size-Over-Lifetime curves) gets reset on the next Awake(). Re-check Auto Configure by hand if you want this instance driven from the fields again.",
                 MessageType.Info);
         }
 

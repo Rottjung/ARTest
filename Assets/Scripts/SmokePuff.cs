@@ -50,13 +50,39 @@ namespace ARReveal
         public bool OpenOnStart = false;
         public float OpenOnStartDelay = 0.5f;
 
+        [Tooltip("Whether Awake() rebuilds the ParticleSystem from the fields above at all. ON (default) is right for a fresh, never-tuned SmokePuff - it's what makes this a self-configuring drop-in with no particle asset to hand-author. Once you've hand-tuned the ParticleSystem component directly to a look you like, UNCHECK this - Configure() then never touches the ParticleSystem again, so EVERY module (including ones Copy From Particle can't read back, like the Color/Size-Over-Lifetime curves and Velocity-Over-Lifetime X/Z) stays exactly as authored, in both Edit and Play mode. Copy From Particle still works as a one-time snapshot of the fields it does understand, but doesn't need to be perfectly complete once this is off, since Configure() simply won't run to discard anything.")]
+        public bool AutoConfigure = true;
+
         private ParticleSystem _ps;
         private bool _fired;
 
         private void Awake()
         {
             _ps = GetComponent<ParticleSystem>();
-            Configure();
+            if (AutoConfigure) Configure();
+
+            // Safety net for a real-device-observed race: ParticleSystem's own
+            // native "Play On Awake" is evaluated by Unity against the
+            // GameObject's OWN activation, independently of - and not
+            // reliably ordered against - this script's Awake() (which is what
+            // sets main.playOnAwake=false, but only when AutoConfigure runs
+            // Configure() above). Since every hole's SmokePuff sits inactive
+            // under ContentWrapper until HandoffToInstantTracking reveals it
+            // by flipping ContentWrapper active all at once
+            // (ContentWrapper.gameObject.SetActive(true) in RevealContent()),
+            // a lost race there auto-plays EVERY puff simultaneously the
+            // instant content reveals - well before each burst point's own
+            // staggered Open() call - exactly the "smoke from every hole all
+            // together at the very start" symptom seen on-site. An explicit
+            // Stop+Clear here, unconditionally and regardless of
+            // AutoConfigure, runs synchronously within this same Awake() -
+            // guaranteed to complete before this frame's rendering - so
+            // whichever side of that race actually won, nothing is ever left
+            // playing/visible until a real Open() call.
+            _ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+            if (!AutoConfigure && _ps.main.playOnAwake)
+                Debug.LogWarning("[SmokePuff] '" + name + "' has AutoConfigure off AND Play On Awake still checked on its ParticleSystem - the Stop() safety net above prevents it bursting early, but consider unchecking Play On Awake directly on the ParticleSystem too, since it serves no purpose here (Open() always drives playback).", this);
         }
 
         private void Start()

@@ -66,7 +66,21 @@ namespace ARReveal
             _revealed = true;
 
             SetContentActive(true);
-            if (BurstSequencer != null) BurstSequencer.PlaySequence();
+            if (BurstSequencer != null)
+            {
+                // Safety net for a real-device-observed race, same reasoning
+                // as HandoffToInstantTracking.RevealContent()'s own doc
+                // comment: SetContentActive(true) just above can, on some
+                // frames, let a child's native ParticleSystem "Play On Awake"
+                // (SmokePuff) fire the instant it first becomes active,
+                // before PlaySequence()'s own staggered per-point delays
+                // elapse - ResetAll() (already used by BurstSequencer for a
+                // manual replay) hides everything again right here first, so
+                // the only thing a viewer ever actually sees is
+                // PlaySequence()'s own staggered triggering.
+                BurstSequencer.ResetAll();
+                BurstSequencer.PlaySequence();
+            }
         }
 
         /// <summary>

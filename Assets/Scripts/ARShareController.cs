@@ -79,7 +79,9 @@ namespace ARReveal
     /// that fills in a loop" per direct request - see
     /// SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
     /// bottom. Once content actually spawns, the ring freezes full and the
-    /// label switches to "READY!" - held for ReadyDisplaySeconds, then EASED
+    /// label switches to "BEREIT!" (German, per direct request - matching
+    /// every other label on this screen, was left in English) - held for
+    /// ReadyDisplaySeconds, then EASED
     /// OUT over ReadyFadeOutSeconds (a CanvasGroup fade, not an instant
     /// SetActive(false)) rather than just vanishing - both per direct
     /// on-site feedback that the READY confirmation was disappearing too
@@ -443,7 +445,7 @@ namespace ARReveal
                 return;
             }
 
-            // Content has just spawned - hold a "READY!" confirmation on the
+            // Content has just spawned - hold a "BEREIT!" confirmation on the
             // calibration screen for ReadyDisplaySeconds, then fade it out
             // over ReadyFadeOutSeconds (rather than an instant
             // SetActive(false)), so a viewer looking at their phone gets a
@@ -452,12 +454,15 @@ namespace ARReveal
             // request - both the hold length and the fade were increased/
             // added after on-site feedback that the original version
             // disappeared too fast for most viewers to actually see).
+            // German wording ("BEREIT!", not "READY!") per direct request -
+            // this whole screen is German-only text throughout, this was
+            // just the one label still in English.
             // Runs in PARALLEL with, not instead of, the Page2DelaySeconds
             // countdown below - both start from this same moment.
             if (_contentSpawnedAt < 0f)
             {
                 _contentSpawnedAt = Time.time;
-                SetCalibrationMessage(null, "READY!");
+                SetCalibrationMessage(null, "BEREIT!");
 
                 // Swap the calibrating visuals for the ready ones, per direct
                 // request: instruction text/QR frame/spinner turn off

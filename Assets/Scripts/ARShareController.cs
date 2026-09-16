@@ -376,6 +376,14 @@ namespace ARReveal
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
+            // Page1_Experience got its own RecordButton/TeilenButton too (same
+            // action, a second physical button - not an alternate location
+            // for the SAME one, so RecordButtonOverride/TeilenButtonOverride
+            // above don't cover this; wired directly by name instead) - see
+            // this class's own "EXPERIENCE" doc comment for why this page
+            // exists at all.
+            WireButton(null, canvasRoot, "Page1_Experience/RecordButton", RetakePhoto);
+            WireButton(null, canvasRoot, "Page1_Experience/TeilenButton", Teilen);
             // rescanButtonComponent is already fully resolved above (override,
             // or found under either possible location) - passed straight
             // through as WireButton's own explicitButton so its internal

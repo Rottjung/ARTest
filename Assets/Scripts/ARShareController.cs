@@ -288,6 +288,7 @@ namespace ARReveal
         private float _lastCamSampleTime;
         private bool _hasLastCamSample;
         private float _motionWarningHoldUntil = -1f;
+        private int _lastKnownLockCount = -1;
         private Transform _tentacleCacheSource;
         private TentacleController[] _tentacles;
 
@@ -662,6 +663,30 @@ namespace ARReveal
         private bool UpdateMotionPeak()
         {
             if (_zapparCamera == null) return false;
+
+            // Discard the baseline (rather than measure across it) whenever
+            // a lock/re-lock just completed - real-device testing found the
+            // warning firing right "after the loading bar" (i.e. exactly
+            // when the very first lock finishes) even holding the phone
+            // still. Root cause: HandoffToInstantTracking re-seeds the SLAM
+            // anchor at that exact moment (SeedAnchorPosition/
+            // PlaceTrackerAnchor), and the camera's OWN rendered transform
+            // is computed FROM that anchor every frame (see
+            // HandoffToInstantTracking's own "EARLY ANCHOR PLACEMENT" doc
+            // comment) - so the anchor reference changing under it can
+            // produce a real, one-time jump in the camera's reported pose
+            // that has nothing to do with the phone actually moving. No
+            // amount of time-windowing fixes that (a real discontinuity
+            // averaged over any window still reads as a huge net
+            // displacement) - the only correct fix is to never measure
+            // across the moment it happens at all, and just resume
+            // measuring fresh from the post-jump pose.
+            if (Handoff != null && Handoff.TotalLocksCompleted != _lastKnownLockCount)
+            {
+                _lastKnownLockCount = Handoff.TotalLocksCompleted;
+                _hasLastCamSample = false;
+            }
+
             Transform camTransform = _zapparCamera.transform;
             Vector3 pos = camTransform.position;
             Quaternion rot = camTransform.rotation;

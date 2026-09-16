@@ -245,10 +245,12 @@ namespace ARReveal
         public float ReadyFadeOutSeconds = 0.6f;
 
         [Header("Warning popup thresholds - untested, tune on a real device")]
-        [Tooltip("Camera linear speed (meters/second, frame-to-frame) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
+        [Tooltip("Camera linear speed (meters/second) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
         public float MotionWarningSpeedThreshold = 3f;
-        [Tooltip("Camera angular speed (degrees/second, frame-to-frame) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
+        [Tooltip("Camera angular speed (degrees/second) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
         public float MotionWarningAngularThreshold = 90f;
+        [Tooltip("Time window (seconds) speed/angular speed are measured over - NOT frame-to-frame (see UpdateMotionPeak's own doc comment for why comparing adjacent frames triggered constantly even holding the phone still: dividing normal per-frame tracking jitter by a tiny Time.deltaTime blows it up into an apparent spike). Smaller = more responsive but noisier; larger = smoother but slower to react.")]
+        public float MotionSampleWindowSeconds = 0.15f;
         [Tooltip("Seconds the motion warning keeps showing after the last detected peak, so a single brief spike doesn't just flash on and off before anyone can actually read it.")]
         public float MotionWarningHoldSeconds = 1f;
 
@@ -283,6 +285,7 @@ namespace ARReveal
         // --- Warning popup state (see UpdateWarningState/UpdateMotionPeak/UpdateTooClose) ---
         private Vector3 _lastCamPos;
         private Quaternion _lastCamRot = Quaternion.identity;
+        private float _lastCamSampleTime;
         private bool _hasLastCamSample;
         private float _motionWarningHoldUntil = -1f;
         private Transform _tentacleCacheSource;
@@ -623,21 +626,38 @@ namespace ARReveal
 
         /// <summary>
         /// "High peaks in movement or rotation" per direct request - tracks
-        /// the AR camera's own frame-to-frame linear/angular speed (position/
-        /// rotation delta divided by Time.deltaTime, not raw per-frame delta,
-        /// so this stays meaningful across a variable frame rate) and flags a
-        /// peak once either exceeds its own threshold. Deliberately checked
-        /// unconditionally (not just before HasRevealedContent) - most
-        /// relevant during the initial QR scan/tilt transition (see this
-        /// project's own "scan horizontal, tilt vertical, drift" discussion),
-        /// but a real, sudden fast spin post-reveal is just as legitimate a
-        /// "please slow down" moment.
+        /// the AR camera's own linear/angular speed and flags a peak once
+        /// either exceeds its own threshold.
         ///
-        /// A single noisy frame shouldn't make the popup flash on and off
+        /// Measured over a small time WINDOW (MotionSampleWindowSeconds),
+        /// NOT frame-to-frame - an earlier version compared every single
+        /// adjacent frame (delta / Time.deltaTime), which real-device
+        /// testing found triggered constantly even holding the phone
+        /// almost still. That's a real miscalculation, not just wrong
+        /// threshold numbers: at a typical 60-120Hz frame rate,
+        /// Time.deltaTime is tiny (0.008-0.017s), so completely ordinary
+        /// tracking noise (a couple millimetres of position jitter, a
+        /// fraction of a degree of rotation jitter - expected from ANY
+        /// real-world 6DoF tracker regardless of how still the phone is
+        /// held) gets divided by that tiny number and blows up into an
+        /// apparent multi-m/s or many-degrees/s spike. Comparing against a
+        /// sample from ~0.15s ago instead fixes this properly rather than
+        /// just papering over it with higher thresholds: random jitter
+        /// doesn't consistently push in one direction, so it mostly
+        /// cancels out over that window, while genuine fast movement still
+        /// shows a large net displacement across the same window.
+        ///
+        /// Deliberately checked unconditionally (not just before
+        /// HasRevealedContent) - most relevant during the initial QR scan/
+        /// tilt transition (see this project's own "scan horizontal, tilt
+        /// vertical, drift" discussion), but a real, sudden fast spin
+        /// post-reveal is just as legitimate a "please slow down" moment.
+        ///
+        /// A single noisy window shouldn't make the popup flash on and off
         /// faster than anyone could read it, so a detected peak extends
         /// _motionWarningHoldUntil by MotionWarningHoldSeconds - the warning
-        /// stays considered active until that hold expires, not just for the
-        /// exact frame(s) that actually exceeded the threshold.
+        /// stays considered active until that hold expires, not just for
+        /// the exact window that actually exceeded the threshold.
         /// </summary>
         private bool UpdateMotionPeak()
         {
@@ -646,16 +666,27 @@ namespace ARReveal
             Vector3 pos = camTransform.position;
             Quaternion rot = camTransform.rotation;
 
-            if (_hasLastCamSample && Time.deltaTime > 0f)
+            if (!_hasLastCamSample)
             {
-                float speed = Vector3.Distance(pos, _lastCamPos) / Time.deltaTime;
-                float angularSpeed = Quaternion.Angle(rot, _lastCamRot) / Time.deltaTime;
+                _lastCamPos = pos;
+                _lastCamRot = rot;
+                _lastCamSampleTime = Time.time;
+                _hasLastCamSample = true;
+                return Time.time < _motionWarningHoldUntil;
+            }
+
+            float elapsed = Time.time - _lastCamSampleTime;
+            if (elapsed >= MotionSampleWindowSeconds)
+            {
+                float speed = Vector3.Distance(pos, _lastCamPos) / elapsed;
+                float angularSpeed = Quaternion.Angle(rot, _lastCamRot) / elapsed;
                 if (speed > MotionWarningSpeedThreshold || angularSpeed > MotionWarningAngularThreshold)
                     _motionWarningHoldUntil = Time.time + MotionWarningHoldSeconds;
+
+                _lastCamPos = pos;
+                _lastCamRot = rot;
+                _lastCamSampleTime = Time.time;
             }
-            _lastCamPos = pos;
-            _lastCamRot = rot;
-            _hasLastCamSample = true;
 
             return Time.time < _motionWarningHoldUntil;
         }

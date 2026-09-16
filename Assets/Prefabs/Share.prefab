@@ -1279,7 +1279,6 @@ GameObject:
   m_Component:
   - component: {fileID: 698874355512161918}
   - component: {fileID: 7870564419219317594}
-  - component: {fileID: 4286626015458049009}
   m_Layer: 0
   m_Name: InstructionText
   m_TagString: Untagged
@@ -1314,40 +1313,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4074181886374045304}
   m_CullTransparentMesh: 1
---- !u!114 &4286626015458049009
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4074181886374045304}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 48
-    m_FontStyle: 0
-    m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 48
-    m_Alignment: 4
-    m_AlignByGeometry: 0
-    m_RichText: 1
-    m_HorizontalOverflow: 0
-    m_VerticalOverflow: 0
-    m_LineSpacing: 1
-  m_Text: Scan the Poster to calibrate
 --- !u!1 &4372915360367522111
 GameObject:
   m_ObjectHideFlags: 0
@@ -1679,6 +1644,8 @@ MonoBehaviour:
   TeilenButtonSprite: {fileID: 21300000, guid: 6fb66b66cef7d86657f6aee55e5bcb63, type: 3}
   RecordButtonSprite: {fileID: 21300000, guid: d9cab713d0a52ae43aab3539119be879, type: 3}
   ReadyImageSprite: {fileID: 21300000, guid: 4d200fd8bbc1b620134551535e0b89fc, type: 3}
+  FotoModeSprite: {fileID: 0}
+  VideoModeSprite: {fileID: 0}
   Page0GroupOverride: {fileID: 7487206761984701937}
   Page1GroupOverride: {fileID: 3863022231102473612}
   Page2GroupOverride: {fileID: 4374334708519011927}
@@ -1687,9 +1654,11 @@ MonoBehaviour:
   FotoButtonOverride: {fileID: 3469548185699407519}
   RecordButtonOverride: {fileID: 9158834148150077796}
   TeilenButtonOverride: {fileID: 7278621878270820834}
+  FotoModeButtonOverride: {fileID: 0}
+  VideoModeButtonOverride: {fileID: 0}
   RescanButtonOverride: {fileID: 2253058174593237410}
   SpinnerImageOverride: {fileID: 3236513036009679960}
-  InstructionTextOverride: {fileID: 4286626015458049009}
+  InstructionTextOverride: {fileID: 0}
   CalibratingTextOverride: {fileID: 1182167912389989548}
   QrFrameOverride: {fileID: 5155438216814641411}
   ReadyImageOverride: {fileID: 6045698916838234989}

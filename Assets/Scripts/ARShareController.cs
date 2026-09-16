@@ -1005,6 +1005,11 @@ namespace ARReveal
         /// actually populates it after a capture. Safe to call repeatedly
         /// (e.g. every AttachToExistingUI/BuildUI) - reuses an existing
         /// "PhotoPreview" child instead of duplicating it.
+        ///
+        /// Tappable per direct request ("so we can click the preview away")
+        /// - a Button on this same GameObject calls DiscardPreview directly,
+        /// so tapping anywhere on the photo itself dismisses it, in
+        /// addition to the separate dedicated DiscardButton.
         /// </summary>
         private void EnsurePhotoPreview(Transform canvasRoot)
         {
@@ -1023,13 +1028,31 @@ namespace ARReveal
                 rt.anchorMax = Vector2.one;
                 rt.offsetMin = Vector2.zero;
                 rt.offsetMax = Vector2.zero;
-                var img = go.AddComponent<Image>();
-                img.preserveAspect = true;
-                img.raycastTarget = false;
+                go.AddComponent<Image>().preserveAspect = true;
             }
+
+            // Tappable per direct request ("so we can click the preview
+            // away") - the whole photo itself discards on tap, IN ADDITION
+            // to the dedicated DiscardButton. raycastTarget needs to be true
+            // for this (used to be false, back when nothing on this Image
+            // was ever meant to receive clicks). Transition is None so
+            // tapping doesn't visibly tint/dim the photo the way a normal
+            // UI button would - it's a full photo, not a button-shaped
+            // control. RecordButton/TeilenButton/DiscardButton still work
+            // normally on top of this - the Graphic Raycaster only ever
+            // hits the SINGLE topmost target at a given screen position, so
+            // tapping one of those buttons never also fires this.
+            var img = go.GetComponent<Image>();
+            img.raycastTarget = true;
+            var tapButton = go.GetComponent<Button>();
+            if (tapButton == null) tapButton = go.AddComponent<Button>();
+            tapButton.transition = Selectable.Transition.None;
+            tapButton.onClick.RemoveAllListeners();
+            tapButton.onClick.AddListener(DiscardPreview);
+
             go.transform.SetAsFirstSibling();
             go.SetActive(false);
-            _photoPreviewImage = go.GetComponent<Image>();
+            _photoPreviewImage = img;
         }
 
 #if UNITY_EDITOR

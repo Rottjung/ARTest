@@ -36,29 +36,27 @@ namespace ARReveal
     ///    both lines in one image) + RESTART and FOTO buttons.
     ///  - SHARE PROMPT / "the selfie screen" (shown after tapping FOTO -
     ///    Foto() is PURE NAVIGATION, it does not capture anything itself):
-    ///    "share your photo, win tickets" text + FotoMode/VideoMode buttons
-    ///    (SelectPhotoMode/SelectVideoMode - decide what the round record
-    ///    button captures) + the round record button, the ONE real "take
-    ///    the photo" action (RetakePhoto - can be tapped more than once to
-    ///    retake/recapture) + TEILEN (share) button. An earlier version had
-    ///    FOTO itself capture + immediately open the save/share dialog,
-    ///    skipping this screen entirely - corrected per direct feedback
-    ///    ("that not the design... foto button make you go to the selfie
-    ///    screen... clicking the red button should make a native
+    ///    "share your photo, win tickets" text + the round record button,
+    ///    the ONE real "take the photo" action (RetakePhoto - can be tapped
+    ///    more than once to retake) + TEILEN (share) button. An earlier
+    ///    version had FOTO itself capture + immediately open the save/share
+    ///    dialog, skipping this screen entirely - corrected per direct
+    ///    feedback ("that not the design... foto button make you go to the
+    ///    selfie screen... clicking the red button should make a native
     ///    screenshot").
     ///
     ///    RetakePhoto no longer shares immediately either, per a LATER
-    ///    direct request ("client wants the video or foto shown first, and
-    ///    if we click teilen we go to the native share") - it captures and
-    ///    shows a full-screen PREVIEW instead (ShowPhotoPreview/
-    ///    PhotoPreview), leaving Teilen as the actual "share this now"
-    ///    trigger - Teilen already called ShareLastPhoto before (as a
-    ///    secondary "re-share if the dialog was dismissed" convenience),
-    ///    now promoted to the primary one. VIDEO capture itself is a
-    ///    placeholder for now (see RetakePhoto's own doc comment) - Unity
-    ///    WebGL has no built-in video encoder, so it needs new
-    ///    MediaRecorder/canvas.captureStream()-based .jslib work, a
-    ///    separate, larger piece of work than the mode-picker UI itself.
+    ///    direct request ("client wants the foto shown first, and if we
+    ///    click teilen we go to the native share") - it captures and shows
+    ///    a full-screen PREVIEW instead (ShowPhotoPreview/PhotoPreview),
+    ///    leaving Teilen as the actual "share this now" trigger - Teilen
+    ///    already called ShareLastPhoto before (as a secondary "re-share if
+    ///    the dialog was dismissed" convenience), now promoted to the
+    ///    primary one. (A brief Foto/Video mode-picker existed here too, for
+    ///    a video-recording feature the client ended up dropping before it
+    ///    was ever built out beyond a placeholder - removed again per
+    ///    direct request; see git history around "Add Foto/Video mode
+    ///    picker" if it's ever wanted back.)
     ///
     /// A third "Distance Alert" screen (warning the viewer to step back) was
     /// tried and then removed entirely per direct request - it's since come
@@ -128,18 +126,20 @@ namespace ARReveal
     /// same flow as the first time." The frame and loading ring are generated at runtime
     /// (CreateRoundedFrameSprite/CreateRingSprite, same procedural-texture
     /// approach as CreateCircleSprite below) since no design asset exists
-    /// for this screen yet; the two text labels use a
-    /// plain UnityEngine.UI.Text with Unity's built-in font as a placeholder
-    /// for the same reason - EVERY OTHER screen's text in this class is a
-    /// pre-rendered PNG per this project's own convention, swap these two
-    /// Text components for Image components once real assets exist.
-    /// SetCalibrationMessage only ever auto-writes hardcoded wording
-    /// ("CALIBRATING...", "Scan the QR to calibrate", "READY!", etc.) to
-    /// whichever of InstructionText/CalibratingText has its OWN
-    /// InstructionTextOverride/CalibratingTextOverride field left empty -
-    /// per direct request, dragging a specific Text object into either
-    /// override field means "hand off control of this label's wording
-    /// entirely," so it's never touched/overwritten after that.
+    /// for this screen yet; the two text labels use a plain TMP
+    /// (TextMeshProUGUI) placeholder with TMP's own default font asset as a
+    /// placeholder for the same reason - EVERY OTHER screen's text in this
+    /// class is a pre-rendered PNG per this project's own convention, swap
+    /// these two TMP components for Image components once real assets
+    /// exist. Every text field in this class is TMP, not legacy
+    /// UnityEngine.UI.Text, per direct request. SetCalibrationMessage only
+    /// ever auto-writes hardcoded wording ("CALIBRATING...", "Scan the QR
+    /// to calibrate", "READY!", etc.) to whichever of InstructionText/
+    /// CalibratingText has its OWN InstructionTextOverride/
+    /// CalibratingTextOverride field left empty - per direct request,
+    /// dragging a specific TMP text object into either override field means
+    /// "hand off control of this label's wording entirely," so it's never
+    /// touched/overwritten after that.
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
@@ -203,9 +203,6 @@ namespace ARReveal
         public Sprite RecordButtonSprite;
         [Tooltip("Shown on the calibration screen once content is ready (see Update()) - only used by the procedural BuildPage0() path (a fresh build with no existing hand-tuned canvas); the hand-tuned Share.prefab has its own 'Ready' image placed directly, found by name (see AttachToExistingUI). Left blank here just means nothing shows in the Ready image's place for a freshly-built UI - CalibratingText's own 'READY!' wording still works regardless.")]
         public Sprite ReadyImageSprite;
-        [Tooltip("The Foto/Video mode-select buttons on the Share Prompt screen (see SelectPhotoMode/SelectVideoMode) - only used by the procedural BuildPage3() path; the hand-tuned Share.prefab has its own FotoMode/VideoMode buttons placed directly, found by name.")]
-        public Sprite FotoModeSprite;
-        public Sprite VideoModeSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
@@ -217,17 +214,14 @@ namespace ARReveal
         public Button FotoButtonOverride;
         public Button RecordButtonOverride;
         public Button TeilenButtonOverride;
-        [Tooltip("The Foto/Video mode-select buttons on the Share Prompt screen (see SelectPhotoMode/SelectVideoMode) - override the by-name lookups (Page3_SharePrompt/FotoMode and .../VideoMode).")]
-        public Button FotoModeButtonOverride;
-        public Button VideoModeButtonOverride;
         [Tooltip("The bottom-center Rescan button (see BuildRescanButton/Rescan) - drag it in directly if hand-tuning its position/sprite, or leave blank to find it by name (RescanButton) under the canvas root.")]
         public Button RescanButtonOverride;
         [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
         public Image SpinnerImageOverride;
-        [Tooltip("Drag the calibration screen's instructional Text component here directly - overrides the by-name lookup (Page0_Calibration/InstructionText).")]
-        public Text InstructionTextOverride;
-        [Tooltip("Drag the calibration screen's 'CALIBRATING...'/'READY!' Text component here directly - overrides the by-name lookup (Page0_Calibration/CalibratingText).")]
-        public Text CalibratingTextOverride;
+        [Tooltip("Drag the calibration screen's instructional TMP text component here directly - overrides the by-name lookup (Page0_Calibration/InstructionText).")]
+        public TMP_Text InstructionTextOverride;
+        [Tooltip("Drag the calibration screen's 'CALIBRATING...'/'READY!' TMP text component here directly - overrides the by-name lookup (Page0_Calibration/CalibratingText).")]
+        public TMP_Text CalibratingTextOverride;
         [Tooltip("The QR viewfinder frame on the calibration screen - hidden the instant content is ready (see Update()), alongside InstructionText and the spinner. Overrides the by-name lookup (Page0_Calibration/QRFrame).")]
         public GameObject QrFrameOverride;
         [Tooltip("Shown the instant content is ready, replacing the QR frame/instruction text/spinner (see Update()) - CalibratingText stays visible throughout (just its wording changes to READY!). Overrides the by-name lookup (Page0_Calibration/Ready).")]
@@ -279,17 +273,12 @@ namespace ARReveal
         private CanvasGroup _page0CanvasGroup;
 
         private Image _spinnerImage;
-        private Text _instructionText;
-        private Text _calibratingText;
+        private TMP_Text _instructionText;
+        private TMP_Text _calibratingText;
         private GameObject _qrFrame;
         private GameObject _readyImage;
-        private Image _fotoModeImage;
-        private Image _videoModeImage;
         private Image _photoPreviewImage;
         private ZapparCamera _zapparCamera;
-
-        private enum CaptureMode { Photo, Video }
-        private CaptureMode _captureMode = CaptureMode.Photo;
 
         // --- Warning popup state (see UpdateWarningState/UpdateMotionPeak/UpdateTooClose) ---
         private Vector3 _lastCamPos;
@@ -357,20 +346,16 @@ namespace ARReveal
                 : spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
             var instructionTransform = canvasRoot.Find("Page0_Calibration/InstructionText");
             _instructionText = InstructionTextOverride != null ? InstructionTextOverride
-                : instructionTransform != null ? instructionTransform.GetComponent<Text>() : null;
+                : instructionTransform != null ? instructionTransform.GetComponent<TMP_Text>() : null;
             var calibratingTransform = canvasRoot.Find("Page0_Calibration/CalibratingText");
             _calibratingText = CalibratingTextOverride != null ? CalibratingTextOverride
-                : calibratingTransform != null ? calibratingTransform.GetComponent<Text>() : null;
+                : calibratingTransform != null ? calibratingTransform.GetComponent<TMP_Text>() : null;
             var qrFrameTransform = canvasRoot.Find("Page0_Calibration/QRFrame");
             _qrFrame = QrFrameOverride != null ? QrFrameOverride : (qrFrameTransform != null ? qrFrameTransform.gameObject : null);
             var readyImageTransform = canvasRoot.Find("Page0_Calibration/Ready");
             _readyImage = ReadyImageOverride != null ? ReadyImageOverride : (readyImageTransform != null ? readyImageTransform.gameObject : null);
             _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
 
-            var fotoModeTransform = FotoModeButtonOverride != null ? FotoModeButtonOverride.transform : canvasRoot.Find("Page3_SharePrompt/FotoMode");
-            _fotoModeImage = fotoModeTransform != null ? fotoModeTransform.GetComponent<Image>() : null;
-            var videoModeTransform = VideoModeButtonOverride != null ? VideoModeButtonOverride.transform : canvasRoot.Find("Page3_SharePrompt/VideoMode");
-            _videoModeImage = videoModeTransform != null ? videoModeTransform.GetComponent<Image>() : null;
             if (_page3Group != null) EnsurePhotoPreview(_page3Group.transform);
 
             // Checks Page1_Experience first - the button's own natural home
@@ -387,8 +372,6 @@ namespace ARReveal
             WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
             WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
             WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
-            WireButton(FotoModeButtonOverride, canvasRoot, "Page3_SharePrompt/FotoMode", SelectPhotoMode);
-            WireButton(VideoModeButtonOverride, canvasRoot, "Page3_SharePrompt/VideoMode", SelectVideoMode);
             // rescanButtonComponent is already fully resolved above (override,
             // or found under either possible location) - passed straight
             // through as WireButton's own explicitButton so its internal
@@ -402,7 +385,6 @@ namespace ARReveal
             SetActiveIfNotNull(_page3Group, false);
             SetActiveIfNotNull(_rescanButton, false);
             SetActiveIfNotNull(_warningPopupGroup, false);
-            UpdateModeButtonHighlights();
 
             EnsureFlashOverlay(canvasRoot);
         }
@@ -601,7 +583,7 @@ namespace ARReveal
         /// null for either to leave it as-is (e.g. the instruction line
         /// doesn't need to change for the READY state). ONLY writes to a
         /// label whose own *TextOverride field was left empty - per direct
-        /// request, dragging a specific Text object into
+        /// request, dragging a specific TMP text object into
         /// InstructionTextOverride/CalibratingTextOverride means "I'm
         /// hand-authoring this label myself" (custom wording, a real
         /// translation, different styling split across runs, etc.), so this
@@ -761,7 +743,6 @@ namespace ARReveal
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
             _rescanButton.SetActive(false);
-            UpdateModeButtonHighlights();
 
             EnsureFlashOverlay(canvasGo.transform);
         }
@@ -1046,23 +1027,24 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Plain UnityEngine.UI.Text with Unity's built-in font - a placeholder
-        /// until a real design asset exists for this screen (every OTHER
-        /// screen's text in this class is a pre-rendered PNG per this
-        /// project's own convention - see this class's own "CALIBRATION
-        /// SCREEN" doc comment for why this one's different for now).
+        /// A TextMeshProUGUI placeholder (Unity's own default TMP font
+        /// asset, via TMP_Settings - assigned automatically since none is
+        /// set explicitly here) until a real design asset exists for this
+        /// screen (every OTHER screen's text in this class is a pre-
+        /// rendered PNG per this project's own convention - see this
+        /// class's own "CALIBRATION SCREEN" doc comment for why this one's
+        /// different for now). TMP, not legacy UnityEngine.UI.Text, per
+        /// direct request - every text field in this class is TMP now.
         /// </summary>
-        private static Text AddPlaceholderText(Transform parent, string name, string text, int fontSize, Vector2 anchoredPos, Vector2 size)
+        private static TMP_Text AddPlaceholderText(Transform parent, string name, string text, int fontSize, Vector2 anchoredPos, Vector2 size)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
-            var label = go.AddComponent<Text>();
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var label = go.AddComponent<TextMeshProUGUI>();
             label.text = text;
             label.fontSize = fontSize;
-            label.alignment = TextAnchor.MiddleCenter;
+            label.alignment = TextAlignmentOptions.Center;
             label.color = Color.white;
-            label.horizontalOverflow = HorizontalWrapMode.Wrap;
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -1107,27 +1089,11 @@ namespace ARReveal
 
             AddImage(group.transform, Page3TextSprite, new Vector2(0f, 400f), new Vector2(760f, 260f));
 
-            // Foto/Video mode-select buttons - per direct request, choosing
-            // between them decides what the round record button below
-            // actually captures (see SelectPhotoMode/SelectVideoMode/
-            // RetakePhoto). Falls back to a plain generated pill if no
-            // design asset is assigned, same "never breaks, just plainer"
-            // convention as RecordButtonSprite below.
-            var fotoModeSprite = FotoModeSprite != null ? FotoModeSprite : CreateRoundedFillSprite(new Color(1f, 1f, 1f, 0.85f), 220, 90, 20);
-            var fotoModeButton = BuildImageButton(group.transform, "FotoMode", fotoModeSprite,
-                new Vector2(-130f, -250f), new Vector2(220f, 90f), SelectPhotoMode);
-            _fotoModeImage = fotoModeButton.GetComponent<Image>();
-
-            var videoModeSprite = VideoModeSprite != null ? VideoModeSprite : CreateRoundedFillSprite(new Color(1f, 1f, 1f, 0.85f), 220, 90, 20);
-            var videoModeButton = BuildImageButton(group.transform, "VideoMode", videoModeSprite,
-                new Vector2(130f, -250f), new Vector2(220f, 90f), SelectVideoMode);
-            _videoModeImage = videoModeButton.GetComponent<Image>();
-
             // Uses RecordButtonSprite (RecButton.png) if assigned; falls back
             // to a plain generated red circle otherwise so this never breaks
-            // if that field is left blank. Tapping it captures per whichever
-            // mode is currently selected above (can be tapped more than once
-            // to retake/recapture - see RetakePhoto's own doc comment).
+            // if that field is left blank. Tapping it captures (can be
+            // tapped more than once to retake - see RetakePhoto's own doc
+            // comment).
             var recordSprite = RecordButtonSprite != null ? RecordButtonSprite : CreateCircleSprite(new Color(0.85f, 0.1f, 0.1f, 1f), 128);
             BuildImageButton(group.transform, "RecordButton", recordSprite,
                 new Vector2(0f, 0f), new Vector2(140f, 140f), RetakePhoto);
@@ -1399,51 +1365,22 @@ namespace ARReveal
         /// here, skipping that screen entirely - wrong per the actual design,
         /// where FOTO is purely a navigation step and the round record
         /// button (RetakePhoto) is the one real "take the photo" action.
-        /// Resets to Photo mode and hides any stale preview from a previous
-        /// visit, per direct request - a fresh visit to this screen should
-        /// always start from the same predictable state (mode picker up,
-        /// nothing captured yet), not wherever the LAST visit left off.
+        /// Hides any stale preview from a previous visit, per direct request
+        /// - a fresh visit to this screen should always start from the same
+        /// predictable state (nothing captured yet), not wherever the LAST
+        /// visit left off.
         /// </summary>
         public void Foto()
         {
             _screen = UiScreen.SharePrompt;
-            SetCaptureMode(CaptureMode.Photo);
             SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
-        }
-
-        /// <summary>Wired to the FotoMode/VideoMode buttons on the Share Prompt screen - see RetakePhoto/UpdateModeButtonHighlights.</summary>
-        public void SelectPhotoMode() => SetCaptureMode(CaptureMode.Photo);
-        public void SelectVideoMode() => SetCaptureMode(CaptureMode.Video);
-
-        private void SetCaptureMode(CaptureMode mode)
-        {
-            _captureMode = mode;
-            UpdateModeButtonHighlights();
-        }
-
-        /// <summary>Dims whichever of FotoMode/VideoMode ISN'T currently selected, so it's visually obvious which one the round record button below will act on - a plain alpha tint rather than needing two separate "selected/unselected" sprite assets per button.</summary>
-        private void UpdateModeButtonHighlights()
-        {
-            const float selectedAlpha = 1f;
-            const float unselectedAlpha = 0.45f;
-            if (_fotoModeImage != null) SetImageAlpha(_fotoModeImage, _captureMode == CaptureMode.Photo ? selectedAlpha : unselectedAlpha);
-            if (_videoModeImage != null) SetImageAlpha(_videoModeImage, _captureMode == CaptureMode.Video ? selectedAlpha : unselectedAlpha);
-        }
-
-        private static void SetImageAlpha(Image image, float alpha)
-        {
-            var c = image.color;
-            c.a = alpha;
-            image.color = c;
         }
 
         /// <summary>
         /// The round record button on the Share Prompt screen - THE actual
-        /// "take the photo" action, for whichever of Photo/Video mode is
-        /// currently selected (see SelectPhotoMode/SelectVideoMode above).
-        /// Can be tapped more than once to retake/recapture, in case the
-        /// first one didn't land right - just re-runs the same routine,
-        /// overwriting whatever was captured before.
+        /// "take the photo" action. Can be tapped more than once to
+        /// retake, in case the first one didn't land right - just re-runs
+        /// the same routine, overwriting whatever was captured before.
         ///
         /// Per direct request, this no longer jumps straight to the native
         /// share sheet - it just captures and shows a PREVIEW (see
@@ -1452,22 +1389,9 @@ namespace ARReveal
         /// small change rather than a restructure - ShareLastPhoto/
         /// ARReveal_ShareImage, the actual native-share plumbing, is
         /// completely unchanged).
-        ///
-        /// VIDEO capture is NOT implemented yet - a real feature on its own
-        /// (Unity WebGL has no built-in video encoder; capturing a video
-        /// means bridging to the browser's own MediaRecorder/
-        /// canvas.captureStream() APIs via new custom .jslib code, which
-        /// doesn't exist in this project yet). Selecting Video mode and
-        /// tapping record currently just logs a warning and does nothing -
-        /// intentional placeholder, not a bug, until that's built.
         /// </summary>
         public void RetakePhoto()
         {
-            if (_captureMode == CaptureMode.Video)
-            {
-                Debug.LogWarning("[ARShareController] Video capture isn't implemented yet - see RetakePhoto's own doc comment. Switch to Foto mode to actually capture something.");
-                return;
-            }
             StartCoroutine(RetakePhotoRoutine());
         }
 

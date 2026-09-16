@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Runtime.InteropServices;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Zappar;
@@ -60,8 +61,28 @@ namespace ARReveal
     ///    separate, larger piece of work than the mode-picker UI itself.
     ///
     /// A third "Distance Alert" screen (warning the viewer to step back) was
-    /// tried and then removed entirely per direct request - see git history
-    /// around "Distance Alert" if it's ever wanted back.
+    /// tried and then removed entirely per direct request - it's since come
+    /// back in a different form, folded into WarningPopup below alongside a
+    /// second, new trigger.
+    ///
+    /// WARNING POPUP (WarningPopup, per direct request): overrides
+    /// whichever OTHER page is currently showing - same "highest priority"
+    /// precedent the original Distance Alert screen set - for either of two
+    /// reasons (see UpdateWarningState/UpdateMotionPeak/UpdateTooClose):
+    ///  - TOO FAST: the AR camera's own frame-to-frame linear/angular speed
+    ///    spiked (MotionWarningSpeedThreshold/MotionWarningAngularThreshold)
+    ///    - shows "Den Scanner langsamer bewegen." Built for this project's
+    ///    own real-world finding that scanning the ground-level QR then
+    ///    tilting up fast to the building is exactly when tracking drifts
+    ///    worst - coaching a slower tilt attacks that at the source rather
+    ///    than only hiding it after the fact.
+    ///  - TOO CLOSE: the viewer is within actual tentacle-attack range - the
+    ///    SAME mechanism the original Distance Alert used
+    ///    (TentacleController.IsCameraWithinAttackRange, re-added - see its
+    ///    own doc comment) - shows an in-universe biohazard-style warning
+    ///    ("Achtung! Zu nah am Subjekt. Infektionsgefahr! Gehe zurück!"),
+    ///    matching the Resident Evil theme rather than reading as a generic
+    ///    app error message.
     ///
     /// CALIBRATION SCREEN (Page0_Calibration - see BuildCalibrationScreen):
     /// shown as soon as the Zappar camera feed is actually live
@@ -211,6 +232,10 @@ namespace ARReveal
         public GameObject QrFrameOverride;
         [Tooltip("Shown the instant content is ready, replacing the QR frame/instruction text/spinner (see Update()) - CalibratingText stays visible throughout (just its wording changes to READY!). Overrides the by-name lookup (Page0_Calibration/Ready).")]
         public GameObject ReadyImageOverride;
+        [Tooltip("Overrides whichever other page is currently showing (see Update()'s own WarningPopup section) - either a motion warning (scanning/tilting too fast) or a proximity warning (within tentacle attack range). Overrides the by-name lookup (WarningPopup).")]
+        public GameObject WarningPopupGroupOverride;
+        [Tooltip("The TMP text inside WarningPopup - overrides the by-name lookup (WarningPopup/Warning).")]
+        public TMP_Text WarningTextOverride;
 
         [Header("Timing / thresholds")]
         [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
@@ -225,17 +250,30 @@ namespace ARReveal
         [Tooltip("Seconds to fade the calibration screen out (CanvasGroup alpha 1->0) once ReadyDisplaySeconds has elapsed, instead of an instant SetActive(false) - a smoother, more noticeable 'ok, it's done now' transition per the same on-site feedback that prompted raising ReadyDisplaySeconds.")]
         public float ReadyFadeOutSeconds = 0.6f;
 
+        [Header("Warning popup thresholds - untested, tune on a real device")]
+        [Tooltip("Camera linear speed (meters/second, frame-to-frame) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
+        public float MotionWarningSpeedThreshold = 3f;
+        [Tooltip("Camera angular speed (degrees/second, frame-to-frame) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
+        public float MotionWarningAngularThreshold = 90f;
+        [Tooltip("Seconds the motion warning keeps showing after the last detected peak, so a single brief spike doesn't just flash on and off before anyone can actually read it.")]
+        public float MotionWarningHoldSeconds = 1f;
+
         [Tooltip("Above CameraSlimeOverlay's 500, so this UI always draws on top of the slime splat.")]
         public int SortingOrder = 600;
 
         private enum UiScreen { None, CallToAction, SharePrompt }
         private UiScreen _screen = UiScreen.None;
 
+        private enum WarningReason { None, TooFast, TooClose }
+        private WarningReason _activeWarning = WarningReason.None;
+
         private GameObject _page0Group;
         private GameObject _page1Group;
         private GameObject _page2Group;
         private GameObject _page3Group;
         private GameObject _rescanButton;
+        private GameObject _warningPopupGroup;
+        private TMP_Text _warningText;
 
         /// <summary>Drives the calibration screen's fade-out (see ReadyFadeOutSeconds) - added to _page0Group whether it was built fresh (BuildPage0) or picked up from a hand-tuned prefab (AttachToExistingUI), so the same Update() logic works either way.</summary>
         private CanvasGroup _page0CanvasGroup;
@@ -252,6 +290,14 @@ namespace ARReveal
 
         private enum CaptureMode { Photo, Video }
         private CaptureMode _captureMode = CaptureMode.Photo;
+
+        // --- Warning popup state (see UpdateWarningState/UpdateMotionPeak/UpdateTooClose) ---
+        private Vector3 _lastCamPos;
+        private Quaternion _lastCamRot = Quaternion.identity;
+        private bool _hasLastCamSample;
+        private float _motionWarningHoldUntil = -1f;
+        private Transform _tentacleCacheSource;
+        private TentacleController[] _tentacles;
 
         /// <summary>The whole UI's own Canvas - toggled off (not the GameObject) for the duration of the actual capture in RetakePhotoRoutine, so none of our own buttons/text end up baked into the saved photo.</summary>
         private Canvas _canvas;
@@ -302,6 +348,10 @@ namespace ARReveal
             _page1Group = Page1GroupOverride != null ? Page1GroupOverride : FindChild(canvasRoot, "Page1_Experience");
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
             _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
+            _warningPopupGroup = WarningPopupGroupOverride != null ? WarningPopupGroupOverride : FindChild(canvasRoot, "WarningPopup");
+            var warningTextTransform = canvasRoot.Find("WarningPopup/Warning");
+            _warningText = WarningTextOverride != null ? WarningTextOverride
+                : warningTextTransform != null ? warningTextTransform.GetComponent<TMP_Text>() : null;
             var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
             _spinnerImage = SpinnerImageOverride != null ? SpinnerImageOverride
                 : spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
@@ -351,6 +401,7 @@ namespace ARReveal
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
             SetActiveIfNotNull(_rescanButton, false);
+            SetActiveIfNotNull(_warningPopupGroup, false);
             UpdateModeButtonHighlights();
 
             EnsureFlashOverlay(canvasRoot);
@@ -398,6 +449,30 @@ namespace ARReveal
 
         private void Update()
         {
+            // WARNING POPUP - per direct request, overrides whichever OTHER
+            // page would otherwise be showing (same "takes priority over
+            // everything" precedent as the original Distance Alert screen -
+            // see git history around "Remove the Distance Alert" - now
+            // folded into this single popup alongside a second, new
+            // trigger). Computed FIRST, before any page-specific logic
+            // below, because the motion warning specifically needs to be
+            // able to interrupt the CALIBRATION screen too - that's exactly
+            // when a fast/erratic scan hurts the QR-based lock's own
+            // precision the most (see the real-world "scan horizontal, tilt
+            // vertical, drift" conversation this was built for).
+            UpdateWarningState();
+            if (_activeWarning != WarningReason.None)
+            {
+                SetActiveIfNotNull(_warningPopupGroup, true);
+                SetActiveIfNotNull(_page0Group, false);
+                SetActiveIfNotNull(_page1Group, false);
+                SetActiveIfNotNull(_page2Group, false);
+                SetActiveIfNotNull(_page3Group, false);
+                SetActiveIfNotNull(_rescanButton, false);
+                return;
+            }
+            SetActiveIfNotNull(_warningPopupGroup, false);
+
             if (!HasRevealedContent)
             {
                 // Shown once camera access is actually live, until content
@@ -538,6 +613,100 @@ namespace ARReveal
         {
             if (instruction != null && _instructionText != null && InstructionTextOverride == null) _instructionText.text = instruction;
             if (calibrating != null && _calibratingText != null && CalibratingTextOverride == null) _calibratingText.text = calibrating;
+        }
+
+        /// <summary>
+        /// Decides which (if either) of the two WarningPopup triggers is
+        /// currently active, and updates the TMP text ONLY on a change (not
+        /// every frame) - see UpdateMotionPeak/UpdateTooClose for each
+        /// trigger's own detection logic. If both happen to be true at the
+        /// same instant, TooClose wins - an actual proximity/attack danger
+        /// reads as more urgent than a scanning-technique tip.
+        /// </summary>
+        private void UpdateWarningState()
+        {
+            bool tooFast = UpdateMotionPeak();
+            bool tooClose = UpdateTooClose();
+
+            WarningReason reason = tooClose ? WarningReason.TooClose : tooFast ? WarningReason.TooFast : WarningReason.None;
+            if (reason == _activeWarning) return;
+            _activeWarning = reason;
+            if (_warningText == null) return;
+
+            if (reason == WarningReason.TooFast)
+                _warningText.text = "Den Scanner langsamer bewegen";
+            else if (reason == WarningReason.TooClose)
+                _warningText.text = "Achtung! Zu nah am Subjekt. Infektionsgefahr! Gehe zurück!";
+        }
+
+        /// <summary>
+        /// "High peaks in movement or rotation" per direct request - tracks
+        /// the AR camera's own frame-to-frame linear/angular speed (position/
+        /// rotation delta divided by Time.deltaTime, not raw per-frame delta,
+        /// so this stays meaningful across a variable frame rate) and flags a
+        /// peak once either exceeds its own threshold. Deliberately checked
+        /// unconditionally (not just before HasRevealedContent) - most
+        /// relevant during the initial QR scan/tilt transition (see this
+        /// project's own "scan horizontal, tilt vertical, drift" discussion),
+        /// but a real, sudden fast spin post-reveal is just as legitimate a
+        /// "please slow down" moment.
+        ///
+        /// A single noisy frame shouldn't make the popup flash on and off
+        /// faster than anyone could read it, so a detected peak extends
+        /// _motionWarningHoldUntil by MotionWarningHoldSeconds - the warning
+        /// stays considered active until that hold expires, not just for the
+        /// exact frame(s) that actually exceeded the threshold.
+        /// </summary>
+        private bool UpdateMotionPeak()
+        {
+            if (_zapparCamera == null) return false;
+            Transform camTransform = _zapparCamera.transform;
+            Vector3 pos = camTransform.position;
+            Quaternion rot = camTransform.rotation;
+
+            if (_hasLastCamSample && Time.deltaTime > 0f)
+            {
+                float speed = Vector3.Distance(pos, _lastCamPos) / Time.deltaTime;
+                float angularSpeed = Quaternion.Angle(rot, _lastCamRot) / Time.deltaTime;
+                if (speed > MotionWarningSpeedThreshold || angularSpeed > MotionWarningAngularThreshold)
+                    _motionWarningHoldUntil = Time.time + MotionWarningHoldSeconds;
+            }
+            _lastCamPos = pos;
+            _lastCamRot = rot;
+            _hasLastCamSample = true;
+
+            return Time.time < _motionWarningHoldUntil;
+        }
+
+        /// <summary>
+        /// "Same as distance attack" per direct request - re-uses the exact
+        /// mechanism the original (removed) Distance Alert screen relied on:
+        /// TentacleController.IsCameraWithinAttackRange, the SAME per-
+        /// tentacle, tip-based Snap Distance check ReachByDistance's own
+        /// attack triggering uses (see that property's own doc comment for
+        /// why this is more meaningful than a flat radius around some single
+        /// content origin point). Only meaningful once a real handoff has
+        /// happened (ContentWrapper's tentacles are hidden/inert before
+        /// then) - see EnsureTentacleCache.
+        /// </summary>
+        private bool UpdateTooClose()
+        {
+            if (Handoff == null || !Handoff.HasHandedOff) return false;
+            EnsureTentacleCache();
+            if (_tentacles == null) return false;
+            foreach (var tentacle in _tentacles)
+                if (tentacle != null && tentacle.IsCameraWithinAttackRange) return true;
+            return false;
+        }
+
+        /// <summary>Lazily caches every TentacleController under ContentWrapper the first time it's needed - the hierarchy is fixed/authored, never rebuilt at runtime, so one scan is enough; re-caches automatically if ContentWrapper is ever reassigned to a different Transform (defensive, not expected to happen in practice).</summary>
+        private void EnsureTentacleCache()
+        {
+            Transform wrapper = Handoff != null ? Handoff.ContentWrapper : null;
+            if (wrapper == null) { _tentacles = null; _tentacleCacheSource = null; return; }
+            if (_tentacles != null && _tentacleCacheSource == wrapper) return;
+            _tentacles = wrapper.GetComponentsInChildren<TentacleController>(true);
+            _tentacleCacheSource = wrapper;
         }
 
         private void LateUpdate()

@@ -1252,6 +1252,22 @@ namespace ARReveal
             return cam != null && HorizontalDistanceToCamera(cam) <= SnapDistance;
         }
 
+        /// <summary>
+        /// Public read-only mirror of IsCameraWithinEngageDistance() - the SAME
+        /// horizontal, tip-based Snap Distance check ReachByDistance's own
+        /// attack triggering uses, exposed so anything outside this class (see
+        /// ARShareController's WarningPopup) can ask "is the viewer currently
+        /// close enough for THIS tentacle to attack" without duplicating the
+        /// distance math or depending on ReachByDistance being enabled - a
+        /// tentacle with SnapAtCameraOnSettle only (no repeating
+        /// ReachByDistance attacks) still has a perfectly meaningful "attack
+        /// range" via its own SnapDistance. Re-added (was briefly removed
+        /// along with the original Distance Alert screen it existed for -
+        /// see git history around "Remove the Distance Alert" - now reused
+        /// for the same purpose by the newer WarningPopup).
+        /// </summary>
+        public bool IsCameraWithinAttackRange => IsCameraWithinEngageDistance();
+
         private bool IsCameraWithinHoldDistance()
         {
             Transform cam = ResolveCamera();

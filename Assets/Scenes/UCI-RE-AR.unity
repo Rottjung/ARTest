@@ -1700,6 +1700,10 @@ PrefabInstance:
       propertyPath: Preloader
       value: 
       objectReference: {fileID: 404304985}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: MotionWarningHoldSeconds
+      value: 0.5
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

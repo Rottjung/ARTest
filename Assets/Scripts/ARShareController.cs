@@ -91,12 +91,14 @@ namespace ARReveal
     /// uses HandoffToInstantTracking's QR+SLAM handoff or
     /// RevealOnTrackingFound's simpler direct-image-tracking reveal). Shows
     /// a rounded-square viewfinder frame to place the QR in, an
-    /// instructional text line ("Preparing..." while TargetPreloader hasn't
-    /// finished warming the browser's cache yet, else "Scan the QR to
-    /// calibrate" - see TargetPreloader's own doc comment for the real
-    /// cold-cache bug this avoids), and a round loading ring (a "loading bar
-    /// that fills in a loop" per direct request - see
-    /// SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
+    /// instructional text line (whatever's authored directly on it - code
+    /// never writes to it at all, per direct request; it used to
+    /// dynamically swap to "Preparing..." while TargetPreloader hadn't
+    /// finished warming the browser's cache yet, see TargetPreloader's own
+    /// doc comment for the cold-cache bug that was flagging, but that
+    /// overwrote hand-authored wording so it was removed), and a round
+    /// loading ring (a "loading bar that fills in a loop" per direct
+    /// request - see SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
     /// bottom. Once content actually spawns, the ring freezes full and the
     /// label switches to "BEREIT!" (German, per direct request - matching
     /// every other label on this screen, was left in English) - held for
@@ -199,7 +201,7 @@ namespace ARReveal
         [Tooltip("Direct image-tracking scenes with no QR/SLAM at all (UCI-RE, the safety backup) - auto-found in the scene if left blank. Only ever consulted when Handoff above is null, so this has zero effect on a scene where Handoff is assigned.")]
         public RevealOnTrackingFound DirectTrackingReveal;
 
-        [Tooltip("Optional - auto-found in the scene if left blank. While this hasn't finished preloading the .zpt yet, the calibration screen shows a 'Preparing...' message instead of 'Scan the QR' - see TargetPreloader's own doc comment for the real bug this addresses (a cold browser cache losing the race against the QR actually being scanned).")]
+        [Tooltip("Optional - auto-found in the scene if left blank. Currently unused by this class - it used to make the calibration screen show a 'Preparing...' message instead of 'Scan the QR' while this hadn't finished preloading the .zpt yet (see TargetPreloader's own doc comment for the cold-cache race that was addressing), but that meant overwriting InstructionText's own hand-authored wording, which was removed per direct request. Left assigned/found in case that distinction is wanted back some other way (e.g. a separate label, or gating something other than text).")]
         public TargetPreloader Preloader;
 
         [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each")]
@@ -539,20 +541,20 @@ namespace ARReveal
                 SetActiveIfNotNull(_spinnerImage != null ? _spinnerImage.gameObject : null, true);
                 SetActiveIfNotNull(_readyImage, false);
 
-                // "Preparing..." instead of "Scan the QR" while the .zpt
-                // itself is still preloading - see TargetPreloader's own
-                // doc comment for the real bug this avoids (scanning before
-                // the target data has actually loaded can never be detected,
-                // no matter how well the QR is framed).
-                bool targetReady = Preloader == null || Preloader.IsReady;
-                // CalibratingText is left completely untouched here (null)
-                // per direct request - "do not override the calibrating
-                // text we have until it is time to change it to Bereit."
-                // Whatever's authored on it directly (e.g. "CALIBRATING...")
-                // just stays as-is through this whole phase; the ONLY write
-                // this label ever gets is the "BEREIT!" one below, at the
-                // exact instant content is revealed.
-                SetCalibrationMessage(cameraReady && !targetReady ? "Preparing..." : "Scan the QR to calibrate", null);
+                // Neither InstructionText nor CalibratingText is touched
+                // here at all, per direct request - "the calibration
+                // instruction text now is overwritten" was a real
+                // complaint, not just about CalibratingText/BEREIT!.
+                // Whatever's authored directly on both labels (e.g. "Scan
+                // the QR to calibrate" / "CALIBRATING...") stays exactly
+                // as-is through this whole phase; the ONLY write either of
+                // them ever gets is CalibratingText's own "BEREIT!" one
+                // below, at the exact instant content is revealed. This
+                // does give up the earlier "Preparing..." vs "Scan the QR"
+                // distinction (see TargetPreloader's own doc comment for
+                // the cold-cache race it used to flag) - Preloader is still
+                // read/wired for that same reason elsewhere if it's ever
+                // wanted back, just not via overwriting this text.
 
                 SetActiveIfNotNull(_page1Group, false);
                 SetActiveIfNotNull(_page2Group, false);

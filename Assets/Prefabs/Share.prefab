@@ -2093,6 +2093,7 @@ MonoBehaviour:
   RecordButtonOverride: {fileID: 9158834148150077796}
   TeilenButtonOverride: {fileID: 7278621878270820834}
   RescanButtonOverride: {fileID: 2253058174593237410}
+  DiscardButtonOverride: {fileID: 0}
   SpinnerImageOverride: {fileID: 3236513036009679960}
   InstructionTextOverride: {fileID: 5318052297079846819}
   CalibratingTextOverride: {fileID: 7504971677378644879}
@@ -2106,6 +2107,7 @@ MonoBehaviour:
   ReadyFadeOutSeconds: 0.6
   MotionWarningSpeedThreshold: 3
   MotionWarningAngularThreshold: 90
+  MotionSampleWindowSeconds: 0.15
   MotionWarningHoldSeconds: 1
   SortingOrder: 600
 --- !u!114 &7474852215128486976

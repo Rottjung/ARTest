@@ -52,11 +52,16 @@ namespace ARReveal
     ///    leaving Teilen as the actual "share this now" trigger - Teilen
     ///    already called ShareLastPhoto before (as a secondary "re-share if
     ///    the dialog was dismissed" convenience), now promoted to the
-    ///    primary one. (A brief Foto/Video mode-picker existed here too, for
-    ///    a video-recording feature the client ended up dropping before it
-    ///    was ever built out beyond a placeholder - removed again per
-    ///    direct request; see git history around "Add Foto/Video mode
-    ///    picker" if it's ever wanted back.)
+    ///    primary one, and resumes the experience afterward (ClearPreviewState
+    ///    - hides the preview, un-pauses the CTA countdown) per direct
+    ///    request. A top-left "back" button (DiscardButton/DiscardPreview,
+    ///    also per direct request) does the same resume WITHOUT sharing,
+    ///    for discarding a photo the viewer decided against. (A brief
+    ///    Foto/Video mode-picker existed here too, for a video-recording
+    ///    feature the client ended up dropping before it was ever built out
+    ///    beyond a placeholder - removed again per direct request; see git
+    ///    history around "Add Foto/Video mode picker" if it's ever wanted
+    ///    back.)
     ///
     /// A third "Distance Alert" screen (warning the viewer to step back) was
     /// tried and then removed entirely per direct request - it's since come
@@ -229,6 +234,8 @@ namespace ARReveal
         public Button TeilenButtonOverride;
         [Tooltip("The bottom-center Rescan button (see BuildRescanButton/Rescan) - drag it in directly if hand-tuning its position/sprite, or leave blank to find it by name (RescanButton) under the canvas root.")]
         public Button RescanButtonOverride;
+        [Tooltip("Top-left 'back' button shown only while PhotoPreview is up (see DiscardPreview) - discards the captured photo without sharing it. Overrides the by-name lookup (DiscardButton) under the canvas root.")]
+        public Button DiscardButtonOverride;
         [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
         public Image SpinnerImageOverride;
         [Tooltip("Drag the calibration screen's instructional TMP text component here directly - overrides the by-name lookup (Page0_Calibration/InstructionText).")]
@@ -281,6 +288,7 @@ namespace ARReveal
         private GameObject _page2Group;
         private GameObject _page3Group;
         private GameObject _rescanButton;
+        private GameObject _discardButton;
         private GameObject _warningPopupGroup;
         private TMP_Text _warningText;
 
@@ -400,6 +408,9 @@ namespace ARReveal
             // from the root instead.
             EnsurePhotoPreview(canvasRoot);
 
+            var discardTransform = DiscardButtonOverride != null ? DiscardButtonOverride.transform : canvasRoot.Find("DiscardButton");
+            _discardButton = discardTransform != null ? discardTransform.gameObject : null;
+
             // Checks Page1_Experience first - the button's own natural home
             // now that Page1 shares its exact visibility window (see
             // Update()'s own doc comment) - falling back to the old
@@ -428,12 +439,14 @@ namespace ARReveal
             // by-name fallback (which only knows the OLD root-level path)
             // never gets a chance to miss it.
             WireButton(rescanButtonComponent, canvasRoot, "RescanButton", Rescan);
+            WireButton(DiscardButtonOverride, canvasRoot, "DiscardButton", DiscardPreview);
 
             SetActiveIfNotNull(_page0Group, false);
             SetActiveIfNotNull(_page1Group, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
             SetActiveIfNotNull(_rescanButton, false);
+            SetActiveIfNotNull(_discardButton, false);
             SetActiveIfNotNull(_warningPopupGroup, false);
 
             EnsureFlashOverlay(canvasRoot);
@@ -508,6 +521,7 @@ namespace ARReveal
                 // the per-frame sync below), since that re-applies
                 // _hasCapturedPreview's own unchanged value.
                 SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
+                SetActiveIfNotNull(_discardButton, false);
                 return;
             }
             SetActiveIfNotNull(_warningPopupGroup, false);
@@ -562,6 +576,7 @@ namespace ARReveal
                 SetActiveIfNotNull(_rescanButton, false);
                 _hasCapturedPreview = false;
                 SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
+                SetActiveIfNotNull(_discardButton, false);
                 _handoffStartTime = -1f;
                 _screen = UiScreen.None;
                 _contentSpawnedAt = -1f;
@@ -649,6 +664,7 @@ namespace ARReveal
             // where it's set) so it correctly reappears on its own once the
             // WarningPopup branch above stops forcing it hidden.
             SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, _hasCapturedPreview);
+            SetActiveIfNotNull(_discardButton, _hasCapturedPreview);
 
             // Page1_Experience (per direct request) shares this EXACT same
             // window - active once the calibration screen has fully finished
@@ -889,11 +905,13 @@ namespace ARReveal
             _page2Group = BuildPage2(canvasGo.transform);
             _page3Group = BuildPage3(canvasGo.transform);
             _rescanButton = BuildRescanButton(canvasGo.transform);
+            _discardButton = BuildDiscardButton(canvasGo.transform);
 
             _page0Group.SetActive(false);
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
             _rescanButton.SetActive(false);
+            _discardButton.SetActive(false);
 
             EnsureFlashOverlay(canvasGo.transform);
         }
@@ -1297,6 +1315,33 @@ namespace ARReveal
             return button.gameObject;
         }
 
+        /// <summary>
+        /// Top-left "back" button, shown only while PhotoPreview is up (see
+        /// DiscardPreview/Update()'s per-frame _hasCapturedPreview sync) -
+        /// per direct request, discards the captured photo without sharing
+        /// it. A root-level sibling (like RescanButton/WarningPopup), NOT a
+        /// child of PhotoPreview itself - PhotoPreview is deliberately an
+        /// EARLY sibling so whichever page (Page1/Page3) draws on top of it
+        /// (see EnsurePhotoPreview's own doc comment), and Unity renders an
+        /// entire earlier sibling's subtree - including any children -
+        /// before a later sibling's, so a child of PhotoPreview would
+        /// render (and layer for input) BEHIND Page1/Page3's own buttons
+        /// too. Placing this as its own later root sibling instead keeps it
+        /// reliably on top and tappable regardless of what else is on
+        /// screen.
+        /// </summary>
+        private GameObject BuildDiscardButton(Transform parent)
+        {
+            var buttonSprite = CreateCircleSprite(new Color(0f, 0f, 0f, 0.55f), 120);
+            var button = BuildImageButton(parent, "DiscardButton", buttonSprite,
+                new Vector2(-420f, 800f), new Vector2(120f, 120f), DiscardPreview);
+
+            var label = AddPlaceholderText(button.transform, "Label", "←", 56, Vector2.zero, new Vector2(120f, 120f));
+            label.raycastTarget = false;
+
+            return button.gameObject;
+        }
+
         private static Image AddImage(Transform parent, Sprite sprite, Vector2 anchoredPos, Vector2 size)
         {
             var go = new GameObject("Image");
@@ -1626,6 +1671,37 @@ namespace ARReveal
         }
 
         /// <summary>
+        /// Hides the preview/discard button and resumes the paused Call To
+        /// Action countdown (by clearing _hasCapturedPreview - see that
+        /// field's own doc comment) - shared by Teilen() (per direct
+        /// request: "resume the experience after sharing") and
+        /// DiscardPreview() below. Does NOT touch _lastPhotoBytes itself -
+        /// Teilen still needs it (ShareLastPhoto runs first); DiscardPreview
+        /// clears it separately, right after calling this.
+        /// </summary>
+        private void ClearPreviewState()
+        {
+            _hasCapturedPreview = false;
+            SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
+            SetActiveIfNotNull(_discardButton, false);
+        }
+
+        /// <summary>
+        /// The top-left "back" button on the photo preview, per direct
+        /// request - discards the captured photo WITHOUT sharing it and
+        /// resumes the experience exactly like Teilen does (ClearPreviewState),
+        /// just skipping ShareLastPhoto entirely. Also clears
+        /// _lastPhotoBytes itself (not just hiding the preview) so a stray
+        /// later Teilen tap can't accidentally re-share a photo the viewer
+        /// explicitly discarded.
+        /// </summary>
+        public void DiscardPreview()
+        {
+            _lastPhotoBytes = null;
+            ClearPreviewState();
+        }
+
+        /// <summary>
         /// Reads the current frame straight off the screen and encodes it to
         /// JPEG - same technique Zappar's own ZSaveNShare.TakeSnapshot uses
         /// internally, just done directly so this project owns the bytes
@@ -1677,10 +1753,16 @@ namespace ARReveal
         /// dismissed by mistake" convenience; it's simply promoted to the
         /// primary trigger now that capture and share are two separate
         /// steps instead of one.
+        ///
+        /// Resumes the experience afterward (ClearPreviewState), per direct
+        /// request - hides the preview/discard button and un-pauses the
+        /// Call To Action countdown, so sharing doesn't leave the viewer
+        /// stuck looking at the same captured photo indefinitely.
         /// </summary>
         public void Teilen()
         {
             ShareLastPhoto();
+            ClearPreviewState();
         }
     }
 }

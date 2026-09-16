@@ -132,14 +132,25 @@ namespace ARReveal
     /// class is a pre-rendered PNG per this project's own convention, swap
     /// these two TMP components for Image components once real assets
     /// exist. Every text field in this class is TMP, not legacy
-    /// UnityEngine.UI.Text, per direct request. SetCalibrationMessage only
-    /// ever auto-writes hardcoded wording ("CALIBRATING...", "Scan the QR
-    /// to calibrate", "READY!", etc.) to whichever of InstructionText/
-    /// CalibratingText has its OWN InstructionTextOverride/
-    /// CalibratingTextOverride field left empty - per direct request,
-    /// dragging a specific TMP text object into either override field means
-    /// "hand off control of this label's wording entirely," so it's never
-    /// touched/overwritten after that.
+    /// UnityEngine.UI.Text, per direct request. SetCalibrationMessage
+    /// writes InstructionText's own live wording ("Preparing...", "Scan the
+    /// QR to calibrate") every frame regardless of whether
+    /// InstructionTextOverride is set - an earlier version skipped writing
+    /// to an overridden field entirely, which broke this (real-device
+    /// report: InstructionTextOverride was assigned, same as every other
+    /// *Override field here, just to point at the hand-tuned object, not
+    /// to opt out of the live text). CalibratingText is different, per a
+    /// LATER direct request ("do not override the calibrating text we have
+    /// until it is time to change it to BEREIT!") - whatever's authored on
+    /// it directly is left completely untouched through the whole
+    /// calibrating phase (Update() passes null for it there), and it only
+    /// ever gets written once, to "BEREIT!", in the exact instant content
+    /// is revealed - that one write still ignores
+    /// CalibratingTextOverride too, for the same reason InstructionText's
+    /// does. Overriding either field now only ever means "use this exact
+    /// object," matching QrFrameOverride/ReadyImageOverride, which were
+    /// never skipped like
+    /// this to begin with.
     ///
     /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
     /// removed entirely per direct request (no camera-switching UI at all
@@ -534,7 +545,14 @@ namespace ARReveal
                 // the target data has actually loaded can never be detected,
                 // no matter how well the QR is framed).
                 bool targetReady = Preloader == null || Preloader.IsReady;
-                SetCalibrationMessage(cameraReady && !targetReady ? "Preparing..." : "Scan the QR to calibrate", "CALIBRATING...");
+                // CalibratingText is left completely untouched here (null)
+                // per direct request - "do not override the calibrating
+                // text we have until it is time to change it to Bereit."
+                // Whatever's authored on it directly (e.g. "CALIBRATING...")
+                // just stays as-is through this whole phase; the ONLY write
+                // this label ever gets is the "BEREIT!" one below, at the
+                // exact instant content is revealed.
+                SetCalibrationMessage(cameraReady && !targetReady ? "Preparing..." : "Scan the QR to calibrate", null);
 
                 SetActiveIfNotNull(_page1Group, false);
                 SetActiveIfNotNull(_page2Group, false);
@@ -646,22 +664,29 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Sets the calibration screen's two placeholder text labels - pass
-        /// null for either to leave it as-is (e.g. the instruction line
-        /// doesn't need to change for the READY state). ONLY writes to a
-        /// label whose own *TextOverride field was left empty - per direct
-        /// request, dragging a specific TMP text object into
-        /// InstructionTextOverride/CalibratingTextOverride means "I'm
-        /// hand-authoring this label myself" (custom wording, a real
-        /// translation, different styling split across runs, etc.), so this
-        /// must never overwrite it. Auto-writing the hardcoded default
-        /// strings only happens for the plain procedurally-built/by-name-found
-        /// case (no override given), same as before.
+        /// Sets the calibration screen's two live status labels - pass null
+        /// for either to leave it as-is (e.g. the instruction line doesn't
+        /// need to change for the READY state). ALWAYS writes, regardless
+        /// of whether InstructionTextOverride/CalibratingTextOverride is
+        /// set - an earlier version skipped writing to an overridden field
+        /// entirely (on the theory that dragging a text object into the
+        /// override slot meant "hand-authoring this wording myself"), but a
+        /// real-device report of "BEREIT! is out of sync with the Ready
+        /// image" traced straight back to that: CalibratingTextOverride was
+        /// assigned (same as every other *Override field here - just
+        /// pointing at the hand-tuned object, not opting out of the live
+        /// CALIBRATING/BEREIT status text), so the write that's supposed to
+        /// happen in the SAME instant the Ready image appears (see Update())
+        /// was being silently skipped, and whatever "Bereit" eventually
+        /// showed wasn't coming from this method at all. Overriding these
+        /// fields now only ever means "use this exact object," matching
+        /// QrFrameOverride/ReadyImageOverride, whose own SetActiveIfNotNull
+        /// calls were never skipped like this in the first place.
         /// </summary>
         private void SetCalibrationMessage(string instruction, string calibrating)
         {
-            if (instruction != null && _instructionText != null && InstructionTextOverride == null) _instructionText.text = instruction;
-            if (calibrating != null && _calibratingText != null && CalibratingTextOverride == null) _calibratingText.text = calibrating;
+            if (instruction != null && _instructionText != null) _instructionText.text = instruction;
+            if (calibrating != null && _calibratingText != null) _calibratingText.text = calibrating;
         }
 
         /// <summary>

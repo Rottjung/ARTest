@@ -282,6 +282,23 @@ namespace ARReveal
         private Image _photoPreviewImage;
         private ZapparCamera _zapparCamera;
 
+        /// <summary>
+        /// True from the moment a capture completes (ShowPhotoPreview) until
+        /// something explicitly clears it (Foto()'s fresh-entry reset, or
+        /// the full "!HasRevealedContent" reset) - the single source of
+        /// truth for "should PhotoPreview be showing right now" AND, per
+        /// direct request, for pausing the Page2DelaySeconds Call To Action
+        /// countdown while it's true (see Update()'s own "PAUSE" comment) -
+        /// so reviewing/sharing a just-captured photo (from Page1 or Page3)
+        /// never gets interrupted by the CTA screen suddenly taking over.
+        /// Deliberately independent of _photoPreviewImage's own active
+        /// state, which Update() also forces false whenever a warning is
+        /// overriding everything (see its WarningPopup section) - this flag
+        /// is what lets the preview correctly reappear once the warning
+        /// clears, and keeps the CTA paused throughout regardless.
+        /// </summary>
+        private bool _hasCapturedPreview;
+
         // --- Warning popup state (see UpdateWarningState/UpdateMotionPeak/UpdateTooClose) ---
         private Vector3 _lastCamPos;
         private Quaternion _lastCamRot = Quaternion.identity;
@@ -360,7 +377,15 @@ namespace ARReveal
             _readyImage = ReadyImageOverride != null ? ReadyImageOverride : (readyImageTransform != null ? readyImageTransform.gameObject : null);
             _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
 
-            if (_page3Group != null) EnsurePhotoPreview(_page3Group.transform);
+            // On the canvas root, NOT nested under Page3_SharePrompt - per
+            // direct request, a capture triggered from Page1_Experience's
+            // own RecordButton needs the preview visible too, and Page3
+            // being inactive at that moment would keep a Page3-nested
+            // preview invisible regardless of its own active state. See
+            // EnsurePhotoPreview's own doc comment for how it stays
+            // correctly layered (behind whichever page's own buttons/text)
+            // from the root instead.
+            EnsurePhotoPreview(canvasRoot);
 
             // Checks Page1_Experience first - the button's own natural home
             // now that Page1 shares its exact visibility window (see
@@ -463,6 +488,13 @@ namespace ARReveal
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
                 SetActiveIfNotNull(_rescanButton, false);
+                // Forced hidden too (NOT cleared - _hasCapturedPreview itself
+                // is untouched) so a warning can never be visually covered by
+                // an opaque captured-photo preview sitting behind it. Comes
+                // back on its own the moment this branch stops running (see
+                // the per-frame sync below), since that re-applies
+                // _hasCapturedPreview's own unchanged value.
+                SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
                 return;
             }
             SetActiveIfNotNull(_warningPopupGroup, false);
@@ -508,6 +540,8 @@ namespace ARReveal
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
                 SetActiveIfNotNull(_rescanButton, false);
+                _hasCapturedPreview = false;
+                SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
                 _handoffStartTime = -1f;
                 _screen = UiScreen.None;
                 _contentSpawnedAt = -1f;
@@ -569,11 +603,32 @@ namespace ARReveal
 
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
-            if (_screen == UiScreen.None && Time.time - _handoffStartTime >= Page2DelaySeconds)
+            // PAUSE the Call To Action countdown while a captured photo is
+            // being shown, per direct request ("we don't want the cta to
+            // interrupt") - a capture can now happen from Page1_Experience
+            // itself (its own RecordButton), well before the CTA would
+            // normally appear, and reviewing/sharing it shouldn't get
+            // yanked away by the CTA suddenly taking over mid-review.
+            // Pushing _handoffStartTime forward by exactly this frame's
+            // elapsed time freezes Time.time - _handoffStartTime at
+            // whatever it was the instant the capture happened - the
+            // simplest way to pause a countdown expressed as "time since
+            // X" without needing a separate accumulated-pause-duration
+            // variable. Resumes exactly where it left off the moment
+            // _hasCapturedPreview goes false again. Harmless (a no-op) once
+            // _screen has already moved past None, e.g. capturing again
+            // from Page3 itself.
+            if (_hasCapturedPreview)
+                _handoffStartTime += Time.deltaTime;
+            else if (_screen == UiScreen.None && Time.time - _handoffStartTime >= Page2DelaySeconds)
                 _screen = UiScreen.CallToAction;
 
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
+            // Re-applies _hasCapturedPreview every frame (rather than only
+            // where it's set) so it correctly reappears on its own once the
+            // WarningPopup branch above stops forcing it hidden.
+            SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, _hasCapturedPreview);
 
             // Page1_Experience (per direct request) shares this EXACT same
             // window - active once the calibration screen has fully finished
@@ -798,6 +853,11 @@ namespace ARReveal
 
             canvasGo.AddComponent<GraphicRaycaster>();
 
+            // First sibling - see EnsurePhotoPreview's own doc comment for
+            // why it needs to render BEHIND whichever page (Page1/Page3)
+            // ends up above it.
+            EnsurePhotoPreview(canvasGo.transform);
+
             _page0Group = BuildPage0(canvasGo.transform);
             _page2Group = BuildPage2(canvasGo.transform);
             _page3Group = BuildPage3(canvasGo.transform);
@@ -876,19 +936,34 @@ namespace ARReveal
         /// A full-screen Image showing the most recently captured photo -
         /// per direct request: "the client wants the video or foto to be
         /// shown first, and if we click teilen we go to the native share."
-        /// Kept as the FIRST sibling under Page3_SharePrompt (opposite of
-        /// CaptureFlash's LAST-sibling convention above) so it renders
-        /// BEHIND the mode buttons/record button/Teilen/text - it's meant
-        /// to visually replace the live camera view once something's been
-        /// captured, not cover up the controls needed to retake or share it.
+        ///
+        /// Lives directly on the CANVAS ROOT (a sibling of Page0/1/2/3, not
+        /// nested inside Page3_SharePrompt) - per direct follow-up request,
+        /// a capture triggered from Page1_Experience's own RecordButton
+        /// needs this visible too, and it can't be if it's a child of
+        /// Page3_SharePrompt while that page happens to be inactive. Kept
+        /// as the FIRST sibling on the root (opposite of CaptureFlash's
+        /// LAST-sibling convention below) so whichever page IS active
+        /// (Page1 or Page3, both added as LATER siblings) always draws its
+        /// own buttons/text on top of it, rather than this covering them -
+        /// it's meant to visually replace the live camera view behind
+        /// everything once something's been captured, not obscure the
+        /// controls needed to retake or share it. Its own active state is
+        /// driven entirely by _hasCapturedPreview (see Update()), which is
+        /// what actually decides "is a preview currently supposed to be
+        /// showing" independent of which page happens to be up - see that
+        /// field's own doc comment, and Update()'s WarningPopup section for
+        /// the one case (a warning firing) this gets forced hidden anyway
+        /// regardless of _hasCapturedPreview.
+        ///
         /// Starts hidden (nothing captured yet); ShowPhotoPreview() is what
-        /// actually populates and reveals it after a capture. Safe to call
-        /// repeatedly (e.g. every AttachToExistingUI/BuildPage3) - reuses an
-        /// existing "PhotoPreview" child instead of duplicating it.
+        /// actually populates it after a capture. Safe to call repeatedly
+        /// (e.g. every AttachToExistingUI/BuildUI) - reuses an existing
+        /// "PhotoPreview" child instead of duplicating it.
         /// </summary>
-        private void EnsurePhotoPreview(Transform page3Root)
+        private void EnsurePhotoPreview(Transform canvasRoot)
         {
-            var existing = page3Root.Find("PhotoPreview");
+            var existing = canvasRoot.Find("PhotoPreview");
             GameObject go;
             if (existing != null)
             {
@@ -897,7 +972,7 @@ namespace ARReveal
             else
             {
                 go = new GameObject("PhotoPreview");
-                go.transform.SetParent(page3Root, false);
+                go.transform.SetParent(canvasRoot, false);
                 var rt = go.AddComponent<RectTransform>();
                 rt.anchorMin = Vector2.zero;
                 rt.anchorMax = Vector2.one;
@@ -1146,10 +1221,6 @@ namespace ARReveal
         {
             var group = new GameObject("Page3_SharePrompt");
             group.transform.SetParent(parent, false);
-
-            // First sibling - see EnsurePhotoPreview's own doc comment for
-            // why it needs to render BEHIND every button/text added below.
-            EnsurePhotoPreview(group.transform);
 
             AddImage(group.transform, Page3TextSprite, new Vector2(0f, 400f), new Vector2(760f, 260f));
 
@@ -1437,6 +1508,7 @@ namespace ARReveal
         public void Foto()
         {
             _screen = UiScreen.SharePrompt;
+            _hasCapturedPreview = false;
             SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
         }
 
@@ -1517,6 +1589,12 @@ namespace ARReveal
             _photoPreviewImage.sprite = Sprite.Create(_previewTexture,
                 new Rect(0f, 0f, _previewTexture.width, _previewTexture.height), new Vector2(0.5f, 0.5f));
 
+            // The actual "show it" - _hasCapturedPreview is what Update()
+            // reads every frame afterward to keep this active (and the CTA
+            // countdown paused - see that field's own doc comment); setting
+            // the GameObject active here too just avoids a one-frame delay
+            // before Update() next runs.
+            _hasCapturedPreview = true;
             _photoPreviewImage.gameObject.SetActive(true);
         }
 

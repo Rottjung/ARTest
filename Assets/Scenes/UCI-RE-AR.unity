@@ -1652,6 +1652,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3660753564888597289, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4597595391347692509, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 11.49497
@@ -1704,6 +1708,10 @@ PrefabInstance:
       propertyPath: Preloader
       value: 
       objectReference: {fileID: 404304985}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: DiscardButtonOverride
+      value: 
+      objectReference: {fileID: 2024501948}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -2298,6 +2306,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
+--- !u!114 &2024501948 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4059919990307038723, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1001 &2081206631
 PrefabInstance:
   m_ObjectHideFlags: 0

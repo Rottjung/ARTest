@@ -1696,6 +1696,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Share
       objectReference: {fileID: 0}
+    - target: {fileID: 5486816648818253643, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: Preloader
       value: 

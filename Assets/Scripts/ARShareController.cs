@@ -770,11 +770,15 @@ namespace ARReveal
         /// A full-screen "PhotoPreview" showing the most recently captured
         /// photo, FRAMED per direct request ("frame the preview a bit so its
         /// clear it a pic, not just frozen screen") - a dark dimming
-        /// background, a light "PhotoFrame" mat inset within it, and the
-        /// actual "PhotoImage" inset further inside that by a border
-        /// thickness, so it reads as a distinct framed photograph sitting
-        /// on top of the (dimmed) live view rather than the screen just
-        /// having frozen. All three layers have raycastTarget on, but only
+        /// background (now fully covered in practice, see below, but kept in
+        /// case that ever changes), a full-screen white "PhotoFrame" mat,
+        /// and the actual "PhotoImage" inset within that by a border
+        /// thickness, so it reads as a distinct framed photograph rather
+        /// than the screen just having frozen. PhotoFrame itself is
+        /// full-screen (edge-to-edge) per a later direct request ("make the
+        /// previewframe size so the white border around it touches the
+        /// edges of the screen") - an earlier version used a fixed centered
+        /// size instead. All three layers have raycastTarget on, but only
         /// the OUTER "PhotoPreview" GameObject has the actual Button
         /// (calling DiscardPreview) - Unity's EventSystem walks UP the
         /// hierarchy from whichever layer was actually tapped to find it, so
@@ -817,10 +821,10 @@ namespace ARReveal
                 var frameGo = new GameObject("PhotoFrame");
                 frameGo.transform.SetParent(go.transform, false);
                 var frameRt = frameGo.AddComponent<RectTransform>();
-                frameRt.anchorMin = new Vector2(0.5f, 0.5f);
-                frameRt.anchorMax = new Vector2(0.5f, 0.5f);
-                frameRt.pivot = new Vector2(0.5f, 0.5f);
-                frameRt.sizeDelta = new Vector2(920f, 1360f);
+                frameRt.anchorMin = Vector2.zero;
+                frameRt.anchorMax = Vector2.one;
+                frameRt.offsetMin = Vector2.zero;
+                frameRt.offsetMax = Vector2.zero;
                 frameGo.AddComponent<Image>().color = Color.white;
 
                 var photoGo = new GameObject("PhotoImage");

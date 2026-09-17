@@ -37,12 +37,19 @@ namespace ARRevealEditor
 
             Undo.RegisterFullObjectHierarchyUndo(controller.gameObject, "Build Share UI");
 
+            // Page3TextSprite/RestartButtonSprite/FotoButtonSprite no longer
+            // exist on ARShareController - the UI flow they belonged to
+            // (Page3_SharePrompt's own text image, Page2's Restart+Foto
+            // button pair) was restructured away (see git history around
+            // "Restructure UI flow"). CalibrateSprite/Page1ReadySprite/
+            // ShareWinButtonSprite/RetakeButtonSprite are the new fields
+            // that replaced them, but their real asset filenames aren't
+            // known here yet - left unassigned rather than guessing wrong
+            // and silently loading an unrelated image; drag them onto
+            // ARShareController by hand once the real art exists.
             AssignIfMissing(ref controller.LogoSprite, "Logo.png");
             AssignIfMissing(ref controller.Page2TextTopSprite, "Page_02_Text_Top.png");
             AssignIfMissing(ref controller.Page2TextBottomSprite, "Page_02_Text_Bottom.png");
-            AssignIfMissing(ref controller.Page3TextSprite, "Page_03_Text.png");
-            AssignIfMissing(ref controller.RestartButtonSprite, "Use_Button_Page_02_01.png");
-            AssignIfMissing(ref controller.FotoButtonSprite, "Use_Button_Page_02_02.png");
             AssignIfMissing(ref controller.TeilenButtonSprite, "Use_Button_Page_03.png");
             AssignIfMissing(ref controller.RecordButtonSprite, "RecButton.png");
 

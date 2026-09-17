@@ -119,6 +119,17 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!114 &80951720 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4039271220583046969, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1001 &93529835
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1652,10 +1663,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 3660753564888597289, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4597595391347692509, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 11.49497
@@ -1700,35 +1707,94 @@ PrefabInstance:
       propertyPath: m_Name
       value: Share
       objectReference: {fileID: 0}
-    - target: {fileID: 5486816648818253643, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
       propertyPath: Preloader
       value: 
       objectReference: {fileID: 404304985}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: DiscardButtonOverride
+      propertyPath: FotoButtonOverride
       value: 
-      objectReference: {fileID: 2024501948}
-    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: MotionSampleWindowSeconds
-      value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: MotionWarningSpeedThreshold
-      value: 3
+      propertyPath: Page4GroupOverride
+      value: 
+      objectReference: {fileID: 1752049323}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: RescanButtonOverride
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-      propertyPath: MotionWarningAngularThreshold
-      value: 180
+      propertyPath: RetakeButtonOverride
+      value: 
+      objectReference: {fileID: 1752049322}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: SpinnerImageOverride
+      value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: RestartButtonOverride
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: ShareWinButtonOverride
+      value: 
+      objectReference: {fileID: 80951720}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: CalibratingTextOverride
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: InstructionTextOverride
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: Page1ReadyGroupOverride
+      value: 
+      objectReference: {fileID: 1752049324}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: WarningMovingImageOverride
+      value: 
+      objectReference: {fileID: 1752049321}
+    - target: {fileID: 6824161183427116650, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: WarningDistanceImageOverride
+      value: 
+      objectReference: {fileID: 1752049320}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+--- !u!1 &1752049320 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7024677673508108781, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1752049321 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3970395941465669497, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1752049322 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1330676535696618300, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+--- !u!1 &1752049323 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2897879484089758061, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &1752049324 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3863022231102473612, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+  m_PrefabInstance: {fileID: 1752049319}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1765243056
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2318,17 +2384,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 77948d5d3635d284780d7f21bb0fa83c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ARReveal.TentacleController
---- !u!114 &2024501948 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4059919990307038723, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
-  m_PrefabInstance: {fileID: 1752049319}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1001 &2081206631
 PrefabInstance:
   m_ObjectHideFlags: 0

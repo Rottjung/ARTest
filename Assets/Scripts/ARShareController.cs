@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Runtime.InteropServices;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Zappar;
@@ -14,159 +13,83 @@ namespace ARReveal
     /// none of this touches the .unity scene file at all) - this is still a
     /// completely standard Unity Canvas with real Button components underneath,
     /// exactly per convention, just constructed at runtime instead of hand-placed
-    /// in the Editor.
+    /// in the Editor. In practice the hand-tuned Share.prefab (picked up via
+    /// AttachToExistingUI) is what's actually used - the procedural BuildUI()
+    /// path below is a best-effort fallback, kept roughly in sync but not
+    /// exercised day to day.
     ///
-    /// Two of these screens are built from the final design's own PNGs (every
-    /// screen's text is pre-rendered INTO its image asset - no font/TextMeshPro
-    /// needed at all, just positioned Image components); the calibration screen
-    /// below is the one exception, see its own doc paragraph for why:
+    /// CURRENT SCREEN FLOW (rewritten per a direct, wholesale UI restructure -
+    /// see git history around "Restructure UI flow" for the previous version
+    /// if any of this needs to be reverted):
     ///
-    ///  - EXPERIENCE (Page1_Experience, per direct request): active for the
-    ///    whole stretch between the calibration screen's fade-out finishing
-    ///    and the Call To Action screen appearing (Page2DelaySeconds later) -
-    ///    see Update()'s own "Page1_Experience" comment for the exact window.
-    ///    Content/layout is whatever's placed directly in the prefab; this
-    ///    class only owns its show/hide timing. The Rescan button typically
-    ///    lives as a child of this page (see AttachToExistingUI/Rescan()'s
-    ///    own doc comments) since they share the identical visibility window.
-    ///  - CALL TO ACTION (shown Page2DelaySeconds after tracking locks): logo +
-    ///    "Heute: dieses Kino... die ganze Welt" two-line text (split into
-    ///    Page_02_Text_Top.png/Page_02_Text_Bottom.png so the logo can sit
-    ///    between them, matching the actual design mockup - the source PNG had
-    ///    both lines in one image) + RESTART and FOTO buttons.
-    ///  - SHARE PROMPT / "the selfie screen" (shown after tapping FOTO -
-    ///    Foto() is PURE NAVIGATION, it does not capture anything itself):
-    ///    "share your photo, win tickets" text + the round record button,
-    ///    the ONE real "take the photo" action (RetakePhoto - can be tapped
-    ///    more than once to retake) + TEILEN (share) button. An earlier
-    ///    version had FOTO itself capture + immediately open the save/share
-    ///    dialog, skipping this screen entirely - corrected per direct
-    ///    feedback ("that not the design... foto button make you go to the
-    ///    selfie screen... clicking the red button should make a native
-    ///    screenshot").
-    ///
-    ///    RetakePhoto no longer shares immediately either, per a LATER
-    ///    direct request ("client wants the foto shown first, and if we
-    ///    click teilen we go to the native share") - it captures and shows
-    ///    a full-screen PREVIEW instead (ShowPhotoPreview/PhotoPreview),
-    ///    leaving Teilen as the actual "share this now" trigger - Teilen
-    ///    already called ShareLastPhoto before (as a secondary "re-share if
-    ///    the dialog was dismissed" convenience), now promoted to the
-    ///    primary one, and resumes the experience afterward (ClearPreviewState
-    ///    - hides the preview, un-pauses the CTA countdown) per direct
-    ///    request. A top-left "back" button (DiscardButton/DiscardPreview,
-    ///    also per direct request) does the same resume WITHOUT sharing,
-    ///    for discarding a photo the viewer decided against. (A brief
-    ///    Foto/Video mode-picker existed here too, for a video-recording
-    ///    feature the client ended up dropping before it was ever built out
-    ///    beyond a placeholder - removed again per direct request; see git
-    ///    history around "Add Foto/Video mode picker" if it's ever wanted
-    ///    back.)
-    ///
-    /// A third "Distance Alert" screen (warning the viewer to step back) was
-    /// tried and then removed entirely per direct request - it's since come
-    /// back in a different form, folded into WarningPopup below alongside a
-    /// second, new trigger.
+    ///  - Page0_Calibration: shown as soon as the Zappar camera feed is
+    ///    actually live (ZapparCamera.CameraSourceInitialized), for as long
+    ///    as content hasn't ACTUALLY spawned yet (!HasRevealedContent - see
+    ///    that property's own doc for why HasContentSpawned, not
+    ///    HasHandedOff, is the right signal to gate on). Just a single
+    ///    static image now (whatever's authored on it directly) - no more
+    ///    dynamic text, viewfinder frame, or loading spinner; those all
+    ///    existed on this page in an earlier version, removed per direct
+    ///    request ("we don't change the calibration text anymore, we now
+    ///    just have an image"). Hides INSTANTLY (no fade of its own) the
+    ///    moment content reveals - the fade job moved to Page1_Ready below.
+    ///  - Page1_Ready: shown the INSTANT content reveals, held for
+    ///    ReadyDisplaySeconds, then eased out over ReadyFadeOutSeconds (a
+    ///    CanvasGroup fade) - per direct request, this is exactly the same
+    ///    hold-then-fade mechanism Page0 used to run internally for its own
+    ///    "BEREIT!" confirmation, just moved onto this separate page/image
+    ///    ("when we normally set the Bereit text we now show Page1_Ready...
+    ///    same fade out as we have now"). Once it fades out, NOTHING is
+    ///    shown until Page2_CallToAction appears (Page2DelaySeconds later) -
+    ///    per direct request, the whole take-a-picture-during-the-experience
+    ///    feature (an earlier Page1_Experience, with its own Record/Teilen/
+    ///    Rescan buttons) is removed entirely.
+    ///  - Page2_CallToAction: logo + "Heute: dieses Kino... die ganze Welt"
+    ///    two-line text + a single ShareWin button (replacing an earlier
+    ///    Restart+Foto pair, per direct request - Restart/replay-the-burst
+    ///    is no longer reachable from this UI, though the underlying
+    ///    Restart() method is left in place in case it's wanted back).
+    ///    Tapping ShareWin calls Foto() (kept as the method name - its ROLE
+    ///    is unchanged, just the button/label is new) which activates
+    ///    Page3_Foto.
+    ///  - Page3_Foto: the live camera + a single RecordButton - THE actual
+    ///    "take the photo" action (RetakePhoto - can be tapped more than
+    ///    once to retake). Capturing shows a full-screen framed PREVIEW
+    ///    (PhotoPreview/ShowPhotoPreview - see that method's own doc for the
+    ///    white-mat framing per direct request, "so its clear it a pic, not
+    ///    just frozen screen") AND activates Page4_Share alongside it -
+    ///    Page3_Foto itself stays active/visible underneath the whole time
+    ///    (RecordButton can still be tapped again to retake directly, same
+    ///    as before).
+    ///  - Page4_Share: TeilenButton (shares via the existing native-share
+    ///    plumbing - see Teilen's own doc comment, nothing about
+    ///    ShareLastPhoto/ARReveal_ShareImage changed) and RetakeButton
+    ///    (discards the preview and goes back to Page3_Foto - see
+    ///    DiscardPreview, shared with PhotoPreview's own tap-to-dismiss).
+    ///    Both hide Page4_Share/the preview afterward (ClearPreviewState).
     ///
     /// WARNING POPUP (WarningPopup, per direct request): overrides
     /// whichever OTHER page is currently showing - same "highest priority"
-    /// precedent the original Distance Alert screen set - for either of two
-    /// reasons (see UpdateWarningState/UpdateMotionPeak/UpdateTooClose):
+    /// precedent an even earlier "Distance Alert" screen set (see git
+    /// history around "Remove the Distance Alert" if that's ever needed) -
+    /// for either of two reasons (see UpdateWarningState/UpdateMotionPeak/
+    /// UpdateTooClose):
     ///  - TOO FAST: the AR camera's own frame-to-frame linear/angular speed
     ///    spiked (MotionWarningSpeedThreshold/MotionWarningAngularThreshold)
-    ///    - shows "Den Scanner langsamer bewegen." Built for this project's
-    ///    own real-world finding that scanning the ground-level QR then
-    ///    tilting up fast to the building is exactly when tracking drifts
-    ///    worst - coaching a slower tilt attacks that at the source rather
-    ///    than only hiding it after the fact.
+    ///    - turns on the "Moving" image. Built for this project's own
+    ///    real-world finding that scanning the ground-level QR then tilting
+    ///    up fast to the building is exactly when tracking drifts worst -
+    ///    coaching a slower tilt attacks that at the source rather than
+    ///    only hiding it after the fact.
     ///  - TOO CLOSE: the viewer is within actual tentacle-attack range - the
-    ///    SAME mechanism the original Distance Alert used
-    ///    (TentacleController.IsCameraWithinAttackRange, re-added - see its
-    ///    own doc comment) - shows an in-universe biohazard-style warning
-    ///    ("Achtung! Zu nah am Subjekt. Infektionsgefahr! Gehe zurück!"),
-    ///    matching the Resident Evil theme rather than reading as a generic
-    ///    app error message.
-    ///
-    /// CALIBRATION SCREEN (Page0_Calibration - see BuildCalibrationScreen):
-    /// shown as soon as the Zappar camera feed is actually live
-    /// (ZapparCamera.CameraSourceInitialized), for as long as content hasn't
-    /// ACTUALLY spawned yet (!HasRevealedContent - see that property's own
-    /// doc for why HasContentSpawned, not HasHandedOff, is the right signal
-    /// to gate on, and for why this works identically whether the scene
-    /// uses HandoffToInstantTracking's QR+SLAM handoff or
-    /// RevealOnTrackingFound's simpler direct-image-tracking reveal). Shows
-    /// a rounded-square viewfinder frame to place the QR in, an
-    /// instructional text line (whatever's authored directly on it - code
-    /// never writes to it at all, per direct request; it used to
-    /// dynamically swap to "Preparing..." while TargetPreloader hadn't
-    /// finished warming the browser's cache yet, see TargetPreloader's own
-    /// doc comment for the cold-cache bug that was flagging, but that
-    /// overwrote hand-authored wording so it was removed), and a round
-    /// loading ring (a "loading bar that fills in a loop" per direct
-    /// request - see SetUpAsLoadingRing/LateUpdate) + "CALIBRATING..." label at the
-    /// bottom. Once content actually spawns, the ring freezes full and the
-    /// label switches to "BEREIT!" (German, per direct request - matching
-    /// every other label on this screen, was left in English) - held for
-    /// ReadyDisplaySeconds, then EASED
-    /// OUT over ReadyFadeOutSeconds (a CanvasGroup fade, not an instant
-    /// SetActive(false)) rather than just vanishing - both per direct
-    /// on-site feedback that the READY confirmation was disappearing too
-    /// fast for a viewer to actually register it (a viewer staring at their
-    /// phone could otherwise miss the reveal entirely with nothing telling
-    /// them to look). Normally shown exactly once per session after that -
-    /// this falls straight out of HasContentSpawned/HasRevealed's own
-    /// existing semantics on either underlying component (set true on the
-    /// very first reveal and never reset back to false on their own,
-    /// including a later passive re-scan/re-lock), so a passive re-scan
-    /// after that first lock (the QR happening to be glimpsed again)
-    /// silently just re-corrects the anchor as it always did, with no UI
-    /// interruption at all - "if we scan the AR again just keep what we
-    /// have now" per direct request. A DELIBERATE full recalibration is
-    /// still available via the bottom-center Rescan button (see
-    /// BuildRescanButton/Rescan) - shown once this screen has fully hidden
-    /// and neither other page is up, it forces HasContentSpawned/HasRevealed
-    /// back to false (HandoffToInstantTracking.RequestRescan()/
-    /// RevealOnTrackingFound.RequestRescan()), which puts this exact screen
-    /// straight back up and waits for a fresh QR scan through the same
-    /// settle/lock pipeline as the very first time - per direct request,
-    /// "put the calibrate UI back on and we can rescan and reset with the
-    /// same flow as the first time." The frame and loading ring are generated at runtime
-    /// (CreateRoundedFrameSprite/CreateRingSprite, same procedural-texture
-    /// approach as CreateCircleSprite below) since no design asset exists
-    /// for this screen yet; the two text labels use a plain TMP
-    /// (TextMeshProUGUI) placeholder with TMP's own default font asset as a
-    /// placeholder for the same reason - EVERY OTHER screen's text in this
-    /// class is a pre-rendered PNG per this project's own convention, swap
-    /// these two TMP components for Image components once real assets
-    /// exist. Every text field in this class is TMP, not legacy
-    /// UnityEngine.UI.Text, per direct request. SetCalibrationMessage
-    /// writes InstructionText's own live wording ("Preparing...", "Scan the
-    /// QR to calibrate") every frame regardless of whether
-    /// InstructionTextOverride is set - an earlier version skipped writing
-    /// to an overridden field entirely, which broke this (real-device
-    /// report: InstructionTextOverride was assigned, same as every other
-    /// *Override field here, just to point at the hand-tuned object, not
-    /// to opt out of the live text). CalibratingText is different, per a
-    /// LATER direct request ("do not override the calibrating text we have
-    /// until it is time to change it to BEREIT!") - whatever's authored on
-    /// it directly is left completely untouched through the whole
-    /// calibrating phase (Update() passes null for it there), and it only
-    /// ever gets written once, to "BEREIT!", in the exact instant content
-    /// is revealed - that one write still ignores
-    /// CalibratingTextOverride too, for the same reason InstructionText's
-    /// does. Overriding either field now only ever means "use this exact
-    /// object," matching QrFrameOverride/ReadyImageOverride, which were
-    /// never skipped like
-    /// this to begin with.
-    ///
-    /// The OLD "Selfie" button used to mean "flip to the front camera" - that's
-    /// removed entirely per direct request (no camera-switching UI at all
-    /// anymore).
-    ///
-    /// RESTART, per direct request, means replay the tentacle/hole/FX burst in
-    /// place - NOT reload the browser page (an earlier version did exactly
-    /// that via a same-tab jslib reload; superseded, see Restart()'s own doc
-    /// comment and HandoffToInstantTracking.RestartRevealSequence()).
+    ///    SAME mechanism an earlier Distance Alert screen used
+    ///    (TentacleController.IsCameraWithinAttackRange - see its own doc
+    ///    comment) - turns on the "Distance" image instead. Wins over the
+    ///    motion warning if both are somehow true at once - an actual
+    ///    proximity/attack danger reads as more urgent than a scanning tip.
+    /// Per direct request, WarningPopup shows one of two IMAGES now
+    /// (Moving/Distance), not a background + dynamic text label like an
+    /// earlier version - see UpdateWarningState.
     ///
     /// SHARING BYPASSES ZAPPAR'S OWN UI ENTIRELY, per direct request ("skip
     /// zappars ui and go native os"). An earlier version used Zappar's WebGL
@@ -176,7 +99,7 @@ namespace ARReveal
     /// dialog), and on-device testing found its Share button unreliable
     /// (silently inert on some devices, "Permission denied" from
     /// navigator.share() on others - confirmed by reading the actual
-    /// minified zappar-sharing.min.js: Save is a plain `<a download>`, only
+    /// minified zappar-sharing.min.js: Save is a plain `&lt;a download&gt;`, only
     /// Share attempts navigator.share(), wrapped in try/catch that logs but
     /// never surfaces the failure to the user). Now this project captures
     /// the photo itself (CapturePhotoBytes - same ReadPixels/EncodeToJPG
@@ -206,68 +129,55 @@ namespace ARReveal
         [Tooltip("Direct image-tracking scenes with no QR/SLAM at all (UCI-RE, the safety backup) - auto-found in the scene if left blank. Only ever consulted when Handoff above is null, so this has zero effect on a scene where Handoff is assigned.")]
         public RevealOnTrackingFound DirectTrackingReveal;
 
-        [Tooltip("Optional - auto-found in the scene if left blank. Currently unused by this class - it used to make the calibration screen show a 'Preparing...' message instead of 'Scan the QR' while this hadn't finished preloading the .zpt yet (see TargetPreloader's own doc comment for the cold-cache race that was addressing), but that meant overwriting InstructionText's own hand-authored wording, which was removed per direct request. Left assigned/found in case that distinction is wanted back some other way (e.g. a separate label, or gating something other than text).")]
+        [Tooltip("Optional - auto-found in the scene if left blank. Currently unused by this class - see git history if the 'Preparing...' cold-cache distinction this used to drive is ever wanted back.")]
         public TargetPreloader Preloader;
 
-        [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each")]
+        [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each (procedural BuildUI() fallback only - the hand-tuned Share.prefab has its own art placed directly)")]
+        public Sprite CalibrateSprite;
+        public Sprite Page1ReadySprite;
         public Sprite LogoSprite;
         public Sprite Page2TextTopSprite;
         public Sprite Page2TextBottomSprite;
-        public Sprite Page3TextSprite;
-        public Sprite RestartButtonSprite;
-        public Sprite FotoButtonSprite;
-        public Sprite TeilenButtonSprite;
-        [Tooltip("The round record/retake button on the Share Prompt screen. Falls back to a plain generated red circle if left blank.")]
+        public Sprite ShareWinButtonSprite;
+        [Tooltip("The round record button on Page3_Foto. Falls back to a plain generated red circle if left blank.")]
         public Sprite RecordButtonSprite;
-        [Tooltip("Shown on the calibration screen once content is ready (see Update()) - only used by the procedural BuildPage0() path (a fresh build with no existing hand-tuned canvas); the hand-tuned Share.prefab has its own 'Ready' image placed directly, found by name (see AttachToExistingUI). Left blank here just means nothing shows in the Ready image's place for a freshly-built UI - CalibratingText's own 'READY!' wording still works regardless.")]
-        public Sprite ReadyImageSprite;
+        public Sprite TeilenButtonSprite;
+        public Sprite RetakeButtonSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
-        [Tooltip("Shown once the calibration screen (Page0) has fully finished its fade-out, and hidden again the instant the Call To Action screen (Page2) appears - see Update(). Overrides the by-name lookup (Page1_Experience).")]
-        public GameObject Page1GroupOverride;
+        [Tooltip("The brief 'BEREIT'-equivalent confirmation shown the instant content reveals (see Update()) - overrides the by-name lookup (Page1_Ready).")]
+        public GameObject Page1ReadyGroupOverride;
         public GameObject Page2GroupOverride;
         public GameObject Page3GroupOverride;
-        public Button RestartButtonOverride;
-        public Button FotoButtonOverride;
+        [Tooltip("Shown alongside PhotoPreview once a photo's been captured on Page3_Foto (see Update()) - overrides the by-name lookup (Page4_Share).")]
+        public GameObject Page4GroupOverride;
+        public Button ShareWinButtonOverride;
         public Button RecordButtonOverride;
         public Button TeilenButtonOverride;
-        [Tooltip("The bottom-center Rescan button (see BuildRescanButton/Rescan) - drag it in directly if hand-tuning its position/sprite, or leave blank to find it by name (RescanButton) under the canvas root.")]
-        public Button RescanButtonOverride;
-        [Tooltip("Top-left 'back' button shown only while PhotoPreview is up (see DiscardPreview) - discards the captured photo without sharing it. Overrides the by-name lookup (DiscardButton) under the canvas root.")]
-        public Button DiscardButtonOverride;
-        [Tooltip("Drag the calibration screen's loading-ring Image component here directly if you're wiring/configuring it by hand - overrides the by-name lookup (Page0_Calibration/Spinner) entirely, so exact naming/nesting doesn't matter.")]
-        public Image SpinnerImageOverride;
-        [Tooltip("Drag the calibration screen's instructional TMP text component here directly - overrides the by-name lookup (Page0_Calibration/InstructionText).")]
-        public TMP_Text InstructionTextOverride;
-        [Tooltip("Drag the calibration screen's 'CALIBRATING...'/'READY!' TMP text component here directly - overrides the by-name lookup (Page0_Calibration/CalibratingText).")]
-        public TMP_Text CalibratingTextOverride;
-        [Tooltip("The QR viewfinder frame on the calibration screen - hidden the instant content is ready (see Update()), alongside InstructionText and the spinner. Overrides the by-name lookup (Page0_Calibration/QRFrame).")]
-        public GameObject QrFrameOverride;
-        [Tooltip("Shown the instant content is ready, replacing the QR frame/instruction text/spinner (see Update()) - CalibratingText stays visible throughout (just its wording changes to READY!). Overrides the by-name lookup (Page0_Calibration/Ready).")]
-        public GameObject ReadyImageOverride;
+        [Tooltip("Page4_Share's own button - discards the preview and goes back to Page3_Foto (see DiscardPreview). Overrides the by-name lookup (Page4_Share/RetakeButton).")]
+        public Button RetakeButtonOverride;
         [Tooltip("Overrides whichever other page is currently showing (see Update()'s own WarningPopup section) - either a motion warning (scanning/tilting too fast) or a proximity warning (within tentacle attack range). Overrides the by-name lookup (WarningPopup).")]
         public GameObject WarningPopupGroupOverride;
-        [Tooltip("The TMP text inside WarningPopup - overrides the by-name lookup (WarningPopup/Warning).")]
-        public TMP_Text WarningTextOverride;
+        [Tooltip("Shown for the TOO FAST warning - overrides the by-name lookup (WarningPopup/Moving).")]
+        public GameObject WarningMovingImageOverride;
+        [Tooltip("Shown for the TOO CLOSE warning - overrides the by-name lookup (WarningPopup/Distance).")]
+        public GameObject WarningDistanceImageOverride;
 
         [Header("Timing / thresholds")]
-        [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + Restart/Foto buttons) appears - requested directly as 30 seconds.")]
+        [Tooltip("Seconds after tracking locks before the Call To Action screen (logo + ShareWin button) appears - requested directly as 30 seconds.")]
         public float Page2DelaySeconds = 30f;
 
-        [Tooltip("How many times per second the calibration loading ring fills up before looping back to empty and starting over.")]
-        public float SpinnerLoopsPerSecond = 0.8f;
-
-        [Tooltip("Seconds to hold a 'READY!' confirmation on the calibration screen once content has actually spawned, before starting to fade it out (see ReadyFadeOutSeconds) - per direct request: without a generous hold here, a viewer staring at their phone could miss the reveal entirely and look up at the real building instead. Bumped up from an original 1.5s after on-site feedback that it was disappearing before most viewers actually registered it. Runs in parallel with (doesn't delay) Page2DelaySeconds' own countdown.")]
+        [Tooltip("Seconds to hold Page1_Ready's confirmation once content has actually spawned, before starting to fade it out (see ReadyFadeOutSeconds) - per direct request: without a generous hold here, a viewer staring at their phone could miss the reveal entirely and look up at the real building instead.")]
         public float ReadyDisplaySeconds = 3f;
 
-        [Tooltip("Seconds to fade the calibration screen out (CanvasGroup alpha 1->0) once ReadyDisplaySeconds has elapsed, instead of an instant SetActive(false) - a smoother, more noticeable 'ok, it's done now' transition per the same on-site feedback that prompted raising ReadyDisplaySeconds.")]
+        [Tooltip("Seconds to fade Page1_Ready out (CanvasGroup alpha 1->0) once ReadyDisplaySeconds has elapsed, instead of an instant SetActive(false) - a smoother, more noticeable 'ok, it's done now' transition.")]
         public float ReadyFadeOutSeconds = 0.6f;
 
         [Header("Warning popup thresholds - untested, tune on a real device")]
-        [Tooltip("Camera linear speed (meters/second) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
+        [Tooltip("Camera linear speed (meters/second) above which the TOO FAST warning shows - see UpdateMotionPeak.")]
         public float MotionWarningSpeedThreshold = 3f;
-        [Tooltip("Camera angular speed (degrees/second) above which the 'move the scanner more slowly' warning shows - see UpdateMotionPeak.")]
+        [Tooltip("Camera angular speed (degrees/second) above which the TOO FAST warning shows - see UpdateMotionPeak.")]
         public float MotionWarningAngularThreshold = 90f;
         [Tooltip("Time window (seconds) speed/angular speed are measured over - NOT frame-to-frame (see UpdateMotionPeak's own doc comment for why comparing adjacent frames triggered constantly even holding the phone still: dividing normal per-frame tracking jitter by a tiny Time.deltaTime blows it up into an apparent spike). Smaller = more responsive but noisier; larger = smoother but slower to react.")]
         public float MotionSampleWindowSeconds = 0.15f;
@@ -284,39 +194,33 @@ namespace ARReveal
         private WarningReason _activeWarning = WarningReason.None;
 
         private GameObject _page0Group;
-        private GameObject _page1Group;
+        private GameObject _page1ReadyGroup;
         private GameObject _page2Group;
         private GameObject _page3Group;
-        private GameObject _rescanButton;
-        private GameObject _discardButton;
+        private GameObject _page4Group;
         private GameObject _warningPopupGroup;
-        private TMP_Text _warningText;
+        private GameObject _warningMovingImage;
+        private GameObject _warningDistanceImage;
 
-        /// <summary>Drives the calibration screen's fade-out (see ReadyFadeOutSeconds) - added to _page0Group whether it was built fresh (BuildPage0) or picked up from a hand-tuned prefab (AttachToExistingUI), so the same Update() logic works either way.</summary>
-        private CanvasGroup _page0CanvasGroup;
+        /// <summary>Drives Page1_Ready's fade-out (see ReadyFadeOutSeconds) - added whether it was built fresh (BuildPage1Ready) or picked up from a hand-tuned prefab (AttachToExistingUI).</summary>
+        private CanvasGroup _page1ReadyCanvasGroup;
 
-        private Image _spinnerImage;
-        private TMP_Text _instructionText;
-        private TMP_Text _calibratingText;
-        private GameObject _qrFrame;
-        private GameObject _readyImage;
+        private GameObject _photoPreviewGroup;
         private Image _photoPreviewImage;
         private ZapparCamera _zapparCamera;
 
         /// <summary>
         /// True from the moment a capture completes (ShowPhotoPreview) until
-        /// something explicitly clears it (Foto()'s fresh-entry reset, or
-        /// the full "!HasRevealedContent" reset) - the single source of
-        /// truth for "should PhotoPreview be showing right now" AND, per
-        /// direct request, for pausing the Page2DelaySeconds Call To Action
-        /// countdown while it's true (see Update()'s own "PAUSE" comment) -
-        /// so reviewing/sharing a just-captured photo (from Page1 or Page3)
-        /// never gets interrupted by the CTA screen suddenly taking over.
-        /// Deliberately independent of _photoPreviewImage's own active
-        /// state, which Update() also forces false whenever a warning is
-        /// overriding everything (see its WarningPopup section) - this flag
-        /// is what lets the preview correctly reappear once the warning
-        /// clears, and keeps the CTA paused throughout regardless.
+        /// something explicitly clears it (Foto()'s fresh-entry reset,
+        /// ClearPreviewState via Teilen/DiscardPreview, or the full
+        /// "!HasRevealedContent" reset) - the single source of truth for
+        /// "should PhotoPreview/Page4_Share be showing right now" AND for
+        /// pausing the Page2DelaySeconds Call To Action countdown while
+        /// it's true (see Update()'s own "PAUSE" comment). Deliberately
+        /// independent of _photoPreviewGroup's own active state, which
+        /// Update() also forces false whenever a warning is overriding
+        /// everything - this flag is what lets the preview correctly
+        /// reappear once the warning clears.
         /// </summary>
         private bool _hasCapturedPreview;
 
@@ -335,7 +239,7 @@ namespace ARReveal
 
         private float _handoffStartTime = -1f;
 
-        /// <summary>Time.time when content first actually spawned (HasRevealedContent flipped true) - drives the "READY!" hold on the calibration screen (see ReadyDisplaySeconds). -1 while not yet spawned.</summary>
+        /// <summary>Time.time when content first actually spawned (HasRevealedContent flipped true) - drives Page1_Ready's hold (see ReadyDisplaySeconds). -1 while not yet spawned.</summary>
         private float _contentSpawnedAt = -1f;
 
         private Image _flashImage;
@@ -376,78 +280,33 @@ namespace ARReveal
         {
             _canvas = canvasRoot.GetComponent<Canvas>();
             _page0Group = Page0GroupOverride != null ? Page0GroupOverride : FindChild(canvasRoot, "Page0_Calibration");
-            _page1Group = Page1GroupOverride != null ? Page1GroupOverride : FindChild(canvasRoot, "Page1_Experience");
+            _page1ReadyGroup = Page1ReadyGroupOverride != null ? Page1ReadyGroupOverride : FindChild(canvasRoot, "Page1_Ready");
+            _page1ReadyCanvasGroup = EnsureCanvasGroup(_page1ReadyGroup);
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
-            _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_SharePrompt");
+            _page3Group = Page3GroupOverride != null ? Page3GroupOverride : FindChild(canvasRoot, "Page3_Foto");
+            _page4Group = Page4GroupOverride != null ? Page4GroupOverride : FindChild(canvasRoot, "Page4_Share");
             _warningPopupGroup = WarningPopupGroupOverride != null ? WarningPopupGroupOverride : FindChild(canvasRoot, "WarningPopup");
-            var warningTextTransform = canvasRoot.Find("WarningPopup/Warning");
-            _warningText = WarningTextOverride != null ? WarningTextOverride
-                : warningTextTransform != null ? warningTextTransform.GetComponent<TMP_Text>() : null;
-            var spinnerTransform = canvasRoot.Find("Page0_Calibration/Spinner");
-            _spinnerImage = SpinnerImageOverride != null ? SpinnerImageOverride
-                : spinnerTransform != null ? spinnerTransform.GetComponent<Image>() : null;
-            var instructionTransform = canvasRoot.Find("Page0_Calibration/InstructionText");
-            _instructionText = InstructionTextOverride != null ? InstructionTextOverride
-                : instructionTransform != null ? instructionTransform.GetComponent<TMP_Text>() : null;
-            var calibratingTransform = canvasRoot.Find("Page0_Calibration/CalibratingText");
-            _calibratingText = CalibratingTextOverride != null ? CalibratingTextOverride
-                : calibratingTransform != null ? calibratingTransform.GetComponent<TMP_Text>() : null;
-            var qrFrameTransform = canvasRoot.Find("Page0_Calibration/QRFrame");
-            _qrFrame = QrFrameOverride != null ? QrFrameOverride : (qrFrameTransform != null ? qrFrameTransform.gameObject : null);
-            var readyImageTransform = canvasRoot.Find("Page0_Calibration/Ready");
-            _readyImage = ReadyImageOverride != null ? ReadyImageOverride : (readyImageTransform != null ? readyImageTransform.gameObject : null);
-            _page0CanvasGroup = EnsureCanvasGroup(_page0Group);
+            _warningMovingImage = WarningMovingImageOverride != null ? WarningMovingImageOverride : FindChild(canvasRoot, "WarningPopup/Moving");
+            _warningDistanceImage = WarningDistanceImageOverride != null ? WarningDistanceImageOverride : FindChild(canvasRoot, "WarningPopup/Distance");
 
-            // On the canvas root, NOT nested under Page3_SharePrompt - per
-            // direct request, a capture triggered from Page1_Experience's
-            // own RecordButton needs the preview visible too, and Page3
-            // being inactive at that moment would keep a Page3-nested
-            // preview invisible regardless of its own active state. See
-            // EnsurePhotoPreview's own doc comment for how it stays
-            // correctly layered (behind whichever page's own buttons/text)
-            // from the root instead.
+            // On the canvas root, NOT nested under Page3_Foto - so it stays
+            // correctly layered (see EnsurePhotoPreview's own doc comment)
+            // regardless of which page happens to be active.
             EnsurePhotoPreview(canvasRoot);
 
-            var discardTransform = DiscardButtonOverride != null ? DiscardButtonOverride.transform : canvasRoot.Find("DiscardButton");
-            _discardButton = discardTransform != null ? discardTransform.gameObject : null;
-
-            // Checks Page1_Experience first - the button's own natural home
-            // now that Page1 shares its exact visibility window (see
-            // Update()'s own doc comment) - falling back to the old
-            // root-level spot for a canvas that hasn't had it moved yet.
-            var rescanTransform = RescanButtonOverride != null ? RescanButtonOverride.transform
-                : (canvasRoot.Find("Page1_Experience/RescanButton") ?? canvasRoot.Find("RescanButton"));
-            _rescanButton = rescanTransform != null ? rescanTransform.gameObject : null;
-            var rescanButtonComponent = RescanButtonOverride != null ? RescanButtonOverride
-                : (rescanTransform != null ? rescanTransform.GetComponent<Button>() : null);
-
-            WireButton(RestartButtonOverride, canvasRoot, "Page2_CallToAction/RestartButton", Restart);
-            WireButton(FotoButtonOverride, canvasRoot, "Page2_CallToAction/FotoButton", Foto);
-            WireButton(RecordButtonOverride, canvasRoot, "Page3_SharePrompt/RecordButton", RetakePhoto);
-            WireButton(TeilenButtonOverride, canvasRoot, "Page3_SharePrompt/TeilenButton", Teilen);
-            // Page1_Experience got its own RecordButton/TeilenButton too (same
-            // action, a second physical button - not an alternate location
-            // for the SAME one, so RecordButtonOverride/TeilenButtonOverride
-            // above don't cover this; wired directly by name instead) - see
-            // this class's own "EXPERIENCE" doc comment for why this page
-            // exists at all.
-            WireButton(null, canvasRoot, "Page1_Experience/RecordButton", RetakePhoto);
-            WireButton(null, canvasRoot, "Page1_Experience/TeilenButton", Teilen);
-            // rescanButtonComponent is already fully resolved above (override,
-            // or found under either possible location) - passed straight
-            // through as WireButton's own explicitButton so its internal
-            // by-name fallback (which only knows the OLD root-level path)
-            // never gets a chance to miss it.
-            WireButton(rescanButtonComponent, canvasRoot, "RescanButton", Rescan);
-            WireButton(DiscardButtonOverride, canvasRoot, "DiscardButton", DiscardPreview);
+            WireButton(ShareWinButtonOverride, canvasRoot, "Page2_CallToAction/ShareWin", Foto);
+            WireButton(RecordButtonOverride, canvasRoot, "Page3_Foto/RecordButton", RetakePhoto);
+            WireButton(TeilenButtonOverride, canvasRoot, "Page4_Share/TeilenButton", Teilen);
+            WireButton(RetakeButtonOverride, canvasRoot, "Page4_Share/RetakeButton", DiscardPreview);
 
             SetActiveIfNotNull(_page0Group, false);
-            SetActiveIfNotNull(_page1Group, false);
+            SetActiveIfNotNull(_page1ReadyGroup, false);
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
-            SetActiveIfNotNull(_rescanButton, false);
-            SetActiveIfNotNull(_discardButton, false);
+            SetActiveIfNotNull(_page4Group, false);
             SetActiveIfNotNull(_warningPopupGroup, false);
+            SetActiveIfNotNull(_warningMovingImage, false);
+            SetActiveIfNotNull(_warningDistanceImage, false);
 
             EnsureFlashOverlay(canvasRoot);
         }
@@ -459,7 +318,7 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Prefers an explicitly-dragged-in Button (RestartButtonOverride etc.
+        /// Prefers an explicitly-dragged-in Button (ShareWinButtonOverride etc.
         /// - immune to renaming/moving while hand-tuning the layout); falls
         /// back to finding it by name/path under canvasRoot if left blank.
         /// </summary>
@@ -477,16 +336,11 @@ namespace ARReveal
         /// has spawned" moment - see HandoffToInstantTracking.
         /// HasContentSpawned's own doc comment for why HasHandedOff was the
         /// wrong signal for this: it fires the instant a handoff attempt
-        /// merely STARTS, well before anything is actually visible, found
-        /// from an on-site report of the calibration screen disappearing
-        /// with nothing yet on screen). Works identically whether the scene
-        /// uses HandoffToInstantTracking's QR+SLAM handoff (HasContentSpawned)
-        /// if Handoff is assigned, or RevealOnTrackingFound's simpler
-        /// direct-image-tracking reveal (HasRevealed - already accurate for
-        /// that simpler system, no separate settling delay exists there) as
-        /// a fallback. Handoff always wins when assigned, so this has zero
-        /// effect on a scene where Handoff is set (UCI-RE-AR) beyond fixing
-        /// which of Handoff's own properties gets read.
+        /// merely STARTS, well before anything is actually visible). Works
+        /// identically whether the scene uses HandoffToInstantTracking's
+        /// QR+SLAM handoff (HasContentSpawned) if Handoff is assigned, or
+        /// RevealOnTrackingFound's simpler direct-image-tracking reveal
+        /// (HasRevealed) as a fallback. Handoff always wins when assigned.
         /// </summary>
         private bool HasRevealedContent =>
             Handoff != null ? Handoff.HasContentSpawned
@@ -495,33 +349,27 @@ namespace ARReveal
         private void Update()
         {
             // WARNING POPUP - per direct request, overrides whichever OTHER
-            // page would otherwise be showing (same "takes priority over
-            // everything" precedent as the original Distance Alert screen -
-            // see git history around "Remove the Distance Alert" - now
-            // folded into this single popup alongside a second, new
-            // trigger). Computed FIRST, before any page-specific logic
-            // below, because the motion warning specifically needs to be
-            // able to interrupt the CALIBRATION screen too - that's exactly
-            // when a fast/erratic scan hurts the QR-based lock's own
-            // precision the most (see the real-world "scan horizontal, tilt
-            // vertical, drift" conversation this was built for).
+            // page would otherwise be showing. Computed FIRST, before any
+            // page-specific logic below, because the motion warning
+            // specifically needs to be able to interrupt the CALIBRATION
+            // screen too - that's exactly when a fast/erratic scan hurts
+            // the QR-based lock's own precision the most.
             UpdateWarningState();
             if (_activeWarning != WarningReason.None)
             {
                 SetActiveIfNotNull(_warningPopupGroup, true);
                 SetActiveIfNotNull(_page0Group, false);
-                SetActiveIfNotNull(_page1Group, false);
+                SetActiveIfNotNull(_page1ReadyGroup, false);
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
-                SetActiveIfNotNull(_rescanButton, false);
+                SetActiveIfNotNull(_page4Group, false);
                 // Forced hidden too (NOT cleared - _hasCapturedPreview itself
                 // is untouched) so a warning can never be visually covered by
                 // an opaque captured-photo preview sitting behind it. Comes
                 // back on its own the moment this branch stops running (see
                 // the per-frame sync below), since that re-applies
                 // _hasCapturedPreview's own unchanged value.
-                SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
-                SetActiveIfNotNull(_discardButton, false);
+                SetActiveIfNotNull(_photoPreviewGroup, false);
                 return;
             }
             SetActiveIfNotNull(_warningPopupGroup, false);
@@ -529,130 +377,70 @@ namespace ARReveal
             if (!HasRevealedContent)
             {
                 // Shown once camera access is actually live, until content
-                // has ACTUALLY spawned - see HasRevealedContent's own doc
-                // comment for why that's a different (later) moment than
-                // "tracking merely locked on". Also the state a Rescan()
-                // returns to - HasRevealedContent reads false again the
-                // instant Handoff/DirectTrackingReveal's own RequestRescan()
-                // runs, so this exact branch is what puts the calibration
-                // screen back up for a genuine second scan, no separate
-                // rescan-specific logic needed here at all.
+                // has ACTUALLY spawned. Also the state a Rescan (if wired
+                // up elsewhere - see Rescan()'s own doc comment) returns to.
                 bool cameraReady = _zapparCamera != null && _zapparCamera.CameraSourceInitialized;
                 SetActiveIfNotNull(_page0Group, cameraReady);
-                // Always reset to fully opaque here - undoes any fade-out
-                // left over from a previous reveal cycle (see the revealed
-                // branch below) now that this screen is showing again.
-                if (_page0CanvasGroup != null) _page0CanvasGroup.alpha = 1f;
 
-                // Always reset back to the CALIBRATING visual state here too -
-                // undoes the READY swap below (frame/instruction/spinner off,
-                // Ready image on) left over from a previous reveal cycle, so
-                // a Rescan() puts back exactly the same screen a first-time
-                // viewer sees, not whatever it looked like at the moment it
-                // last faded out.
-                SetActiveIfNotNull(_qrFrame, true);
-                SetActiveIfNotNull(_instructionText != null ? _instructionText.gameObject : null, true);
-                SetActiveIfNotNull(_spinnerImage != null ? _spinnerImage.gameObject : null, true);
-                SetActiveIfNotNull(_readyImage, false);
-
-                // Neither InstructionText nor CalibratingText is touched
-                // here at all, per direct request - "the calibration
-                // instruction text now is overwritten" was a real
-                // complaint, not just about CalibratingText/BEREIT!.
-                // Whatever's authored directly on both labels (e.g. "Scan
-                // the QR to calibrate" / "CALIBRATING...") stays exactly
-                // as-is through this whole phase; the ONLY write either of
-                // them ever gets is CalibratingText's own "BEREIT!" one
-                // below, at the exact instant content is revealed. This
-                // does give up the earlier "Preparing..." vs "Scan the QR"
-                // distinction (see TargetPreloader's own doc comment for
-                // the cold-cache race it used to flag) - Preloader is still
-                // read/wired for that same reason elsewhere if it's ever
-                // wanted back, just not via overwriting this text.
-
-                SetActiveIfNotNull(_page1Group, false);
+                SetActiveIfNotNull(_page1ReadyGroup, false);
+                if (_page1ReadyCanvasGroup != null) _page1ReadyCanvasGroup.alpha = 1f; // reset any fade-out for next time
                 SetActiveIfNotNull(_page2Group, false);
                 SetActiveIfNotNull(_page3Group, false);
-                SetActiveIfNotNull(_rescanButton, false);
+                SetActiveIfNotNull(_page4Group, false);
                 _hasCapturedPreview = false;
-                SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
-                SetActiveIfNotNull(_discardButton, false);
+                SetActiveIfNotNull(_photoPreviewGroup, false);
                 _handoffStartTime = -1f;
                 _screen = UiScreen.None;
                 _contentSpawnedAt = -1f;
                 return;
             }
 
-            // Content has just spawned - hold a "BEREIT!" confirmation on the
-            // calibration screen for ReadyDisplaySeconds, then fade it out
-            // over ReadyFadeOutSeconds (rather than an instant
-            // SetActive(false)), so a viewer looking at their phone gets a
-            // clear "yes, look here now" cue instead of the screen just
-            // vanishing with nothing yet visible behind it (per direct
-            // request - both the hold length and the fade were increased/
-            // added after on-site feedback that the original version
-            // disappeared too fast for most viewers to actually see).
-            // German wording ("BEREIT!", not "READY!") per direct request -
-            // this whole screen is German-only text throughout, this was
-            // just the one label still in English.
-            // Runs in PARALLEL with, not instead of, the Page2DelaySeconds
-            // countdown below - both start from this same moment.
+            // Page0 hides INSTANTLY the moment content reveals - it's just a
+            // static image now, nothing on it worth holding/fading (that
+            // job belongs to Page1_Ready below).
+            SetActiveIfNotNull(_page0Group, false);
+
+            // Page1_Ready shows the INSTANT content reveals, holds for
+            // ReadyDisplaySeconds, then fades over ReadyFadeOutSeconds -
+            // per direct request, this is exactly the hold-then-fade
+            // mechanism an earlier version ran on Page0 itself for its own
+            // "BEREIT!" confirmation, just moved onto this separate page.
             if (_contentSpawnedAt < 0f)
             {
                 _contentSpawnedAt = Time.time;
-                SetCalibrationMessage(null, "BEREIT!");
-
-                // Swap the calibrating visuals for the ready ones, per direct
-                // request: instruction text/QR frame/spinner turn off
-                // immediately, the new Ready image turns on immediately -
-                // CalibratingText is the ONE thing that stays up throughout,
-                // just with its wording changed above. All four then hold
-                // together (or fade together, once past ReadyDisplaySeconds
-                // below) as a single readable "you're set, look up" moment,
-                // rather than the QR frame/spinner lingering pointlessly
-                // alongside it.
-                SetActiveIfNotNull(_qrFrame, false);
-                SetActiveIfNotNull(_instructionText != null ? _instructionText.gameObject : null, false);
-                SetActiveIfNotNull(_spinnerImage != null ? _spinnerImage.gameObject : null, false);
-                SetActiveIfNotNull(_readyImage, true);
+                if (_page1ReadyCanvasGroup != null) _page1ReadyCanvasGroup.alpha = 1f;
             }
 
             float readyElapsed = Time.time - _contentSpawnedAt;
-            bool page0Visible;
+            bool page1ReadyVisible;
             if (readyElapsed < ReadyDisplaySeconds)
             {
-                page0Visible = true;
-                if (_page0CanvasGroup != null) _page0CanvasGroup.alpha = 1f;
+                page1ReadyVisible = true;
+                if (_page1ReadyCanvasGroup != null) _page1ReadyCanvasGroup.alpha = 1f;
             }
             else if (readyElapsed < ReadyDisplaySeconds + ReadyFadeOutSeconds)
             {
-                page0Visible = true;
-                if (_page0CanvasGroup != null)
-                    _page0CanvasGroup.alpha = Mathf.Lerp(1f, 0f, (readyElapsed - ReadyDisplaySeconds) / ReadyFadeOutSeconds);
+                page1ReadyVisible = true;
+                if (_page1ReadyCanvasGroup != null)
+                    _page1ReadyCanvasGroup.alpha = Mathf.Lerp(1f, 0f, (readyElapsed - ReadyDisplaySeconds) / ReadyFadeOutSeconds);
             }
             else
             {
-                page0Visible = false;
+                page1ReadyVisible = false;
             }
-            SetActiveIfNotNull(_page0Group, page0Visible);
+            SetActiveIfNotNull(_page1ReadyGroup, page1ReadyVisible);
 
             if (_handoffStartTime < 0f) _handoffStartTime = Time.time;
 
             // PAUSE the Call To Action countdown while a captured photo is
             // being shown, per direct request ("we don't want the cta to
-            // interrupt") - a capture can now happen from Page1_Experience
-            // itself (its own RecordButton), well before the CTA would
-            // normally appear, and reviewing/sharing it shouldn't get
-            // yanked away by the CTA suddenly taking over mid-review.
-            // Pushing _handoffStartTime forward by exactly this frame's
-            // elapsed time freezes Time.time - _handoffStartTime at
-            // whatever it was the instant the capture happened - the
-            // simplest way to pause a countdown expressed as "time since
-            // X" without needing a separate accumulated-pause-duration
+            // interrupt"). Pushing _handoffStartTime forward by exactly
+            // this frame's elapsed time freezes Time.time - _handoffStartTime
+            // at whatever it was the instant the capture happened - the
+            // simplest way to pause a countdown expressed as "time since X"
+            // without needing a separate accumulated-pause-duration
             // variable. Resumes exactly where it left off the moment
-            // _hasCapturedPreview goes false again. Harmless (a no-op) once
-            // _screen has already moved past None, e.g. capturing again
-            // from Page3 itself.
+            // _hasCapturedPreview goes false again (Teilen/DiscardPreview).
             if (_hasCapturedPreview)
                 _handoffStartTime += Time.deltaTime;
             else if (_screen == UiScreen.None && Time.time - _handoffStartTime >= Page2DelaySeconds)
@@ -660,60 +448,25 @@ namespace ARReveal
 
             SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
             SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
-            // Re-applies _hasCapturedPreview every frame (rather than only
-            // where it's set) so it correctly reappears on its own once the
-            // WarningPopup branch above stops forcing it hidden.
-            SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, _hasCapturedPreview);
-            SetActiveIfNotNull(_discardButton, _hasCapturedPreview);
-
-            // Page1_Experience (per direct request) shares this EXACT same
-            // window - active once the calibration screen has fully finished
-            // (including its own fade-out above) and hidden again the
-            // instant Page2 (Call To Action) appears. The Rescan button now
-            // typically lives AS A CHILD of Page1_Experience (per direct
-            // request - "I can add rescan to this page"), so toggling Page1
-            // here already hides/shows it for free; _rescanButton is set
-            // explicitly too regardless, harmless if it's already covered by
-            // Page1's own active state, and still correct on its own if it
-            // ever ends up back at the canvas root instead.
-            bool experienceActive = !page0Visible && _screen == UiScreen.None;
-            SetActiveIfNotNull(_page1Group, experienceActive);
-            SetActiveIfNotNull(_rescanButton, experienceActive);
-        }
-
-        /// <summary>
-        /// Sets the calibration screen's two live status labels - pass null
-        /// for either to leave it as-is (e.g. the instruction line doesn't
-        /// need to change for the READY state). ALWAYS writes, regardless
-        /// of whether InstructionTextOverride/CalibratingTextOverride is
-        /// set - an earlier version skipped writing to an overridden field
-        /// entirely (on the theory that dragging a text object into the
-        /// override slot meant "hand-authoring this wording myself"), but a
-        /// real-device report of "BEREIT! is out of sync with the Ready
-        /// image" traced straight back to that: CalibratingTextOverride was
-        /// assigned (same as every other *Override field here - just
-        /// pointing at the hand-tuned object, not opting out of the live
-        /// CALIBRATING/BEREIT status text), so the write that's supposed to
-        /// happen in the SAME instant the Ready image appears (see Update())
-        /// was being silently skipped, and whatever "Bereit" eventually
-        /// showed wasn't coming from this method at all. Overriding these
-        /// fields now only ever means "use this exact object," matching
-        /// QrFrameOverride/ReadyImageOverride, whose own SetActiveIfNotNull
-        /// calls were never skipped like this in the first place.
-        /// </summary>
-        private void SetCalibrationMessage(string instruction, string calibrating)
-        {
-            if (instruction != null && _instructionText != null) _instructionText.text = instruction;
-            if (calibrating != null && _calibratingText != null) _calibratingText.text = calibrating;
+            // Page4_Share and the preview share the exact same trigger -
+            // both turn on together the instant RetakePhoto captures
+            // something (see ShowPhotoPreview), and both turn off together
+            // via ClearPreviewState (Teilen/DiscardPreview). Page3_Foto
+            // stays active underneath the whole time - per direct request
+            // ("we turn on Page4_Share"), it's an addition, not a
+            // replacement, so RecordButton is still reachable to retake
+            // directly too.
+            SetActiveIfNotNull(_page4Group, _hasCapturedPreview);
+            SetActiveIfNotNull(_photoPreviewGroup, _hasCapturedPreview);
         }
 
         /// <summary>
         /// Decides which (if either) of the two WarningPopup triggers is
-        /// currently active, and updates the TMP text ONLY on a change (not
-        /// every frame) - see UpdateMotionPeak/UpdateTooClose for each
-        /// trigger's own detection logic. If both happen to be true at the
-        /// same instant, TooClose wins - an actual proximity/attack danger
-        /// reads as more urgent than a scanning-technique tip.
+        /// currently active, and toggles the Moving/Distance images ONLY on
+        /// a change (not every frame) - see UpdateMotionPeak/UpdateTooClose
+        /// for each trigger's own detection logic. If both happen to be
+        /// true at the same instant, TooClose wins - an actual proximity/
+        /// attack danger reads as more urgent than a scanning-technique tip.
         /// </summary>
         private void UpdateWarningState()
         {
@@ -723,12 +476,9 @@ namespace ARReveal
             WarningReason reason = tooClose ? WarningReason.TooClose : tooFast ? WarningReason.TooFast : WarningReason.None;
             if (reason == _activeWarning) return;
             _activeWarning = reason;
-            if (_warningText == null) return;
 
-            if (reason == WarningReason.TooFast)
-                _warningText.text = "Den Scanner langsamer bewegen";
-            else if (reason == WarningReason.TooClose)
-                _warningText.text = "Achtung! Zu nah am Subjekt. Infektionsgefahr! Gehe zurück!";
+            SetActiveIfNotNull(_warningMovingImage, reason == WarningReason.TooFast);
+            SetActiveIfNotNull(_warningDistanceImage, reason == WarningReason.TooClose);
         }
 
         /// <summary>
@@ -756,9 +506,8 @@ namespace ARReveal
         ///
         /// Deliberately checked unconditionally (not just before
         /// HasRevealedContent) - most relevant during the initial QR scan/
-        /// tilt transition (see this project's own "scan horizontal, tilt
-        /// vertical, drift" discussion), but a real, sudden fast spin
-        /// post-reveal is just as legitimate a "please slow down" moment.
+        /// tilt transition, but a real, sudden fast spin post-reveal is
+        /// just as legitimate a "please slow down" moment.
         ///
         /// A single noisy window shouldn't make the popup flash on and off
         /// faster than anyone could read it, so a detected peak extends
@@ -772,14 +521,13 @@ namespace ARReveal
 
             // Discard the baseline (rather than measure across it) whenever
             // a lock/re-lock just completed - real-device testing found the
-            // warning firing right "after the loading bar" (i.e. exactly
-            // when the very first lock finishes) even holding the phone
-            // still. Root cause: HandoffToInstantTracking re-seeds the SLAM
-            // anchor at that exact moment (SeedAnchorPosition/
-            // PlaceTrackerAnchor), and the camera's OWN rendered transform
-            // is computed FROM that anchor every frame (see
-            // HandoffToInstantTracking's own "EARLY ANCHOR PLACEMENT" doc
-            // comment) - so the anchor reference changing under it can
+            // warning firing right after the very first lock finishes, even
+            // holding the phone still. Root cause: HandoffToInstantTracking
+            // re-seeds the SLAM anchor at that exact moment
+            // (SeedAnchorPosition/PlaceTrackerAnchor), and the camera's OWN
+            // rendered transform is computed FROM that anchor every frame
+            // (see HandoffToInstantTracking's own "EARLY ANCHOR PLACEMENT"
+            // doc comment) - so the anchor reference changing under it can
             // produce a real, one-time jump in the camera's reported pose
             // that has nothing to do with the phone actually moving. No
             // amount of time-windowing fixes that (a real discontinuity
@@ -824,7 +572,7 @@ namespace ARReveal
 
         /// <summary>
         /// "Same as distance attack" per direct request - re-uses the exact
-        /// mechanism the original (removed) Distance Alert screen relied on:
+        /// mechanism an earlier Distance Alert screen relied on:
         /// TentacleController.IsCameraWithinAttackRange, the SAME per-
         /// tentacle, tip-based Snap Distance check ReachByDistance's own
         /// attack triggering uses (see that property's own doc comment for
@@ -853,27 +601,6 @@ namespace ARReveal
             _tentacleCacheSource = wrapper;
         }
 
-        private void LateUpdate()
-        {
-            if (_spinnerImage == null || _page0Group == null || !_page0Group.activeInHierarchy) return;
-
-            if (_contentSpawnedAt >= 0f)
-            {
-                // READY state - freeze the ring as a complete, filled circle
-                // (reads as "done") instead of continuing to loop, for the
-                // brief window this screen stays up after content spawns.
-                _spinnerImage.fillAmount = 1f;
-                return;
-            }
-
-            // A radial-fill loading ring (Image.Type.Filled/Radial360), not a
-            // rotated shape - fillAmount sweeps 0 -> 1 on a repeating sawtooth
-            // (Mathf.Repeat), so it fills up, snaps back to empty, and fills
-            // again in an endless loop, exactly "a round loading bar that
-            // fills in a loop" per direct request.
-            _spinnerImage.fillAmount = Mathf.Repeat(Time.time * SpinnerLoopsPerSecond, 1f);
-        }
-
         private static void SetActiveIfNotNull(GameObject go, bool active)
         {
             if (go != null && go.activeSelf != active) go.SetActive(active);
@@ -897,21 +624,20 @@ namespace ARReveal
             canvasGo.AddComponent<GraphicRaycaster>();
 
             // First sibling - see EnsurePhotoPreview's own doc comment for
-            // why it needs to render BEHIND whichever page (Page1/Page3)
-            // ends up above it.
+            // why it needs to render BEHIND whichever page ends up above it.
             EnsurePhotoPreview(canvasGo.transform);
 
             _page0Group = BuildPage0(canvasGo.transform);
+            _page1ReadyGroup = BuildPage1Ready(canvasGo.transform);
             _page2Group = BuildPage2(canvasGo.transform);
             _page3Group = BuildPage3(canvasGo.transform);
-            _rescanButton = BuildRescanButton(canvasGo.transform);
-            _discardButton = BuildDiscardButton(canvasGo.transform);
+            _page4Group = BuildPage4(canvasGo.transform);
 
             _page0Group.SetActive(false);
+            _page1ReadyGroup.SetActive(false);
             _page2Group.SetActive(false);
             _page3Group.SetActive(false);
-            _rescanButton.SetActive(false);
-            _discardButton.SetActive(false);
+            _page4Group.SetActive(false);
 
             EnsureFlashOverlay(canvasGo.transform);
         }
@@ -978,38 +704,32 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// A full-screen Image showing the most recently captured photo -
-        /// per direct request: "the client wants the video or foto to be
-        /// shown first, and if we click teilen we go to the native share."
+        /// A full-screen "PhotoPreview" showing the most recently captured
+        /// photo, FRAMED per direct request ("frame the preview a bit so its
+        /// clear it a pic, not just frozen screen") - a dark dimming
+        /// background, a light "PhotoFrame" mat inset within it, and the
+        /// actual "PhotoImage" inset further inside that by a border
+        /// thickness, so it reads as a distinct framed photograph sitting
+        /// on top of the (dimmed) live view rather than the screen just
+        /// having frozen. All three layers have raycastTarget on, but only
+        /// the OUTER "PhotoPreview" GameObject has the actual Button
+        /// (calling DiscardPreview) - Unity's EventSystem walks UP the
+        /// hierarchy from whichever layer was actually tapped to find it, so
+        /// tapping the dimmed background, the frame, or the photo itself all
+        /// correctly dismiss it (per direct request, "so we can click the
+        /// preview away"), without needing three separate Button components.
         ///
-        /// Lives directly on the CANVAS ROOT (a sibling of Page0/1/2/3, not
-        /// nested inside Page3_SharePrompt) - per direct follow-up request,
-        /// a capture triggered from Page1_Experience's own RecordButton
-        /// needs this visible too, and it can't be if it's a child of
-        /// Page3_SharePrompt while that page happens to be inactive. Kept
-        /// as the FIRST sibling on the root (opposite of CaptureFlash's
-        /// LAST-sibling convention below) so whichever page IS active
-        /// (Page1 or Page3, both added as LATER siblings) always draws its
-        /// own buttons/text on top of it, rather than this covering them -
-        /// it's meant to visually replace the live camera view behind
-        /// everything once something's been captured, not obscure the
-        /// controls needed to retake or share it. Its own active state is
-        /// driven entirely by _hasCapturedPreview (see Update()), which is
-        /// what actually decides "is a preview currently supposed to be
-        /// showing" independent of which page happens to be up - see that
-        /// field's own doc comment, and Update()'s WarningPopup section for
-        /// the one case (a warning firing) this gets forced hidden anyway
-        /// regardless of _hasCapturedPreview.
+        /// Lives directly on the CANVAS ROOT (a sibling of Page0-4, not
+        /// nested inside Page3_Foto) so it stays visible/correctly layered
+        /// regardless of which page happens to be active. Kept as the FIRST
+        /// sibling on the root (opposite of CaptureFlash's LAST-sibling
+        /// convention below) so whichever page IS active draws its own
+        /// buttons/text on top of it, rather than this covering them.
         ///
         /// Starts hidden (nothing captured yet); ShowPhotoPreview() is what
-        /// actually populates it after a capture. Safe to call repeatedly
-        /// (e.g. every AttachToExistingUI/BuildUI) - reuses an existing
-        /// "PhotoPreview" child instead of duplicating it.
-        ///
-        /// Tappable per direct request ("so we can click the preview away")
-        /// - a Button on this same GameObject calls DiscardPreview directly,
-        /// so tapping anywhere on the photo itself dismisses it, in
-        /// addition to the separate dedicated DiscardButton.
+        /// actually populates PhotoImage after a capture. Safe to call
+        /// repeatedly (e.g. every AttachToExistingUI/BuildUI) - reuses an
+        /// existing "PhotoPreview" child instead of duplicating it.
         /// </summary>
         private void EnsurePhotoPreview(Transform canvasRoot)
         {
@@ -1028,22 +748,42 @@ namespace ARReveal
                 rt.anchorMax = Vector2.one;
                 rt.offsetMin = Vector2.zero;
                 rt.offsetMax = Vector2.zero;
-                go.AddComponent<Image>().preserveAspect = true;
+                var bg = go.AddComponent<Image>();
+                bg.color = new Color(0f, 0f, 0f, 0.92f);
+
+                var frameGo = new GameObject("PhotoFrame");
+                frameGo.transform.SetParent(go.transform, false);
+                var frameRt = frameGo.AddComponent<RectTransform>();
+                frameRt.anchorMin = new Vector2(0.5f, 0.5f);
+                frameRt.anchorMax = new Vector2(0.5f, 0.5f);
+                frameRt.pivot = new Vector2(0.5f, 0.5f);
+                frameRt.sizeDelta = new Vector2(920f, 1360f);
+                frameGo.AddComponent<Image>().color = Color.white;
+
+                var photoGo = new GameObject("PhotoImage");
+                photoGo.transform.SetParent(frameGo.transform, false);
+                var photoRt = photoGo.AddComponent<RectTransform>();
+                photoRt.anchorMin = Vector2.zero;
+                photoRt.anchorMax = Vector2.one;
+                const float borderThickness = 24f;
+                photoRt.offsetMin = new Vector2(borderThickness, borderThickness);
+                photoRt.offsetMax = new Vector2(-borderThickness, -borderThickness);
+                var photoImg = photoGo.AddComponent<Image>();
+                photoImg.preserveAspect = true;
             }
 
-            // Tappable per direct request ("so we can click the preview
-            // away") - the whole photo itself discards on tap, IN ADDITION
-            // to the dedicated DiscardButton. raycastTarget needs to be true
-            // for this (used to be false, back when nothing on this Image
-            // was ever meant to receive clicks). Transition is None so
-            // tapping doesn't visibly tint/dim the photo the way a normal
-            // UI button would - it's a full photo, not a button-shaped
-            // control. RecordButton/TeilenButton/DiscardButton still work
-            // normally on top of this - the Graphic Raycaster only ever
-            // hits the SINGLE topmost target at a given screen position, so
-            // tapping one of those buttons never also fires this.
-            var img = go.GetComponent<Image>();
-            img.raycastTarget = true;
+            // Every layer needs raycastTarget on so a tap anywhere on the
+            // dimmed background/frame/photo all hit-test successfully and
+            // bubble up to the single Button below.
+            var bgImage = go.GetComponent<Image>();
+            if (bgImage != null) bgImage.raycastTarget = true;
+            var frameTransform = go.transform.Find("PhotoFrame");
+            var frameImage = frameTransform != null ? frameTransform.GetComponent<Image>() : null;
+            if (frameImage != null) frameImage.raycastTarget = true;
+            var photoTransform = frameTransform != null ? frameTransform.Find("PhotoImage") : null;
+            var photoImage = photoTransform != null ? photoTransform.GetComponent<Image>() : null;
+            if (photoImage != null) photoImage.raycastTarget = true;
+
             var tapButton = go.GetComponent<Button>();
             if (tapButton == null) tapButton = go.AddComponent<Button>();
             tapButton.transition = Selectable.Transition.None;
@@ -1052,7 +792,8 @@ namespace ARReveal
 
             go.transform.SetAsFirstSibling();
             go.SetActive(false);
-            _photoPreviewImage = img;
+            _photoPreviewGroup = go;
+            _photoPreviewImage = photoImage;
         }
 
 #if UNITY_EDITOR
@@ -1076,14 +817,11 @@ namespace ARReveal
         /// <summary>
         /// Surgical companion to EditorRebuildUI() - adds JUST the
         /// calibration screen to an already-hand-tuned "ARShareCanvas" if
-        /// it's missing, without touching or rebuilding Page2/Page3 or
-        /// anything else already placed/tuned. For a canvas built before
-        /// the calibration screen existed (e.g. a hand-tuned prefab saved
-        /// from an earlier version of this tool) - EditorRebuildUI() would
-        /// wipe that hand-tuning entirely, this doesn't touch it at all.
-        /// Safe to call repeatedly - no-ops if Page0_Calibration already
-        /// exists. See Assets/Editor/AddCalibrationScreenToSharePrefab.cs
-        /// for the menu command that calls this on a prefab asset directly.
+        /// it's missing, without touching or rebuilding anything else
+        /// already placed/tuned. Safe to call repeatedly - no-ops if
+        /// Page0_Calibration already exists. See
+        /// Assets/Editor/AddCalibrationScreenToSharePrefab.cs for the menu
+        /// command that calls this on a prefab asset directly.
         /// </summary>
         public void EditorAddCalibrationScreenIfMissing()
         {
@@ -1100,131 +838,43 @@ namespace ARReveal
             }
 
             _page0Group = BuildPage0(canvasRoot);
-            _page0Group.transform.SetSiblingIndex(0); // first, ahead of Page2/Page3
+            _page0Group.transform.SetSiblingIndex(0);
             _page0Group.SetActive(false);
 
-            // Keep the flash overlay on top of the newly-added screen too.
             EnsureFlashOverlay(canvasRoot);
 
             Debug.Log("[ARShareController] Added Page0_Calibration under " + canvasRoot.name + ".");
         }
-
-        /// <summary>
-        /// Upgrades an ALREADY-PLACED "Page0_Calibration/Spinner" in place to
-        /// a radial-fill loading ring (per direct request: "a round loading
-        /// bar that fills in a loop") - only touches its sprite and Image
-        /// fill settings (see SetUpAsLoadingRing), leaving whatever
-        /// position/size it was hand-adjusted to completely untouched. For
-        /// a spinner built by an earlier version of this tool (the old
-        /// rotating gapped-ring "C" shape). Safe to re-run. See
-        /// Assets/Editor/UpgradeSpinnerToRadialFill.cs for the menu command
-        /// that applies this to a prefab asset directly.
-        /// </summary>
-        public void EditorUpgradeSpinnerToRadialFill()
-        {
-            Image image = SpinnerImageOverride;
-            if (image == null)
-            {
-                var canvasRoot = transform.Find("ARShareCanvas");
-                var spinnerTransform = canvasRoot != null ? canvasRoot.Find("Page0_Calibration/Spinner") : null;
-                if (spinnerTransform == null)
-                {
-                    Debug.LogError("[ARShareController] No 'Page0_Calibration/Spinner' found (and SpinnerImageOverride isn't set) - either drag the Image into SpinnerImageOverride directly, or add the calibration screen first (ARReveal/UI/Add Calibration Screen To Share Prefab).");
-                    return;
-                }
-                image = spinnerTransform.GetComponent<Image>();
-            }
-            if (image == null)
-            {
-                Debug.LogError("[ARShareController] Spinner object has no Image component.");
-                return;
-            }
-
-            image.sprite = CreateRingSprite(Color.white, 128, 0.16f);
-            SetUpAsLoadingRing(image);
-            _spinnerImage = image;
-
-            Debug.Log("[ARShareController] Spinner upgraded to a radial-fill loading ring - its position/size were left untouched.");
-        }
-
-        /// <summary>
-        /// Surgical companion to EditorRebuildUI(), same spirit as
-        /// EditorAddCalibrationScreenIfMissing() above - adds JUST the
-        /// bottom-center Rescan button to an already-hand-tuned
-        /// "ARShareCanvas" if it's missing, without touching or rebuilding
-        /// anything else already placed/tuned. For a canvas built/saved
-        /// before the Rescan button existed. Safe to call repeatedly -
-        /// no-ops if a "RescanButton" already exists directly under the
-        /// canvas root. See Assets/Editor/AddRescanButtonToSharePrefab.cs
-        /// for the menu command that calls this on a prefab asset directly.
-        /// </summary>
-        public void EditorAddRescanButtonIfMissing()
-        {
-            var canvasRoot = transform.Find("ARShareCanvas");
-            if (canvasRoot == null)
-            {
-                Debug.LogError("[ARShareController] No 'ARShareCanvas' child found - build the UI first (ARReveal/UI/Build Share UI In Scene).");
-                return;
-            }
-            if (canvasRoot.Find("RescanButton") != null)
-            {
-                Debug.Log("[ARShareController] RescanButton already exists under " + canvasRoot.name + " - nothing to add.");
-                return;
-            }
-
-            _rescanButton = BuildRescanButton(canvasRoot);
-            _rescanButton.SetActive(false);
-
-            // Keep the flash overlay on top of the newly-added button too.
-            EnsureFlashOverlay(canvasRoot);
-
-            Debug.Log("[ARShareController] Added RescanButton under " + canvasRoot.name + ".");
-        }
 #endif
 
         // --- CALIBRATION ---------------------------------------------------------
+        /// <summary>
+        /// Just a single static image now - per direct request ("we don't
+        /// change the calibration text anymore, we now just have an
+        /// image"), the viewfinder frame/instruction text/loading spinner/
+        /// ready-text swap an earlier version ran on this page are all
+        /// gone; that whole "content is ready" moment moved to the separate
+        /// Page1_Ready (see Update()).
+        /// </summary>
         private GameObject BuildPage0(Transform parent)
         {
             var group = new GameObject("Page0_Calibration");
             group.transform.SetParent(parent, false);
-
-            // Rounded-square viewfinder frame - where the QR should be placed.
-            // Generated at runtime (see CreateRoundedFrameSprite) - no design
-            // asset for this exists yet. Named "QRFrame" (not left as the
-            // AddImage default "Image") so the by-name lookup in
-            // AttachToExistingUI/EditorAddCalibrationScreenIfMissing still
-            // finds it consistently, matching the hand-tuned Share.prefab's
-            // own naming.
-            var frameSprite = CreateRoundedFrameSprite(new Color(1f, 1f, 1f, 0.9f), 512, 64, 10);
-            var frameImage = AddImage(group.transform, frameSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
-            frameImage.gameObject.name = "QRFrame";
-            _qrFrame = frameImage.gameObject;
-
-            _instructionText = AddPlaceholderText(group.transform, "InstructionText", "Scan the QR to calibrate",
-                48, new Vector2(0f, 620f), new Vector2(800f, 160f));
-
-            var spinnerImage = AddImage(group.transform, CreateRingSprite(Color.white, 128, 0.16f), new Vector2(0f, -700f), new Vector2(100f, 100f));
-            spinnerImage.gameObject.name = "Spinner";
-            SetUpAsLoadingRing(spinnerImage);
-            _spinnerImage = spinnerImage;
-
-            _calibratingText = AddPlaceholderText(group.transform, "CalibratingText", "CALIBRATING...",
-                36, new Vector2(0f, -820f), new Vector2(500f, 80f));
-
-            // Shown in place of the three above once content is ready (see
-            // Update()) - starts hidden, matching the "calibrating" baseline
-            // state every other element of this page starts in.
-            var readyImage = AddImage(group.transform, ReadyImageSprite, new Vector2(0f, 150f), new Vector2(650f, 650f));
-            readyImage.gameObject.name = "Ready";
-            readyImage.gameObject.SetActive(false);
-            _readyImage = readyImage.gameObject;
-
-            _page0CanvasGroup = EnsureCanvasGroup(group);
-
+            AddImage(group.transform, CalibrateSprite, Vector2.zero, new Vector2(1080f, 1920f)).gameObject.name = "Calibrate";
             return group;
         }
 
-        /// <summary>Gets or adds a CanvasGroup - used to fade the calibration screen out (see ReadyFadeOutSeconds) whether it was just built fresh here or picked up from a hand-tuned prefab that predates this fade (AttachToExistingUI).</summary>
+        /// <summary>See Update()'s own doc comment for exactly when this shows/fades - the CanvasGroup here is what ReadyFadeOutSeconds animates.</summary>
+        private GameObject BuildPage1Ready(Transform parent)
+        {
+            var group = new GameObject("Page1_Ready");
+            group.transform.SetParent(parent, false);
+            AddImage(group.transform, Page1ReadySprite, Vector2.zero, new Vector2(1080f, 1920f));
+            _page1ReadyCanvasGroup = EnsureCanvasGroup(group);
+            return group;
+        }
+
+        /// <summary>Gets or adds a CanvasGroup - used to fade Page1_Ready out (see ReadyFadeOutSeconds) whether it was just built fresh here or picked up from a hand-tuned prefab.</summary>
         private static CanvasGroup EnsureCanvasGroup(GameObject go)
         {
             if (go == null) return null;
@@ -1233,64 +883,27 @@ namespace ARReveal
             return cg;
         }
 
-        /// <summary>
-        /// A TextMeshProUGUI placeholder (Unity's own default TMP font
-        /// asset, via TMP_Settings - assigned automatically since none is
-        /// set explicitly here) until a real design asset exists for this
-        /// screen (every OTHER screen's text in this class is a pre-
-        /// rendered PNG per this project's own convention - see this
-        /// class's own "CALIBRATION SCREEN" doc comment for why this one's
-        /// different for now). TMP, not legacy UnityEngine.UI.Text, per
-        /// direct request - every text field in this class is TMP now.
-        /// </summary>
-        private static TMP_Text AddPlaceholderText(Transform parent, string name, string text, int fontSize, Vector2 anchoredPos, Vector2 size)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent, false);
-            var label = go.AddComponent<TextMeshProUGUI>();
-            label.text = text;
-            label.fontSize = fontSize;
-            label.alignment = TextAlignmentOptions.Center;
-            label.color = Color.white;
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = anchoredPos;
-            return label;
-        }
-
         // --- CALL TO ACTION ----------------------------------------------------
         private GameObject BuildPage2(Transform parent)
         {
             var group = new GameObject("Page2_CallToAction");
             group.transform.SetParent(parent, false);
 
-            // Stacked top-to-bottom: "Heute: dieses Kino." / logo / "Ab 17.
-            // September: die ganze Welt." / Restart+Foto buttons - approximate
-            // first-pass positions matching the design mockup's own vertical
-            // order; adjust once visible on a real device, I can't preview this
-            // without one.
             AddImage(group.transform, Page2TextTopSprite, new Vector2(0f, 520f), new Vector2(700f, 130f));
             AddImage(group.transform, LogoSprite, new Vector2(0f, 330f), new Vector2(800f, 225f));
             AddImage(group.transform, Page2TextBottomSprite, new Vector2(0f, 150f), new Vector2(700f, 130f));
 
-            BuildImageButton(group.transform, "RestartButton", RestartButtonSprite,
-                new Vector2(-150f, -600f), new Vector2(280f, 140f), Restart);
-            BuildImageButton(group.transform, "FotoButton", FotoButtonSprite,
-                new Vector2(150f, -600f), new Vector2(280f, 140f), Foto);
+            BuildImageButton(group.transform, "ShareWin", ShareWinButtonSprite,
+                new Vector2(0f, -600f), new Vector2(320f, 140f), Foto);
 
             return group;
         }
 
-        // --- SHARE PROMPT --------------------------------------------------------
+        // --- FOTO --------------------------------------------------------
         private GameObject BuildPage3(Transform parent)
         {
-            var group = new GameObject("Page3_SharePrompt");
+            var group = new GameObject("Page3_Foto");
             group.transform.SetParent(parent, false);
-
-            AddImage(group.transform, Page3TextSprite, new Vector2(0f, 400f), new Vector2(760f, 260f));
 
             // Uses RecordButtonSprite (RecButton.png) if assigned; falls back
             // to a plain generated red circle otherwise so this never breaks
@@ -1299,70 +912,23 @@ namespace ARReveal
             // comment).
             var recordSprite = RecordButtonSprite != null ? RecordButtonSprite : CreateCircleSprite(new Color(0.85f, 0.1f, 0.1f, 1f), 128);
             BuildImageButton(group.transform, "RecordButton", recordSprite,
-                new Vector2(0f, 0f), new Vector2(140f, 140f), RetakePhoto);
-
-            BuildImageButton(group.transform, "TeilenButton", TeilenButtonSprite,
-                new Vector2(0f, -500f), new Vector2(280f, 140f), Teilen);
+                new Vector2(0f, -700f), new Vector2(140f, 140f), RetakePhoto);
 
             return group;
         }
 
-        // --- RESCAN --------------------------------------------------------
-        /// <summary>
-        /// Bottom-center "Rescan" button, per direct request - added directly
-        /// on the root canvas (a sibling of Page0/Page2/Page3, not nested
-        /// inside any of them), since its own visibility is gated
-        /// independently of all three (see Update(): HasRevealedContent AND
-        /// the calibration screen has fully hidden/faded AND neither Page2
-        /// nor Page3 is up) rather than being tied to any single page.
-        /// Tapping it calls Rescan(), which does nothing more than forward to
-        /// Handoff/DirectTrackingReveal's own RequestRescan() - see that
-        /// method's own doc comment for why that alone is enough to put the
-        /// exact same calibration screen back up and run a genuine fresh
-        /// settle/lock, with zero extra state to manage here. No design
-        /// asset exists for this yet (added ad hoc, per direct request) - a
-        /// generated rounded pill background (see CreateRoundedFillSprite)
-        /// plus plain placeholder text, same "swap for a real asset later"
-        /// caveat as the calibration screen's own two text labels.
-        /// </summary>
-        private GameObject BuildRescanButton(Transform parent)
+        // --- SHARE --------------------------------------------------------
+        private GameObject BuildPage4(Transform parent)
         {
-            var buttonSprite = CreateRoundedFillSprite(new Color(0f, 0f, 0f, 0.55f), 320, 110, 28);
-            var button = BuildImageButton(parent, "RescanButton", buttonSprite,
-                new Vector2(0f, -880f), new Vector2(320f, 110f), Rescan);
-            button.GetComponent<Image>().preserveAspect = false;
+            var group = new GameObject("Page4_Share");
+            group.transform.SetParent(parent, false);
 
-            var label = AddPlaceholderText(button.transform, "Label", "RESCAN", 36, Vector2.zero, new Vector2(320f, 110f));
-            label.raycastTarget = false;
+            BuildImageButton(group.transform, "RetakeButton", RetakeButtonSprite,
+                new Vector2(-150f, -700f), new Vector2(280f, 140f), DiscardPreview);
+            BuildImageButton(group.transform, "TeilenButton", TeilenButtonSprite,
+                new Vector2(150f, -700f), new Vector2(280f, 140f), Teilen);
 
-            return button.gameObject;
-        }
-
-        /// <summary>
-        /// Top-left "back" button, shown only while PhotoPreview is up (see
-        /// DiscardPreview/Update()'s per-frame _hasCapturedPreview sync) -
-        /// per direct request, discards the captured photo without sharing
-        /// it. A root-level sibling (like RescanButton/WarningPopup), NOT a
-        /// child of PhotoPreview itself - PhotoPreview is deliberately an
-        /// EARLY sibling so whichever page (Page1/Page3) draws on top of it
-        /// (see EnsurePhotoPreview's own doc comment), and Unity renders an
-        /// entire earlier sibling's subtree - including any children -
-        /// before a later sibling's, so a child of PhotoPreview would
-        /// render (and layer for input) BEHIND Page1/Page3's own buttons
-        /// too. Placing this as its own later root sibling instead keeps it
-        /// reliably on top and tappable regardless of what else is on
-        /// screen.
-        /// </summary>
-        private GameObject BuildDiscardButton(Transform parent)
-        {
-            var buttonSprite = CreateCircleSprite(new Color(0f, 0f, 0f, 0.55f), 120);
-            var button = BuildImageButton(parent, "DiscardButton", buttonSprite,
-                new Vector2(-420f, 800f), new Vector2(120f, 120f), DiscardPreview);
-
-            var label = AddPlaceholderText(button.transform, "Label", "←", 56, Vector2.zero, new Vector2(120f, 120f));
-            label.raycastTarget = false;
-
-            return button.gameObject;
+            return group;
         }
 
         private static Image AddImage(Transform parent, Sprite sprite, Vector2 anchoredPos, Vector2 size)
@@ -1422,137 +988,12 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Generates a rounded-square OUTLINE (transparent fill, so the live
-        /// camera feed shows through the middle - it's a viewfinder, not a
-        /// solid shape) - the "typical QR rounded square window" for the
-        /// calibration screen. Standard rounded-box signed-distance-field
-        /// technique (see RoundedBoxSDF) - thickness is drawn as a band
-        /// around the zero-distance boundary.
-        /// </summary>
-        private static Sprite CreateRoundedFrameSprite(Color color, int size, int cornerRadius, int thickness)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var pixels = new Color[size * size];
-            float half = size / 2f;
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    Vector2 p = new Vector2(x + 0.5f - half, y + 0.5f - half);
-                    float dist = RoundedBoxSDF(p, half - 1f, cornerRadius);
-                    bool onBorder = Mathf.Abs(dist) <= thickness * 0.5f;
-                    pixels[y * size + x] = onBorder ? color : new Color(0f, 0f, 0f, 0f);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
-        }
-
-        /// <summary>Signed distance from p to the boundary of a square of half-extent halfExtent with rounded corners of the given radius - negative inside, positive outside, zero exactly on the boundary. Standard technique (Inigo Quilez's rounded-box SDF).</summary>
-        private static float RoundedBoxSDF(Vector2 p, float halfExtent, float radius)
-        {
-            Vector2 q = new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - new Vector2(halfExtent - radius, halfExtent - radius);
-            float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
-            float inside = Mathf.Min(Mathf.Max(q.x, q.y), 0f);
-            return outside + inside - radius;
-        }
-
-        /// <summary>
-        /// Generates a SOLID filled rounded-rect (a "pill" background) at
-        /// exactly width x height pixels - unlike CreateRoundedFrameSprite
-        /// (an outline) or the square-only RoundedBoxSDF/CreateRingSprite
-        /// above, this supports a genuinely rectangular (non-square) shape
-        /// at its own real aspect ratio, generated at the exact pixel size
-        /// the button will actually display at so it can be shown with
-        /// preserveAspect OFF with no stretching - see BuildRescanButton.
-        /// </summary>
-        private static Sprite CreateRoundedFillSprite(Color color, int width, int height, int cornerRadius)
-        {
-            var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            var pixels = new Color[width * height];
-            Vector2 halfExtents = new Vector2(width / 2f - 1f, height / 2f - 1f);
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    Vector2 p = new Vector2(x + 0.5f - width / 2f, y + 0.5f - height / 2f);
-                    Vector2 q = new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - (halfExtents - new Vector2(cornerRadius, cornerRadius));
-                    float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
-                    float inside = Mathf.Min(Mathf.Max(q.x, q.y), 0f);
-                    float dist = outside + inside - cornerRadius;
-                    pixels[y * width + x] = dist <= 0f ? color : new Color(0f, 0f, 0f, 0f);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
-        }
-
-        /// <summary>
-        /// Generates a plain, fully-closed ring (donut) - the base shape for
-        /// the calibration loading ring. No design asset exists for this yet
-        /// - see this class's own "CALIBRATION SCREEN" doc comment. The
-        /// actual "loading bar" animation isn't baked into this texture at
-        /// all - see SetUpAsLoadingRing, which uses Unity's own
-        /// Image.Type.Filled/Radial360 to progressively reveal this same
-        /// closed ring around its circumference.
-        /// </summary>
-        private static Sprite CreateRingSprite(Color color, int size, float thicknessFraction)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var pixels = new Color[size * size];
-            Vector2 center = new Vector2((size - 1) / 2f, (size - 1) / 2f);
-            float outerRadius = size / 2f - 2f;
-            float innerRadius = outerRadius * (1f - thicknessFraction);
-
-            for (int y = 0; y < size; y++)
-            {
-                for (int x = 0; x < size; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center);
-                    bool onRing = dist >= innerRadius && dist <= outerRadius;
-                    pixels[y * size + x] = onRing ? color : new Color(0f, 0f, 0f, 0f);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
-        }
-
-        /// <summary>
-        /// Configures a plain closed-ring Image as a radial-fill "loading
-        /// bar that fills in a loop" (per direct request) - Unity's built-in
-        /// Image.Type.Filled/Radial360 progressively reveals the ring
-        /// starting from the top, clockwise, as fillAmount goes 0 -> 1 (see
-        /// LateUpdate for the actual looping animation). Reusable so both a
-        /// fresh BuildPage0 build and EditorUpgradeSpinnerToRadialFill
-        /// (upgrading an already hand-placed spinner in place) configure it
-        /// identically.
-        /// </summary>
-        private static void SetUpAsLoadingRing(Image image)
-        {
-            image.type = Image.Type.Filled;
-            image.fillMethod = Image.FillMethod.Radial360;
-            image.fillOrigin = (int)Image.Origin360.Top;
-            image.fillClockwise = true;
-            image.fillAmount = 0f;
-        }
-
-        /// <summary>
-        /// Replays the tentacle/hole/FX burst in place - per direct request,
-        /// NOT a page reload (an earlier version did that via a same-tab
-        /// jslib call; superseded now that both reveal mechanisms expose
-        /// their own proper in-place reset: HandoffToInstantTracking.
-        /// RestartRevealSequence() for QR+SLAM scenes, or
-        /// RevealOnTrackingFound.RestartRevealSequence() for direct
-        /// image-tracking scenes - Handoff always wins if assigned, same as
-        /// HasRevealedContent). Tracking/SLAM (if any) is untouched, so this
-        /// is instant and needs no rescan. Also resets THIS controller's own
-        /// screen timing, so the Call To Action screen reappears
-        /// Page2DelaySeconds after this restart (not the original handoff),
-        /// and immediately hides whichever page was showing rather than
-        /// leaving it stuck up while the burst replays.
+        /// Replays the tentacle/hole/FX burst in place - NOT reload the
+        /// browser page (see HandoffToInstantTracking.RestartRevealSequence()).
+        /// Not currently wired to any button (per direct request, the
+        /// Call To Action screen's Restart button was replaced by ShareWin -
+        /// see this class's own top doc comment) - left in place in case
+        /// it's wanted back on some other trigger later.
         /// </summary>
         public void Restart()
         {
@@ -1566,20 +1007,19 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// The bottom-center Rescan button's own action, per direct request:
-        /// "it put the calibrate UI back on and we can rescan and reset with
-        /// the same flow as the first time." Unlike Restart() above (an
-        /// instant in-place FX replay that leaves tracking completely
-        /// untouched), this is a genuine full recalibration - it forwards to
+        /// A genuine full recalibration - forwards to
         /// Handoff.RequestRescan()/DirectTrackingReveal.RequestRescan(),
         /// which hides the content again and forces HasContentSpawned/
         /// HasRevealed back to false. That alone is enough: the moment
         /// HasRevealedContent reads false again, Update()'s own existing
         /// "!HasRevealedContent" branch takes over on its own and puts the
-        /// calibration screen ("Scan the QR to calibrate") straight back up,
-        /// resets _screen/_handoffStartTime/_contentSpawnedAt, and hides
-        /// Page2/Page3/this button - exactly the same state the very first
-        /// launch starts in, with no separate reset logic needed here.
+        /// calibration screen straight back up, resets
+        /// _screen/_handoffStartTime/_contentSpawnedAt, and hides
+        /// Page1-4 - exactly the same state the very first launch starts
+        /// in, with no separate reset logic needed here. Not currently
+        /// wired to any button (the Rescan button was removed per direct
+        /// request along with the rest of the old Page1_Experience) - left
+        /// in place in case a rescan trigger is wanted back somewhere.
         /// </summary>
         public void Rescan()
         {
@@ -1588,38 +1028,30 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// Just advances from the Call To Action screen to the Share Prompt
-        /// screen ("the selfie screen, the one with the red button" per
-        /// direct correction) - does NOT capture anything itself. An earlier
-        /// version captured + immediately opened the save/share dialog right
-        /// here, skipping that screen entirely - wrong per the actual design,
-        /// where FOTO is purely a navigation step and the round record
-        /// button (RetakePhoto) is the one real "take the photo" action.
-        /// Hides any stale preview from a previous visit, per direct request
-        /// - a fresh visit to this screen should always start from the same
-        /// predictable state (nothing captured yet), not wherever the LAST
-        /// visit left off.
+        /// Advances from the Call To Action screen to Page3_Foto (kept as
+        /// the method name from an earlier "FOTO button" version - its ROLE
+        /// is unchanged, just the button/label is now "ShareWin"). Does NOT
+        /// capture anything itself - the round record button on Page3_Foto
+        /// (RetakePhoto) is the one real "take the photo" action. Hides any
+        /// stale preview/Page4_Share from a previous visit, per direct
+        /// request - a fresh visit to this screen should always start from
+        /// the same predictable state (nothing captured yet).
         /// </summary>
         public void Foto()
         {
             _screen = UiScreen.SharePrompt;
-            _hasCapturedPreview = false;
-            SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
+            ClearPreviewState();
         }
 
         /// <summary>
-        /// The round record button on the Share Prompt screen - THE actual
-        /// "take the photo" action. Can be tapped more than once to
-        /// retake, in case the first one didn't land right - just re-runs
-        /// the same routine, overwriting whatever was captured before.
+        /// The round record button on Page3_Foto - THE actual "take the
+        /// photo" action. Can be tapped more than once to retake, in case
+        /// the first one didn't land right - just re-runs the same routine,
+        /// overwriting whatever was captured before.
         ///
-        /// Per direct request, this no longer jumps straight to the native
-        /// share sheet - it just captures and shows a PREVIEW (see
-        /// ShowPhotoPreview), leaving Teilen as the actual "now share this"
-        /// action (see Teilen's own doc comment for why that's a clean,
-        /// small change rather than a restructure - ShareLastPhoto/
-        /// ARReveal_ShareImage, the actual native-share plumbing, is
-        /// completely unchanged).
+        /// Captures and shows a framed PREVIEW (see ShowPhotoPreview) AND
+        /// turns on Page4_Share alongside it (see Update()) - leaving
+        /// Teilen (Page4_Share) as the actual "now share this" action.
         /// </summary>
         public void RetakePhoto()
         {
@@ -1666,11 +1098,12 @@ namespace ARReveal
         private Texture2D _previewTexture;
 
         /// <summary>
-        /// Populates PhotoPreview (see EnsurePhotoPreview) with the just-
-        /// captured JPEG and reveals it - per direct request, the client
-        /// wants the photo shown first, with Teilen as the actual "share
-        /// this" action (RetakePhoto can still be tapped again to retake,
-        /// which simply calls this again and replaces what's shown).
+        /// Populates PhotoPreview's inner PhotoImage (see EnsurePhotoPreview)
+        /// with the just-captured JPEG and reveals the whole framed preview
+        /// (plus Page4_Share, via Update()'s _hasCapturedPreview sync) -
+        /// leaving Teilen as the actual "share this" action (RetakePhoto can
+        /// still be tapped again to retake, which simply calls this again
+        /// and replaces what's shown).
         /// </summary>
         private void ShowPhotoPreview()
         {
@@ -1685,38 +1118,38 @@ namespace ARReveal
                 new Rect(0f, 0f, _previewTexture.width, _previewTexture.height), new Vector2(0.5f, 0.5f));
 
             // The actual "show it" - _hasCapturedPreview is what Update()
-            // reads every frame afterward to keep this active (and the CTA
-            // countdown paused - see that field's own doc comment); setting
-            // the GameObject active here too just avoids a one-frame delay
-            // before Update() next runs.
+            // reads every frame afterward to keep this (and Page4_Share)
+            // active, and the CTA countdown paused - see that field's own
+            // doc comment; setting the GameObject active here too just
+            // avoids a one-frame delay before Update() next runs.
             _hasCapturedPreview = true;
-            _photoPreviewImage.gameObject.SetActive(true);
+            if (_photoPreviewGroup != null) _photoPreviewGroup.SetActive(true);
         }
 
         /// <summary>
-        /// Hides the preview/discard button and resumes the paused Call To
+        /// Hides the preview/Page4_Share and resumes the paused Call To
         /// Action countdown (by clearing _hasCapturedPreview - see that
-        /// field's own doc comment) - shared by Teilen() (per direct
-        /// request: "resume the experience after sharing") and
-        /// DiscardPreview() below. Does NOT touch _lastPhotoBytes itself -
-        /// Teilen still needs it (ShareLastPhoto runs first); DiscardPreview
-        /// clears it separately, right after calling this.
+        /// field's own doc comment) - shared by Foto() (fresh-entry reset),
+        /// Teilen() (after sharing), and DiscardPreview() (retake/discard).
+        /// Does NOT touch _lastPhotoBytes itself - Teilen still needs it
+        /// (ShareLastPhoto runs first); DiscardPreview clears it separately.
         /// </summary>
         private void ClearPreviewState()
         {
             _hasCapturedPreview = false;
-            SetActiveIfNotNull(_photoPreviewImage != null ? _photoPreviewImage.gameObject : null, false);
-            SetActiveIfNotNull(_discardButton, false);
+            SetActiveIfNotNull(_photoPreviewGroup, false);
+            SetActiveIfNotNull(_page4Group, false);
         }
 
         /// <summary>
-        /// The top-left "back" button on the photo preview, per direct
-        /// request - discards the captured photo WITHOUT sharing it and
-        /// resumes the experience exactly like Teilen does (ClearPreviewState),
-        /// just skipping ShareLastPhoto entirely. Also clears
-        /// _lastPhotoBytes itself (not just hiding the preview) so a stray
-        /// later Teilen tap can't accidentally re-share a photo the viewer
-        /// explicitly discarded.
+        /// Page4_Share's RetakeButton, and PhotoPreview's own tap-to-dismiss
+        /// (see EnsurePhotoPreview) - discards the captured photo WITHOUT
+        /// sharing it and goes back to Page3_Foto (ClearPreviewState hides
+        /// the preview/Page4_Share, revealing Page3_Foto - which stayed
+        /// active underneath the whole time - and its own RecordButton
+        /// again). Also clears _lastPhotoBytes itself (not just hiding the
+        /// preview) so a stray later Teilen tap can't accidentally re-share
+        /// a photo the viewer explicitly discarded.
         /// </summary>
         public void DiscardPreview()
         {
@@ -1751,7 +1184,7 @@ namespace ARReveal
         /// native share sheet (Plugins/WebGL/ARReveal_Share.jslib calls
         /// navigator.share() directly) - bypassing Zappar's own
         /// zappar-sharing.js overlay entirely, per direct request. Falls
-        /// back to a plain download inside that same plugin if this
+        /// back to a plain download in that same plugin if this
         /// browser/device has no file-sharing support at all, so this never
         /// silently does nothing.
         /// </summary>
@@ -1766,20 +1199,15 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// THE "share this now" action, per direct request: RetakePhoto no
-        /// longer shares automatically (it just captures and shows a
-        /// preview - see ShowPhotoPreview), so this is what actually opens
-        /// the native OS share sheet for whatever's currently shown in that
+        /// Page4_Share's TeilenButton - THE "share this now" action, opening
+        /// the native OS share sheet for whatever's currently shown in the
         /// preview. Nothing about ShareLastPhoto/ARReveal_ShareImage
-        /// themselves changed - Teilen already called this exact method
-        /// before, just as a secondary "re-share if the dialog was
-        /// dismissed by mistake" convenience; it's simply promoted to the
-        /// primary trigger now that capture and share are two separate
-        /// steps instead of one.
+        /// themselves changed - just where this gets called from as the UI
+        /// itself was restructured around it.
         ///
-        /// Resumes the experience afterward (ClearPreviewState), per direct
-        /// request - hides the preview/discard button and un-pauses the
-        /// Call To Action countdown, so sharing doesn't leave the viewer
+        /// Resumes the experience afterward (ClearPreviewState) - hides the
+        /// preview/Page4_Share and un-pauses the Call To Action countdown,
+        /// revealing Page3_Foto again, so sharing doesn't leave the viewer
         /// stuck looking at the same captured photo indefinitely.
         /// </summary>
         public void Teilen()

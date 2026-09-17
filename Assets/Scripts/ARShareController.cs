@@ -26,13 +26,15 @@ namespace ARReveal
     ///    actually live (ZapparCamera.CameraSourceInitialized), for as long
     ///    as content hasn't ACTUALLY spawned yet (!HasRevealedContent - see
     ///    that property's own doc for why HasContentSpawned, not
-    ///    HasHandedOff, is the right signal to gate on). Just a single
-    ///    static image now (whatever's authored on it directly) - no more
-    ///    dynamic text, viewfinder frame, or loading spinner; those all
-    ///    existed on this page in an earlier version, removed per direct
-    ///    request ("we don't change the calibration text anymore, we now
-    ///    just have an image"). Hides INSTANTLY (no fade of its own) the
-    ///    moment content reveals - the fade job moved to Page1_Ready below.
+    ///    HasHandedOff, is the right signal to gate on). A single static
+    ///    background image (whatever's authored on it directly) plus a
+    ///    looping loading ring (EnsureSpinner) - the dynamic text/viewfinder
+    ///    frame an earlier version also had here are gone for good ("we
+    ///    don't change the calibration text anymore, we now just have an
+    ///    image"), but the spinner itself was brought back afterward per a
+    ///    later direct request ("i need the spinner back"). Hides INSTANTLY
+    ///    (no fade of its own) the moment content reveals - the fade job
+    ///    moved to Page1_Ready below.
     ///  - Page1_Ready: shown the INSTANT content reveals, held for
     ///    ReadyDisplaySeconds, then eased out over ReadyFadeOutSeconds (a
     ///    CanvasGroup fade) - per direct request, this is exactly the same
@@ -154,6 +156,8 @@ namespace ARReveal
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
+        [Tooltip("The calibration screen's loading ring (see EnsureSpinner) - overrides the by-name lookup (Page0_Calibration/Spinner). Leave blank to have one auto-created under Page0_Calibration if none exists yet.")]
+        public Image SpinnerImageOverride;
         [Tooltip("The brief 'BEREIT'-equivalent confirmation shown the instant content reveals (see Update()) - overrides the by-name lookup (Page1_Ready).")]
         public GameObject Page1ReadyGroupOverride;
         public GameObject Page2GroupOverride;
@@ -181,6 +185,9 @@ namespace ARReveal
 
         [Tooltip("Seconds to fade Page1_Ready out (CanvasGroup alpha 1->0) once ReadyDisplaySeconds has elapsed, instead of an instant SetActive(false) - a smoother, more noticeable 'ok, it's done now' transition.")]
         public float ReadyFadeOutSeconds = 0.6f;
+
+        [Tooltip("How many full loops per second the calibration screen's loading ring fills at (see LateUpdate/EnsureSpinner).")]
+        public float SpinnerLoopsPerSecond = 0.8f;
 
         [Header("Warning popup thresholds - untested, tune on a real device")]
         [Tooltip("Camera linear speed (meters/second) above which the TOO FAST warning shows - see UpdateMotionPeak.")]
@@ -212,6 +219,9 @@ namespace ARReveal
 
         /// <summary>Drives Page1_Ready's fade-out (see ReadyFadeOutSeconds) - added whether it was built fresh (BuildPage1Ready) or picked up from a hand-tuned prefab (AttachToExistingUI).</summary>
         private CanvasGroup _page1ReadyCanvasGroup;
+
+        /// <summary>The calibration screen's loading ring (see EnsureSpinner/LateUpdate) - restored per direct request after being dropped in the wholesale UI restructure.</summary>
+        private Image _spinnerImage;
 
         private GameObject _photoPreviewGroup;
         private Image _photoPreviewImage;
@@ -288,6 +298,7 @@ namespace ARReveal
         {
             _canvas = canvasRoot.GetComponent<Canvas>();
             _page0Group = Page0GroupOverride != null ? Page0GroupOverride : FindChild(canvasRoot, "Page0_Calibration");
+            EnsureSpinner(_page0Group);
             _page1ReadyGroup = Page1ReadyGroupOverride != null ? Page1ReadyGroupOverride : FindChild(canvasRoot, "Page1_Ready");
             _page1ReadyCanvasGroup = EnsureCanvasGroup(_page1ReadyGroup);
             _page2Group = Page2GroupOverride != null ? Page2GroupOverride : FindChild(canvasRoot, "Page2_CallToAction");
@@ -633,6 +644,26 @@ namespace ARReveal
             _tentacleCacheSource = wrapper;
         }
 
+        /// <summary>
+        /// Animates the calibration screen's loading ring (see EnsureSpinner) -
+        /// in LateUpdate (not Update) so it always reads this frame's actual
+        /// Page0_Calibration active state, set earlier in Update(), rather
+        /// than lagging a frame behind. A radial-fill loading ring
+        /// (Image.Type.Filled/Radial360), not a rotated shape - fillAmount
+        /// sweeps 0 -> 1 on a repeating sawtooth (Mathf.Repeat), so it fills
+        /// up, snaps back to empty, and fills again in an endless loop while
+        /// the calibration screen is up. No freeze-at-1 "READY" special case
+        /// (an earlier version needed one because Page0 itself used to show
+        /// the READY confirmation and stay up briefly afterward) -
+        /// Page0_Calibration now hides INSTANTLY the moment content reveals
+        /// (see Update()), so there's nothing left to freeze it for.
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (_spinnerImage == null || _page0Group == null || !_page0Group.activeInHierarchy) return;
+            _spinnerImage.fillAmount = Mathf.Repeat(Time.time * SpinnerLoopsPerSecond, 1f);
+        }
+
         private static void SetActiveIfNotNull(GameObject go, bool active)
         {
             if (go != null && go.activeSelf != active) go.SetActive(active);
@@ -881,18 +912,22 @@ namespace ARReveal
 
         // --- CALIBRATION ---------------------------------------------------------
         /// <summary>
-        /// Just a single static image now - per direct request ("we don't
+        /// A single static background image (per direct request, "we don't
         /// change the calibration text anymore, we now just have an
-        /// image"), the viewfinder frame/instruction text/loading spinner/
-        /// ready-text swap an earlier version ran on this page are all
-        /// gone; that whole "content is ready" moment moved to the separate
-        /// Page1_Ready (see Update()).
+        /// image" - the viewfinder frame/instruction text/ready-text swap
+        /// an earlier version ran on this page are gone for good; that
+        /// whole "content is ready" moment moved to the separate
+        /// Page1_Ready, see Update()) plus a loading ring (EnsureSpinner) -
+        /// restored per direct request ("i need the spinner back") after
+        /// being dropped along with the rest of this page's old dynamic
+        /// elements in the same restructure.
         /// </summary>
         private GameObject BuildPage0(Transform parent)
         {
             var group = new GameObject("Page0_Calibration");
             group.transform.SetParent(parent, false);
             AddPageBackground(group);
+            EnsureSpinner(group);
             return group;
         }
 
@@ -913,6 +948,101 @@ namespace ARReveal
             var cg = go.GetComponent<CanvasGroup>();
             if (cg == null) cg = go.AddComponent<CanvasGroup>();
             return cg;
+        }
+
+        /// <summary>
+        /// The calibration screen's loading ring - restored per direct
+        /// request ("i need the spinner back") after being dropped in the
+        /// wholesale UI restructure (see git history around "Restructure UI
+        /// flow") when Page0_Calibration became a single static image. No
+        /// design asset exists for this (see CreateRingSprite's own doc
+        /// comment) - a plain generated ring, animated via
+        /// Image.Type.Filled/Radial360 rather than a rotated shape (see
+        /// LateUpdate), exactly "a round loading bar that fills in a loop"
+        /// per the original request this restores. Self-installing (like
+        /// EnsurePhotoPreview/EnsureFlashOverlay) so it comes back
+        /// automatically under Page0_Calibration whether that's the
+        /// hand-tuned Share prefab or the procedural BuildUI() fallback -
+        /// reuses an existing "Spinner" child (or SpinnerImageOverride) if
+        /// one's already there, and only generates+assigns the ring sprite
+        /// if it doesn't already have one, so a hand-placed custom spinner
+        /// image is never clobbered.
+        /// </summary>
+        private void EnsureSpinner(GameObject page0Group)
+        {
+            if (page0Group == null) return;
+
+            Transform existing = SpinnerImageOverride != null ? SpinnerImageOverride.transform : page0Group.transform.Find("Spinner");
+            GameObject go;
+            Image image;
+            if (existing != null)
+            {
+                go = existing.gameObject;
+                image = go.GetComponent<Image>();
+                if (image == null) image = go.AddComponent<Image>();
+            }
+            else
+            {
+                go = new GameObject("Spinner");
+                go.transform.SetParent(page0Group.transform, false);
+                var rt = go.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.sizeDelta = new Vector2(140f, 140f);
+                rt.anchoredPosition = new Vector2(0f, -700f);
+                image = go.AddComponent<Image>();
+            }
+
+            if (image.sprite == null) image.sprite = CreateRingSprite(Color.white, 128, 0.16f);
+            SetUpAsLoadingRing(image);
+            _spinnerImage = image;
+        }
+
+        /// <summary>
+        /// Generates a plain, fully-closed ring (donut) - the base shape for
+        /// the calibration loading ring. No design asset exists for this -
+        /// the actual "loading bar" animation isn't baked into this texture
+        /// at all - see SetUpAsLoadingRing, which uses Unity's own
+        /// Image.Type.Filled/Radial360 to progressively reveal this same
+        /// closed ring around its circumference.
+        /// </summary>
+        private static Sprite CreateRingSprite(Color color, int size, float thicknessFraction)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            Vector2 center = new Vector2((size - 1) / 2f, (size - 1) / 2f);
+            float outerRadius = size / 2f - 2f;
+            float innerRadius = outerRadius * (1f - thicknessFraction);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dist = Vector2.Distance(new Vector2(x, y), center);
+                    bool onRing = dist >= innerRadius && dist <= outerRadius;
+                    pixels[y * size + x] = onRing ? color : new Color(0f, 0f, 0f, 0f);
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        /// <summary>
+        /// Configures a plain closed-ring Image as a radial-fill "loading
+        /// bar that fills in a loop" (per the original request) - Unity's
+        /// built-in Image.Type.Filled/Radial360 progressively reveals the
+        /// ring starting from the top, clockwise, as fillAmount goes 0 -> 1
+        /// (see LateUpdate for the actual looping animation).
+        /// </summary>
+        private static void SetUpAsLoadingRing(Image image)
+        {
+            image.type = Image.Type.Filled;
+            image.fillMethod = Image.FillMethod.Radial360;
+            image.fillOrigin = (int)Image.Origin360.Top;
+            image.fillClockwise = true;
+            image.fillAmount = 0f;
         }
 
         // --- CALL TO ACTION ----------------------------------------------------

@@ -20,7 +20,7 @@ RenderSettings:
   m_FogDensity: 0.01
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
+  m_AmbientSkyColor: {r: 1.1712568, g: 1.1712568, b: 1.1712568, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
   m_AmbientIntensity: 1.5
@@ -1704,6 +1704,10 @@ PrefabInstance:
       propertyPath: Preloader
       value: 
       objectReference: {fileID: 404304985}
+    - target: {fileID: 7487206761984701937, guid: bed6d3d415d99a94f90891586e30103b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1796,11 +1800,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6645264776881184097, guid: 157a19c41e16e00438ce785ccf60f045, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 45.499985
+      value: 40.4
       objectReference: {fileID: 0}
     - target: {fileID: 6645264776881184097, guid: 157a19c41e16e00438ce785ccf60f045, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 15.93
+      value: 21
       objectReference: {fileID: 0}
     - target: {fileID: 6645264776881184097, guid: 157a19c41e16e00438ce785ccf60f045, type: 3}
       propertyPath: m_LocalPosition.z
@@ -1938,11 +1942,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1892689784636543455, guid: 3e1fe64cee9abe54890be65aaccd201e, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 45.5
+      value: 40.400017
       objectReference: {fileID: 0}
     - target: {fileID: 1892689784636543455, guid: 3e1fe64cee9abe54890be65aaccd201e, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 16
+      value: 21.07
       objectReference: {fileID: 0}
     - target: {fileID: 1892689784636543455, guid: 3e1fe64cee9abe54890be65aaccd201e, type: 3}
       propertyPath: m_LocalPosition.z

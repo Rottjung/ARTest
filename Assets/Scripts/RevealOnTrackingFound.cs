@@ -109,11 +109,13 @@ namespace ARReveal
 
         /// <summary>
         /// The direct-image-tracking equivalent of
-        /// HandoffToInstantTracking.RequestRescan() - the "Rescan" button's
-        /// own action (ARShareController.Rescan()) for a scene using this
-        /// simpler reveal mechanism instead of the QR/SLAM handoff, per
-        /// direct request ("we need a rescan button... reset with the same
-        /// flow as the first time"). Unlike Hide() above (a no-op whenever
+        /// HandoffToInstantTracking.RequestRescan() - originally the
+        /// "Rescan" button's own action (ARShareController.Rescan(), since
+        /// removed along with the button per direct request - "rescan has
+        /// been removed") for a scene using this simpler reveal mechanism
+        /// instead of the QR/SLAM handoff, per the original request ("we
+        /// need a rescan button... reset with the same flow as the first
+        /// time"). Unlike Hide() above (a no-op whenever
         /// RevealOnlyOnce is set, which it normally is - the burst is meant
         /// to be a one-time event, not something ordinary tracking loss
         /// should undo), this unconditionally hides content and clears

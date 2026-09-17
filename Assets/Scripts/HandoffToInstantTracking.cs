@@ -1144,8 +1144,11 @@ namespace ARReveal
         }
 
         /// <summary>
-        /// A DELIBERATE full recalibration - the "Rescan" button's own
-        /// action (ARShareController.Rescan()), per direct request: "we need
+        /// A DELIBERATE full recalibration - originally the "Rescan"
+        /// button's own action (ARShareController.Rescan(), since removed
+        /// along with the button per direct request - "rescan has been
+        /// removed" - this method itself is left in place, just currently
+        /// unreachable from the UI). Per the original request: "we need
         /// a rescan button... it put the calibrate UI back on and we can
         /// rescan and reset with the same flow as the first time." Unlike
         /// RestartRevealSequence() above (an instant in-place FX replay that

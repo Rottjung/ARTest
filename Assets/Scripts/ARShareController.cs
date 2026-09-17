@@ -57,10 +57,11 @@ namespace ARReveal
     ///    once to retake). Capturing shows a full-screen framed PREVIEW
     ///    (PhotoPreview/ShowPhotoPreview - see that method's own doc for the
     ///    white-mat framing per direct request, "so its clear it a pic, not
-    ///    just frozen screen") AND activates Page4_Share alongside it -
-    ///    Page3_Foto itself stays active/visible underneath the whole time
-    ///    (RecordButton can still be tapped again to retake directly, same
-    ///    as before).
+    ///    just frozen screen") and switches EXCLUSIVELY to Page4_Share -
+    ///    Page3_Foto itself turns off while the preview/Page4_Share is
+    ///    showing (an earlier version left it on underneath, which per
+    ///    direct report looked wrong - "Page4 is still showing page3
+    ///    behind it"; all pages are mutually exclusive now, see Update()).
     ///  - Page4_Share: TeilenButton (shares via the existing native-share
     ///    plumbing - see Teilen's own doc comment, nothing about
     ///    ShareLastPhoto/ARReveal_ShareImage changed) and RetakeButton
@@ -73,14 +74,14 @@ namespace ARReveal
     /// precedent an even earlier "Distance Alert" screen set (see git
     /// history around "Remove the Distance Alert" if that's ever needed) -
     /// for either of two reasons (see UpdateWarningState/UpdateMotionPeak/
-    /// UpdateTooClose):
+    /// UpdateTooClose). Only checked once content has actually revealed
+    /// (Page1_Ready is on screen) - per direct request ("wait with the
+    /// warnings until after bereit"), an earlier version deliberately
+    /// checked this during the calibration/QR-scan phase too; reversed
+    /// since it's a worse fit with Page1_Ready's own "BEREIT!" moment now.
     ///  - TOO FAST: the AR camera's own frame-to-frame linear/angular speed
     ///    spiked (MotionWarningSpeedThreshold/MotionWarningAngularThreshold)
-    ///    - turns on the "Moving" image. Built for this project's own
-    ///    real-world finding that scanning the ground-level QR then tilting
-    ///    up fast to the building is exactly when tracking drifts worst -
-    ///    coaching a slower tilt attacks that at the source rather than
-    ///    only hiding it after the fact.
+    ///    - turns on the "Moving" image.
     ///  - TOO CLOSE: the viewer is within actual tentacle-attack range - the
     ///    SAME mechanism an earlier Distance Alert screen used
     ///    (TentacleController.IsCameraWithinAttackRange - see its own doc
@@ -90,6 +91,25 @@ namespace ARReveal
     /// Per direct request, WarningPopup shows one of two IMAGES now
     /// (Moving/Distance), not a background + dynamic text label like an
     /// earlier version - see UpdateWarningState.
+    ///
+    /// NO PER-BUTTON SPRITES ANYWHERE ANYMORE, per direct request ("all
+    /// button do not use sprites anymore, we use transparent button on
+    /// top of the design"). Every page's actual look is one combined
+    /// background image baked directly into that page's GameObject in
+    /// the hand-tuned Share.prefab (a real Image + sprite, e.g.
+    /// Page2_CallToAction's own Image component); every button
+    /// (ShareWin/RecordButton/TeilenButton/RetakeButton) is just an
+    /// invisible Image (alpha 0) + Button sitting on top of that art as a
+    /// hit-target - confirmed directly in the prefab's own YAML. Earlier
+    /// versions of this class had a whole "Sprites" field block
+    /// (CalibrateSprite, Page1ReadySprite, LogoSprite, Page2TextTop/
+    /// BottomSprite, *ButtonSprite, plus a generated-red-circle fallback
+    /// for RecordButton) for the procedural BuildUI() fallback to assign
+    /// per-element art with - all removed as dead weight once the real
+    /// design stopped working that way; BuildPage0-4 below now just
+    /// build the same transparent-placeholder-background-plus-
+    /// transparent-hit-target shape the real prefab uses, with no sprite
+    /// loading of any kind.
     ///
     /// SHARING BYPASSES ZAPPAR'S OWN UI ENTIRELY, per direct request ("skip
     /// zappars ui and go native os"). An earlier version used Zappar's WebGL
@@ -131,18 +151,6 @@ namespace ARReveal
 
         [Tooltip("Optional - auto-found in the scene if left blank. Currently unused by this class - see git history if the 'Preparing...' cold-cache distinction this used to drive is ever wanted back.")]
         public TargetPreloader Preloader;
-
-        [Header("Sprites - drag the matching PNG from Assets/Images/UI onto each (procedural BuildUI() fallback only - the hand-tuned Share.prefab has its own art placed directly)")]
-        public Sprite CalibrateSprite;
-        public Sprite Page1ReadySprite;
-        public Sprite LogoSprite;
-        public Sprite Page2TextTopSprite;
-        public Sprite Page2TextBottomSprite;
-        public Sprite ShareWinButtonSprite;
-        [Tooltip("The round record button on Page3_Foto. Falls back to a plain generated red circle if left blank.")]
-        public Sprite RecordButtonSprite;
-        public Sprite TeilenButtonSprite;
-        public Sprite RetakeButtonSprite;
 
         [Header("Optional: after hand-tuning a prebuilt UI (see ARReveal/Build Share UI In Scene), drag the resulting page groups/buttons in here directly. Leave blank to auto-find them by name instead (see AttachToExistingUI).")]
         public GameObject Page0GroupOverride;
@@ -351,34 +359,54 @@ namespace ARReveal
             // WARNING POPUP - per direct request, overrides whichever OTHER
             // page would otherwise be showing. Computed FIRST, before any
             // page-specific logic below, because the motion warning
-            // specifically needs to be able to interrupt the CALIBRATION
-            // screen too - that's exactly when a fast/erratic scan hurts
-            // the QR-based lock's own precision the most.
-            UpdateWarningState();
-            if (_activeWarning != WarningReason.None)
+            // specifically only starts once Page1_Ready is actually on
+            // screen - per direct request ("wait with the warnings until
+            // after bereit... so only after Page1 is on the screen we
+            // start listening"). An earlier version checked this
+            // unconditionally so it could interrupt the calibration/QR-scan
+            // phase too - reversed per this direct request, so no
+            // motion/proximity warning can appear before content (and
+            // Page1_Ready) has actually revealed. UpdateWarningState isn't
+            // even called while !HasRevealedContent, so its internal
+            // motion-sample baseline naturally starts fresh (_hasLastCamSample
+            // is false) the first time it IS called after reveal, rather
+            // than carrying over any pre-reveal jitter.
+            if (HasRevealedContent)
             {
-                SetActiveIfNotNull(_warningPopupGroup, true);
-                SetActiveIfNotNull(_page0Group, false);
-                SetActiveIfNotNull(_page1ReadyGroup, false);
-                SetActiveIfNotNull(_page2Group, false);
-                SetActiveIfNotNull(_page3Group, false);
-                SetActiveIfNotNull(_page4Group, false);
-                // Forced hidden too (NOT cleared - _hasCapturedPreview itself
-                // is untouched) so a warning can never be visually covered by
-                // an opaque captured-photo preview sitting behind it. Comes
-                // back on its own the moment this branch stops running (see
-                // the per-frame sync below), since that re-applies
-                // _hasCapturedPreview's own unchanged value.
-                SetActiveIfNotNull(_photoPreviewGroup, false);
-                return;
+                UpdateWarningState();
+                if (_activeWarning != WarningReason.None)
+                {
+                    SetActiveIfNotNull(_warningPopupGroup, true);
+                    SetActiveIfNotNull(_page0Group, false);
+                    SetActiveIfNotNull(_page1ReadyGroup, false);
+                    SetActiveIfNotNull(_page2Group, false);
+                    SetActiveIfNotNull(_page3Group, false);
+                    SetActiveIfNotNull(_page4Group, false);
+                    // Forced hidden too (NOT cleared - _hasCapturedPreview itself
+                    // is untouched) so a warning can never be visually covered by
+                    // an opaque captured-photo preview sitting behind it. Comes
+                    // back on its own the moment this branch stops running (see
+                    // the per-frame sync below), since that re-applies
+                    // _hasCapturedPreview's own unchanged value.
+                    SetActiveIfNotNull(_photoPreviewGroup, false);
+                    return;
+                }
+            }
+            else if (_activeWarning != WarningReason.None)
+            {
+                // Defensive only (e.g. a rescan mid-warning) - UpdateWarningState
+                // itself never runs while !HasRevealedContent, so this can't
+                // normally happen, but don't leave a stale warning "on" if it did.
+                _activeWarning = WarningReason.None;
+                SetActiveIfNotNull(_warningMovingImage, false);
+                SetActiveIfNotNull(_warningDistanceImage, false);
             }
             SetActiveIfNotNull(_warningPopupGroup, false);
 
             if (!HasRevealedContent)
             {
                 // Shown once camera access is actually live, until content
-                // has ACTUALLY spawned. Also the state a Rescan (if wired
-                // up elsewhere - see Rescan()'s own doc comment) returns to.
+                // has ACTUALLY spawned.
                 bool cameraReady = _zapparCamera != null && _zapparCamera.CameraSourceInitialized;
                 SetActiveIfNotNull(_page0Group, cameraReady);
 
@@ -446,16 +474,20 @@ namespace ARReveal
             else if (_screen == UiScreen.None && Time.time - _handoffStartTime >= Page2DelaySeconds)
                 _screen = UiScreen.CallToAction;
 
-            SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
-            SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt);
-            // Page4_Share and the preview share the exact same trigger -
+            // Mutually exclusive - only ever one page on screen at a time.
+            // Page4_Share (and the preview) share the exact same trigger -
             // both turn on together the instant RetakePhoto captures
             // something (see ShowPhotoPreview), and both turn off together
-            // via ClearPreviewState (Teilen/DiscardPreview). Page3_Foto
-            // stays active underneath the whole time - per direct request
-            // ("we turn on Page4_Share"), it's an addition, not a
-            // replacement, so RecordButton is still reachable to retake
-            // directly too.
+            // via ClearPreviewState (Teilen/DiscardPreview). Page3_Foto is
+            // explicitly turned OFF while that's showing (per direct
+            // report, "Page4 is still showing page3 behind it" - an
+            // earlier version left Page3_Foto active underneath so
+            // RecordButton stayed reachable to retake directly, but that's
+            // not the wanted look) - retaking now goes through Page4's own
+            // RetakeButton (DiscardPreview), which re-reveals Page3_Foto by
+            // clearing _hasCapturedPreview.
+            SetActiveIfNotNull(_page2Group, _screen == UiScreen.CallToAction);
+            SetActiveIfNotNull(_page3Group, _screen == UiScreen.SharePrompt && !_hasCapturedPreview);
             SetActiveIfNotNull(_page4Group, _hasCapturedPreview);
             SetActiveIfNotNull(_photoPreviewGroup, _hasCapturedPreview);
         }
@@ -860,7 +892,7 @@ namespace ARReveal
         {
             var group = new GameObject("Page0_Calibration");
             group.transform.SetParent(parent, false);
-            AddImage(group.transform, CalibrateSprite, Vector2.zero, new Vector2(1080f, 1920f)).gameObject.name = "Calibrate";
+            AddPageBackground(group);
             return group;
         }
 
@@ -869,7 +901,7 @@ namespace ARReveal
         {
             var group = new GameObject("Page1_Ready");
             group.transform.SetParent(parent, false);
-            AddImage(group.transform, Page1ReadySprite, Vector2.zero, new Vector2(1080f, 1920f));
+            AddPageBackground(group);
             _page1ReadyCanvasGroup = EnsureCanvasGroup(group);
             return group;
         }
@@ -889,11 +921,8 @@ namespace ARReveal
             var group = new GameObject("Page2_CallToAction");
             group.transform.SetParent(parent, false);
 
-            AddImage(group.transform, Page2TextTopSprite, new Vector2(0f, 520f), new Vector2(700f, 130f));
-            AddImage(group.transform, LogoSprite, new Vector2(0f, 330f), new Vector2(800f, 225f));
-            AddImage(group.transform, Page2TextBottomSprite, new Vector2(0f, 150f), new Vector2(700f, 130f));
-
-            BuildImageButton(group.transform, "ShareWin", ShareWinButtonSprite,
+            AddPageBackground(group);
+            BuildTransparentButton(group.transform, "ShareWin",
                 new Vector2(0f, -600f), new Vector2(320f, 140f), Foto);
 
             return group;
@@ -905,13 +934,8 @@ namespace ARReveal
             var group = new GameObject("Page3_Foto");
             group.transform.SetParent(parent, false);
 
-            // Uses RecordButtonSprite (RecButton.png) if assigned; falls back
-            // to a plain generated red circle otherwise so this never breaks
-            // if that field is left blank. Tapping it captures (can be
-            // tapped more than once to retake - see RetakePhoto's own doc
-            // comment).
-            var recordSprite = RecordButtonSprite != null ? RecordButtonSprite : CreateCircleSprite(new Color(0.85f, 0.1f, 0.1f, 1f), 128);
-            BuildImageButton(group.transform, "RecordButton", recordSprite,
+            AddPageBackground(group);
+            BuildTransparentButton(group.transform, "RecordButton",
                 new Vector2(0f, -700f), new Vector2(140f, 140f), RetakePhoto);
 
             return group;
@@ -923,37 +947,53 @@ namespace ARReveal
             var group = new GameObject("Page4_Share");
             group.transform.SetParent(parent, false);
 
-            BuildImageButton(group.transform, "RetakeButton", RetakeButtonSprite,
+            AddPageBackground(group);
+            BuildTransparentButton(group.transform, "RetakeButton",
                 new Vector2(-150f, -700f), new Vector2(280f, 140f), DiscardPreview);
-            BuildImageButton(group.transform, "TeilenButton", TeilenButtonSprite,
+            BuildTransparentButton(group.transform, "TeilenButton",
                 new Vector2(150f, -700f), new Vector2(280f, 140f), Teilen);
 
             return group;
         }
 
-        private static Image AddImage(Transform parent, Sprite sprite, Vector2 anchoredPos, Vector2 size)
+        /// <summary>
+        /// Full-screen, fully transparent placeholder Image added directly
+        /// on a page group (not a separate child) - matches how the
+        /// hand-tuned Share.prefab itself carries each page's real
+        /// background art directly on the page GameObject (e.g.
+        /// Page2_CallToAction's own Image component). This procedural
+        /// fallback has no real design art to load anymore (see this
+        /// class's own top doc comment - no more per-element Sprite
+        /// fields), so it just gives the page the right GameObject/
+        /// RectTransform shape; drag real art onto it by hand afterward.
+        /// </summary>
+        private static void AddPageBackground(GameObject group)
         {
-            var go = new GameObject("Image");
-            go.transform.SetParent(parent, false);
-            var image = go.AddComponent<Image>();
-            image.sprite = sprite;
-            image.preserveAspect = true;
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = anchoredPos;
-            return image;
+            var rt = group.AddComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            group.AddComponent<Image>().color = Color.clear;
         }
 
-        private static Button BuildImageButton(Transform parent, string name, Sprite sprite, Vector2 anchoredPos, Vector2 size, UnityEngine.Events.UnityAction onClick)
+        /// <summary>
+        /// A plain transparent hit-target - per direct request, real
+        /// buttons no longer render their own sprite art at all ("all
+        /// button do not use sprites anymore, we use transparent button on
+        /// top of the design"); the visible button is whatever the page's
+        /// own background art already shows underneath. The Image exists
+        /// only so Button/raycast hit-testing has something to test against
+        /// - alpha 0, Transition.None so there's no tint flash on tap over
+        /// art this component knows nothing about. Matches the hand-tuned
+        /// Share.prefab's own buttons exactly.
+        /// </summary>
+        private static Button BuildTransparentButton(Transform parent, string name, Vector2 anchoredPos, Vector2 size, UnityEngine.Events.UnityAction onClick)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var image = go.AddComponent<Image>();
-            image.sprite = sprite;
-            image.preserveAspect = true;
+            image.color = new Color(1f, 1f, 1f, 0f);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -963,28 +1003,9 @@ namespace ARReveal
 
             var button = go.AddComponent<Button>();
             button.targetGraphic = image;
+            button.transition = Selectable.Transition.None;
             button.onClick.AddListener(onClick);
             return button;
-        }
-
-        /// <summary>Generates a plain filled circle sprite at runtime - see BuildPage3's own doc comment for why (no dedicated asset was provided for this button).</summary>
-        private static Sprite CreateCircleSprite(Color color, int diameter)
-        {
-            var tex = new Texture2D(diameter, diameter, TextureFormat.RGBA32, false);
-            Vector2 center = new Vector2((diameter - 1) / 2f, (diameter - 1) / 2f);
-            float radius = diameter / 2f;
-            var pixels = new Color[diameter * diameter];
-            for (int y = 0; y < diameter; y++)
-            {
-                for (int x = 0; x < diameter; x++)
-                {
-                    float dist = Vector2.Distance(new Vector2(x, y), center);
-                    pixels[y * diameter + x] = dist <= radius ? color : new Color(0f, 0f, 0f, 0f);
-                }
-            }
-            tex.SetPixels(pixels);
-            tex.Apply();
-            return Sprite.Create(tex, new Rect(0f, 0f, diameter, diameter), new Vector2(0.5f, 0.5f), 100f);
         }
 
         /// <summary>
@@ -1004,27 +1025,6 @@ namespace ARReveal
             _handoffStartTime = Time.time;
             SetActiveIfNotNull(_page2Group, false);
             SetActiveIfNotNull(_page3Group, false);
-        }
-
-        /// <summary>
-        /// A genuine full recalibration - forwards to
-        /// Handoff.RequestRescan()/DirectTrackingReveal.RequestRescan(),
-        /// which hides the content again and forces HasContentSpawned/
-        /// HasRevealed back to false. That alone is enough: the moment
-        /// HasRevealedContent reads false again, Update()'s own existing
-        /// "!HasRevealedContent" branch takes over on its own and puts the
-        /// calibration screen straight back up, resets
-        /// _screen/_handoffStartTime/_contentSpawnedAt, and hides
-        /// Page1-4 - exactly the same state the very first launch starts
-        /// in, with no separate reset logic needed here. Not currently
-        /// wired to any button (the Rescan button was removed per direct
-        /// request along with the rest of the old Page1_Experience) - left
-        /// in place in case a rescan trigger is wanted back somewhere.
-        /// </summary>
-        public void Rescan()
-        {
-            if (Handoff != null) Handoff.RequestRescan();
-            else if (DirectTrackingReveal != null) DirectTrackingReveal.RequestRescan();
         }
 
         /// <summary>

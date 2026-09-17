@@ -22,8 +22,6 @@ namespace ARRevealEditor
     /// </summary>
     public static class BuildShareUIInScene
     {
-        private const string ImagesFolder = "Assets/Images/UI/";
-
         [MenuItem("ARReveal/UI/Build Share UI In Scene")]
         public static void Build()
         {
@@ -37,22 +35,16 @@ namespace ARRevealEditor
 
             Undo.RegisterFullObjectHierarchyUndo(controller.gameObject, "Build Share UI");
 
-            // Page3TextSprite/RestartButtonSprite/FotoButtonSprite no longer
-            // exist on ARShareController - the UI flow they belonged to
-            // (Page3_SharePrompt's own text image, Page2's Restart+Foto
-            // button pair) was restructured away (see git history around
-            // "Restructure UI flow"). CalibrateSprite/Page1ReadySprite/
-            // ShareWinButtonSprite/RetakeButtonSprite are the new fields
-            // that replaced them, but their real asset filenames aren't
-            // known here yet - left unassigned rather than guessing wrong
-            // and silently loading an unrelated image; drag them onto
-            // ARShareController by hand once the real art exists.
-            AssignIfMissing(ref controller.LogoSprite, "Logo.png");
-            AssignIfMissing(ref controller.Page2TextTopSprite, "Page_02_Text_Top.png");
-            AssignIfMissing(ref controller.Page2TextBottomSprite, "Page_02_Text_Bottom.png");
-            AssignIfMissing(ref controller.TeilenButtonSprite, "Use_Button_Page_03.png");
-            AssignIfMissing(ref controller.RecordButtonSprite, "RecButton.png");
-
+            // ARShareController no longer has any per-element Sprite fields
+            // to auto-assign here - per direct request, no button renders
+            // its own sprite art anymore ("all button do not use sprites
+            // anymore, we use transparent button on top of the design").
+            // Every page's real look is one background image hand-placed
+            // directly on the page's own Image component in the saved
+            // prefab; EditorRebuildUI()/BuildPage0-4 just lay out the
+            // correctly-named, correctly-sized placeholder GameObjects for
+            // that art (and the transparent button hit-targets) to be
+            // hand-tuned afterward.
             controller.EditorRebuildUI();
 
             Selection.activeGameObject = controller.gameObject;
@@ -64,14 +56,6 @@ namespace ARRevealEditor
                 controller.gameObject.name + "' GameObject from the Hierarchy into a Project folder " +
                 "(e.g. Assets/Prefabs/) to save it as a prefab - it's already wired up and sitting in " +
                 "the scene, so nothing else needs to be done for it to work.");
-        }
-
-        private static void AssignIfMissing(ref Sprite field, string fileName)
-        {
-            if (field != null) return;
-            field = AssetDatabase.LoadAssetAtPath<Sprite>(ImagesFolder + fileName);
-            if (field == null)
-                Debug.LogWarning("[BuildShareUIInScene] Could not auto-find sprite at " + ImagesFolder + fileName + " - drag it into the matching field on ARShareController by hand.");
         }
     }
 }

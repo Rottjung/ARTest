@@ -132,8 +132,29 @@
             <div class="spinner"></div>
         </div>
     </div>
-    <script type="text/javascript" src="https://libs.zappar.com/zappar-cv/2.1.9/zappar-cv.js"></script>
-    <script>
+    <!--
+        The zappar-cv.js load and the whole AR bootstrap below are both
+        marked type="text/plain" so the browser parses but does NOT
+        execute them automatically - the compatibility-check script at the
+        bottom of the page activates them (by cloning each into a real
+        <script> and reinserting it, a standard technique for gating
+        script execution) only once it's confirmed this browser/device can
+        actually run Universal AR, per direct request ("add a compatibility
+        check at the beginning... if its incompatible we need to launch a
+        youtube link in full screen instead"). This also means an
+        incompatible device never starts downloading the Unity build
+        itself (tens of MB) at all - not just an aesthetic fallback.
+
+        IMPORTANT: this file lives under Packages/com.zappar.uar/WebGLTemplates,
+        NOT (only) Assets/WebGLTemplates - PackageImportSettings.cs's
+        [InitializeOnLoad] hook (RefreshPackage) unconditionally overwrites
+        Assets/WebGLTemplates from THIS copy on every single script
+        recompile. Edit this file, not the Assets/ copy, or the next
+        recompile silently wipes your changes back to pristine (this bit us
+        once already - see git history around "compatible test").
+    -->
+    <script type="text/plain" id="zappar-cv-script" src="https://libs.zappar.com/zappar-cv/2.1.9/zappar-cv.js"></script>
+    <script type="text/plain" id="ar-bootstrap-script">
         var db = indexedDB.open("dummy_indexdb", 1); // iOS 14.6 fix; the call to open indexdb hangs forever otherwise
 
         const buildUrl = "Build";
@@ -161,10 +182,10 @@
         #if USE_DATA_CACHING
             cacheControl: function (url) {
             // typically includes: .data, .bundle, .zpt
-            ZAPPAR_WEBGL_CACHING   
+            ZAPPAR_WEBGL_CACHING
             if (url.match(/\.mp4/) || url.match(/\.custom/) || url.match(/\.zbin/)) {
                 return "immutable";
-            }   
+            }
             // Disable explicit caching for all other files.
             // Note: the default browser cache may cache them anyway.
             return "no-store";
@@ -181,7 +202,7 @@
 
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
             container.className = "unity-mobile";
-            //config.matchWebGLToCanvasSize = false;    
+            //config.matchWebGLToCanvasSize = false;
             //set devicePixelRatio=1; to avoid draining fillrate performance on mobile and override low DPI mode
             config.devicePixelRatio = window.devicePixelRatio;
         }
@@ -220,6 +241,157 @@
             });
         }
 
+    </script>
+    <script>
+        // ============================================================
+        // PASTE THE FALLBACK YOUTUBE URL HERE ONCE YOU HAVE IT.
+        // Any normal YouTube link works (youtube.com/watch?v=..., youtu.be/...,
+        // or an /embed/ link) - shown full-screen instead of the AR
+        // experience whenever Zappar's own compatibility check below says
+        // this browser/device can't run Universal AR at all. Leave blank
+        // to keep the old behaviour (always attempt the AR experience,
+        // regardless of what the compatibility check says).
+        var FALLBACK_YOUTUBE_URL = "https://www.youtube.com/watch?v=iNrIUANm50s";
+        // ============================================================
+
+        (async function () {
+            var compatible = true;
+
+            // TESTING HOOK: visit the page with ?simulateIncompatible
+            // anywhere in the URL (e.g. .../?simulateIncompatible) to force
+            // the "incompatible" path on any device/browser, without
+            // needing to actually find one Zappar rejects - lets you test
+            // the YouTube fallback on the real deployed (GitHub Pages)
+            // site. Skips the real check entirely when present.
+            var forceIncompatible = new URLSearchParams(window.location.search).has("simulateIncompatible");
+
+            if (forceIncompatible) {
+                console.warn("[compat] ?simulateIncompatible is in the URL - forcing the incompatible-browser fallback for testing.");
+                compatible = false;
+            } else {
+                try {
+                    // browserIncompatible()/browserIncompatibleUI() are real
+                    // Zappar functions, but they live in the separate
+                    // @zappar/zappar JS package (npm), NOT in zappar-cv.js
+                    // above (confirmed by reading zappar-cv.js directly - it's
+                    // just a WASM CV engine with no compatibility check of its
+                    // own). Loaded here as an ES module via jsdelivr's +esm
+                    // endpoint so it works from a plain script tag with no
+                    // bundler - see https://docs.zap.works/universal-ar/javascript/getting-started/compatibility/
+                    var zapparJs = await import("https://cdn.jsdelivr.net/npm/@zappar/zappar@4.4.0/+esm");
+                    compatible = !zapparJs.browserIncompatible();
+                } catch (e) {
+                    // If the compatibility check itself can't load (offline
+                    // CDN, ad-blocker, etc.), fail OPEN - attempt the normal AR
+                    // experience rather than stranding an actually-compatible
+                    // user because of an unrelated network hiccup.
+                    console.warn("[compat] Could not run Zappar's compatibility check - continuing normally.", e);
+                }
+            }
+
+            if (!compatible && FALLBACK_YOUTUBE_URL) {
+                showYouTubeFallback(FALLBACK_YOUTUBE_URL);
+                return; // never activate the AR bootstrap scripts below
+            }
+
+            // Compatible (or the check itself failed, or no fallback video
+            // is set yet) - activate the two inert scripts above in the
+            // same order they'd have run in originally. A script tag
+            // parsed with a non-JS type never executes on its own; giving
+            // a NEW script element the same content/src and inserting it
+            // does - the standard way to gate script execution behind an
+            // async check without touching either script's own contents.
+            await activateScript("zappar-cv-script");
+            await activateScript("ar-bootstrap-script");
+        })();
+
+        function activateScript(id) {
+            return new Promise(function (resolve, reject) {
+                var original = document.getElementById(id);
+                var clone = document.createElement("script");
+                for (var i = 0; i < original.attributes.length; i++) {
+                    var attr = original.attributes[i];
+                    if (attr.name !== "type" && attr.name !== "id") clone.setAttribute(attr.name, attr.value);
+                }
+                clone.text = original.text;
+                if (clone.src) {
+                    clone.onload = function () { resolve(); };
+                    clone.onerror = reject;
+                    original.replaceWith(clone);
+                } else {
+                    original.replaceWith(clone); // inline scripts execute synchronously on insertion
+                    resolve();
+                }
+            });
+        }
+
+        function showYouTubeFallback(url) {
+            var match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+            var videoId = match ? match[1] : null;
+            var container = document.querySelector("#unity-container");
+            if (container) container.style.display = "none";
+            if (!videoId) {
+                console.error("[compat] FALLBACK_YOUTUBE_URL isn't a recognizable YouTube link - showing nothing.");
+                return;
+            }
+
+            // Per direct request ("not mute the video by default... force
+            // full screen") - neither can actually be done automatically on
+            // page load, on ANY browser: unmuted autoplay and
+            // requestFullscreen() both require a real user gesture (a
+            // synchronous click/tap handler), which nothing has happened
+            // yet this early. A one-tap prompt IS that gesture, so both
+            // unlock the instant it's tapped. Note fullscreen itself still
+            // won't happen on iOS Safari specifically even after the tap -
+            // confirmed directly (WebKit bug 212934/Apple dev forum thread
+            // 133248): iOS Safari has no requestFullscreen() support for
+            // iframes/divs at all, only for a bare <video> element, so an
+            // iPhone will still just play the video unmuted, filling the
+            // viewport via CSS below - not a code bug, a platform limit.
+            var prompt = document.createElement("div");
+            prompt.style.position = "fixed";
+            prompt.style.top = "0";
+            prompt.style.left = "0";
+            prompt.style.width = "100%";
+            prompt.style.height = "100%";
+            prompt.style.display = "flex";
+            prompt.style.alignItems = "center";
+            prompt.style.justifyContent = "center";
+            prompt.style.background = "#000";
+            prompt.style.color = "#fff";
+            prompt.style.font = "600 6vw/1.4 sans-serif";
+            prompt.style.textAlign = "center";
+            prompt.style.cursor = "pointer";
+            prompt.textContent = "Tap to watch";
+
+            prompt.addEventListener("click", function onTap() {
+                prompt.removeEventListener("click", onTap);
+
+                var iframe = document.createElement("iframe");
+                iframe.src = "https://www.youtube.com/embed/" + videoId + "?autoplay=1&playsinline=1&controls=1";
+                iframe.style.position = "fixed";
+                iframe.style.top = "0";
+                iframe.style.left = "0";
+                iframe.style.width = "100%";
+                iframe.style.height = "100%";
+                iframe.style.border = "0";
+                iframe.setAttribute("allow", "autoplay; fullscreen; encrypted-media");
+                iframe.allowFullscreen = true;
+                prompt.replaceWith(iframe);
+
+                var request = iframe.requestFullscreen || iframe.webkitRequestFullscreen;
+                if (request) {
+                    var result = request.call(iframe);
+                    if (result && result.catch) {
+                        result.catch(function (e) {
+                            console.warn("[compat] Fullscreen request was denied/unsupported - video still plays unmuted, full-viewport.", e);
+                        });
+                    }
+                }
+            });
+
+            document.body.appendChild(prompt);
+        }
     </script>
 </body>
 

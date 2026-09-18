@@ -585,7 +585,7 @@ MonoBehaviour:
   Exposure: 0
   Contrast: 1.025
   Brightness: 0
-  Saturation: 0.75
+  Saturation: 1
   Tint: {r: 1, g: 1, b: 1, a: 1}
 --- !u!20 &468690112
 Camera:

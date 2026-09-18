@@ -7,12 +7,16 @@ namespace Zappar
     public abstract class ZapparBaseCameraBackground : MonoBehaviour, ICameraListener
     {
         [Header("Camera feed color grading")]
+        [Tooltip("Multiplicative, in stops (camera-style) - 0 = no change, +1 = twice as bright, -1 = half as bright. Applied before Brightness/Contrast in CameraBackgroundShader.")]
+        public float Exposure = 0f;
         [Tooltip("Pivoted around mid-gray in CameraBackgroundShader - 1 = no change (the original ungraded look), higher = more contrast, lower = flatter.")]
         public float Contrast = 1f;
         [Tooltip("Added directly to each color channel in CameraBackgroundShader - 0 = no change.")]
         public float Brightness = 0f;
         [Tooltip("1 = no change, 0 = fully grayscale, above 1 = more saturated than the raw camera feed.")]
         public float Saturation = 1f;
+        [Tooltip("Multiplied directly onto the graded color in CameraBackgroundShader (applied last, like a white-balance cast) - white = no change.")]
+        public Color Tint = Color.white;
 
         private Material m_cameraMaterial = null;
 
@@ -121,13 +125,15 @@ namespace Zappar
 
             m_cameraMaterial.SetMatrix("_nativeTextureMatrix", m_textureMatrix);
 
-            // Applied every frame (not just once) so tweaking Contrast/
-            // Brightness/Saturation in the Inspector - even mid-Play Mode -
-            // takes effect immediately, same as any other live-tunable
-            // value on this component. Negligible cost either way.
+            // Applied every frame (not just once) so tweaking any of these
+            // in the Inspector - even mid-Play Mode - takes effect
+            // immediately, same as any other live-tunable value on this
+            // component. Negligible cost either way.
+            m_cameraMaterial.SetFloat("_Exposure", Exposure);
             m_cameraMaterial.SetFloat("_Contrast", Contrast);
             m_cameraMaterial.SetFloat("_Brightness", Brightness);
             m_cameraMaterial.SetFloat("_Saturation", Saturation);
+            m_cameraMaterial.SetColor("_Tint", Tint);
 
             m_camTexture = Z.PipelineCameraFrameTexture(m_pipeline);
 

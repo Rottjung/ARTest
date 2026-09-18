@@ -11,9 +11,11 @@ Shader "Zappar/CameraBackgroundShader"
         // camera, no texture copy. Defaults (1, 0, 1) are all no-ops, so
         // leaving these untouched reproduces the original ungraded look
         // exactly.
+        _Exposure ("Exposure (stops)", Range(-3, 3)) = 0
         _Contrast ("Contrast", Range(0, 3)) = 1
         _Brightness ("Brightness", Range(-1, 1)) = 0
         _Saturation ("Saturation", Range(0, 3)) = 1
+        _Tint ("Tint", Color) = (1, 1, 1, 1)
     }
     SubShader
     {
@@ -44,9 +46,11 @@ Shader "Zappar/CameraBackgroundShader"
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float4x4 _nativeTextureMatrix;
+            float _Exposure;
             float _Contrast;
             float _Brightness;
             float _Saturation;
+            fixed4 _Tint;
 
             v2f vert (appdata v)
             {
@@ -62,13 +66,18 @@ Shader "Zappar/CameraBackgroundShader"
             {
                 fixed4 col = tex2D(_MainTex, i.uv);
 
-                // Brightness (additive) -> contrast (pivoted around mid-gray)
-                // -> saturation (lerp toward the pixel's own luminance) -
+                // Exposure (multiplicative, in stops - camera-style, applied
+                // first as if it happened at capture) -> brightness
+                // (additive) -> contrast (pivoted around mid-gray) ->
+                // saturation (lerp toward the pixel's own luminance) -> tint
+                // (color multiply, applied last like a white-balance cast) -
                 // standard order, each one a no-op at its default value.
+                col.rgb *= exp2(_Exposure);
                 col.rgb += _Brightness;
                 col.rgb = (col.rgb - 0.5) * _Contrast + 0.5;
                 float luminance = dot(col.rgb, float3(0.299, 0.587, 0.114));
                 col.rgb = lerp(luminance.xxx, col.rgb, _Saturation);
+                col.rgb *= _Tint.rgb;
 
                 col.rgb = saturate(col.rgb);
                 return col;

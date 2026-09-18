@@ -582,9 +582,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf107aa5ece594fe1aa6c80028ab66ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparCameraBackground
-  Contrast: 10
+  Exposure: 1
+  Contrast: 1.025
   Brightness: 0
-  Saturation: -1
+  Saturation: 0.75
+  Tint: {r: 1, g: 1, b: 1, a: 1}
 --- !u!20 &468690112
 Camera:
   m_ObjectHideFlags: 0
@@ -1300,55 +1302,6 @@ Transform:
   m_LocalRotation: {x: 0.60725087, y: -0.14460836, z: -0.69395053, w: -0.35884187}
   m_LocalPosition: {x: 37.45645, y: 20.449814, z: 1.120861}
   m_LocalScale: {x: 2, y: 2, z: 2}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1227214585
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1227214587}
-  - component: {fileID: 1227214586}
-  m_Layer: 0
-  m_Name: Global Volume
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1227214586
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1227214585}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Core.Runtime::UnityEngine.Rendering.Volume
-  m_IsGlobal: 1
-  priority: 0
-  blendDistance: 0
-  weight: 1
-  sharedProfile: {fileID: 11400000, guid: c6ace32e6f922ee458662424d04e8522, type: 2}
---- !u!4 &1227214587
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1227214585}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 540, y: 80, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -2425,4 +2378,3 @@ SceneRoots:
   - {fileID: 1191017942}
   - {fileID: 1752049319}
   - {fileID: 404304986}
-  - {fileID: 1227214587}

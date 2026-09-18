@@ -582,6 +582,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf107aa5ece594fe1aa6c80028ab66ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparCameraBackground
+  Contrast: 10
+  Brightness: 0
+  Saturation: -1
 --- !u!20 &468690112
 Camera:
   m_ObjectHideFlags: 0
@@ -772,7 +775,6 @@ GameObject:
   - component: {fileID: 523330461}
   - component: {fileID: 523330460}
   - component: {fileID: 523330459}
-  - component: {fileID: 523330463}
   - component: {fileID: 523330464}
   m_Layer: 0
   m_Name: Zappar Camera
@@ -909,19 +911,6 @@ Transform:
   - {fileID: 468690109}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &523330463
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 523330458}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3c2eb0cc433255d43a08205add911dac, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ARReveal.ZapparMotionFeed
-  Enabled: 0
 --- !u!81 &523330464
 AudioListener:
   m_ObjectHideFlags: 0

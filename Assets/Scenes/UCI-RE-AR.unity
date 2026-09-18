@@ -582,7 +582,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf107aa5ece594fe1aa6c80028ab66ac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Zappar.UAR::Zappar.ZapparCameraBackground
-  Exposure: 1
+  Exposure: 0
   Contrast: 1.025
   Brightness: 0
   Saturation: 0.75

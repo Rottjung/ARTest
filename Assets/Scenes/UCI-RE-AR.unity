@@ -127,6 +127,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1675093268}
     m_Modifications:
+    - target: {fileID: 5668026365491967860, guid: f86655861603f6249b2db8e04d98c084, type: 3}
+      propertyPath: AttackTarget
+      value: 
+      objectReference: {fileID: 1501273713}
+    - target: {fileID: 5668026365491967860, guid: f86655861603f6249b2db8e04d98c084, type: 3}
+      propertyPath: UseAttackTarget
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5668026365491967860, guid: f86655861603f6249b2db8e04d98c084, type: 3}
+      propertyPath: AttackTargetChance
+      value: 0.45
+      objectReference: {fileID: 0}
     - target: {fileID: 6926876035622983290, guid: f86655861603f6249b2db8e04d98c084, type: 3}
       propertyPath: m_Name
       value: T5
@@ -326,6 +338,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 163.577
       objectReference: {fileID: 0}
+    - target: {fileID: 6678980608398353394, guid: 920a8779a2a1854428e6cf3692f9cbbf, type: 3}
+      propertyPath: AttackTarget
+      value: 
+      objectReference: {fileID: 173990622}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1431,7 +1447,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1501273713}
   m_Layer: 0
-  m_Name: T2target
+  m_Name: T5target
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1446,7 +1462,7 @@ Transform:
   m_GameObject: {fileID: 1501273712}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 11.6, y: 24.5, z: 17.2}
+  m_LocalPosition: {x: -10.1, y: 13.5, z: 35.9}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2002,6 +2018,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1675093268}
     m_Modifications:
+    - target: {fileID: 1026682107753571604, guid: 74991ada9d7839842a7447fff233b23b, type: 3}
+      propertyPath: AttackTarget
+      value: 
+      objectReference: {fileID: 1191017942}
     - target: {fileID: 5850972472780246784, guid: 74991ada9d7839842a7447fff233b23b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 24.62
@@ -2086,6 +2106,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1675093268}
     m_Modifications:
+    - target: {fileID: 2062311694726607590, guid: 3736cdee72d2b794ba847028f6653cfb, type: 3}
+      propertyPath: AttackTarget
+      value: 
+      objectReference: {fileID: 777038241}
     - target: {fileID: 3887601277816753859, guid: 3736cdee72d2b794ba847028f6653cfb, type: 3}
       propertyPath: m_LocalPosition.x
       value: 38.71
